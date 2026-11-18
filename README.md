@@ -101,6 +101,9 @@ The development follows an Agile methodology adapted for a solo developer, organ
 | Sprint 4 | AI anomaly detection and additional features      |
 | Sprint 5 | Testing, security hardening and release           |
 
+Daily progress, sprint reviews and design decisions are recorded in the
+[development log](docs/dev-log/README.md).
+
 ## Security and Privacy
 
 UniVault is designed with privacy and security as core principles.

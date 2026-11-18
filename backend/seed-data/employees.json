@@ -1,0 +1,904 @@
+{
+  "_synthetic": true,
+  "generator": "scripts/generate-synthetic-data.mjs",
+  "seed": 2026,
+  "as_of": "2026-11-20",
+  "schema_version": "1.0",
+  "notice": "Fictional test data for the UniVault prototype. Not real people or organisations.",
+  "count": 50,
+  "records": [
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0001",
+      "person_id": "P0001",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00001",
+        "full_name": "Lahiru Silva",
+        "designation": "Logistics Coordinator",
+        "department": "Operations",
+        "employment_type": "contract",
+        "date_of_joining": "2019-07-03",
+        "nic_number": "199935300063",
+        "work_location": "Galle Branch",
+        "work_phone": "+94110001844"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0002",
+      "person_id": "P0002",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00002",
+        "full_name": "Keerthana Janani Navaratnam",
+        "designation": "Forklift Operator",
+        "department": "Warehouse",
+        "employment_type": "contract",
+        "date_of_joining": "2023-05-11",
+        "nic_number": "846886839V",
+        "work_location": "Warehouse",
+        "work_email": "keerthana.navaratnam2@lanka-agro-tools.example",
+        "work_phone": "+94110009119"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0003",
+      "person_id": "P0003",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00003",
+        "full_name": "Malith Wijesinghe",
+        "designation": "HR Executive",
+        "department": "Human Resources",
+        "employment_type": "permanent",
+        "date_of_joining": "2013-12-07",
+        "nic_number": "197834501968",
+        "work_location": "Kandy Branch",
+        "work_email": "malith.wijesinghe3@serendib-trading.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0004",
+      "person_id": "P0004",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00004",
+        "full_name": "Chamara Wijesinghe",
+        "designation": "Storekeeper",
+        "department": "Warehouse",
+        "employment_type": "permanent",
+        "date_of_joining": "2014-08-29",
+        "nic_number": "197433904529",
+        "work_location": "Main Showroom",
+        "work_email": "chamara.wijesinghe4@lanka-agro-tools.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0005",
+      "person_id": "P0005",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00005",
+        "full_name": "Hafsa Mohamed",
+        "designation": "IT Support Officer",
+        "department": "Information Technology",
+        "employment_type": "contract",
+        "date_of_joining": "2025-10-13",
+        "work_location": "Head Office – Colombo",
+        "work_email": "hafsa.mohamed5@serendib-trading.example",
+        "work_phone": "+94110002607"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0006",
+      "person_id": "P0006",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00006",
+        "full_name": "Piumi Dissanayake",
+        "designation": "Field Technician",
+        "department": "Field Services",
+        "employment_type": "permanent",
+        "date_of_joining": "2022-01-01",
+        "nic_number": "698491662V",
+        "work_location": "Warehouse",
+        "work_email": "piumi.dissanayake6@lanka-agro-tools.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0007",
+      "person_id": "P0007",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00007",
+        "full_name": "Nusra Shafna Cassim",
+        "designation": "Accounts Assistant",
+        "department": "Finance",
+        "employment_type": "probationary",
+        "date_of_joining": "2026-07-18",
+        "nic_number": "197754201918",
+        "work_location": "Kandy Branch",
+        "work_email": "nusra.cassim7@serendib-trading.example",
+        "work_phone": "+94110003766"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0008",
+      "person_id": "P0008",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00008",
+        "full_name": "Thilini Gunawardena",
+        "designation": "Showroom Manager",
+        "department": "Sales",
+        "employment_type": "permanent",
+        "date_of_joining": "2025-05-25",
+        "nic_number": "200283504671",
+        "work_location": "Field Operations",
+        "work_email": "thilini.gunawardena8@lanka-agro-tools.example",
+        "work_phone": "+94110006534"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0009",
+      "person_id": "P0009",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00009",
+        "full_name": "Isuru Ruwan Herath",
+        "designation": "HR Assistant",
+        "department": "Human Resources",
+        "employment_type": "contract",
+        "date_of_joining": "2018-08-01",
+        "nic_number": "721108987V",
+        "work_location": "Kandy Branch",
+        "work_phone": "+94110004323"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0010",
+      "person_id": "P0010",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00010",
+        "full_name": "Rashmi Sachini Wijesinghe",
+        "designation": "Accounts Clerk",
+        "department": "Accounts",
+        "employment_type": "permanent",
+        "date_of_joining": "2010-12-16",
+        "nic_number": "718431103V",
+        "work_location": "Warehouse",
+        "work_email": "rashmi.wijesinghe10@lanka-agro-tools.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0011",
+      "person_id": "P0011",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00011",
+        "full_name": "Ishara Piumi Jayasinghe",
+        "designation": "Operations Executive",
+        "department": "Operations",
+        "employment_type": "permanent",
+        "date_of_joining": "2020-11-29",
+        "nic_number": "197364407863",
+        "work_location": "Kurunegala Branch",
+        "work_email": "ishara.jayasinghe11@serendib-trading.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0012",
+      "person_id": "P0012",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00012",
+        "full_name": "Nimesha Sanduni Wijesinghe",
+        "designation": "Machinery Mechanic",
+        "department": "Field Services",
+        "employment_type": "permanent",
+        "date_of_joining": "2020-03-21",
+        "nic_number": "836238095V",
+        "work_location": "Main Showroom",
+        "work_email": "nimesha.wijesinghe12@lanka-agro-tools.example",
+        "work_phone": "+94110001235"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0013",
+      "person_id": "P0013",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00013",
+        "full_name": "Dilini Thilini Herath",
+        "designation": "Customer Service Officer",
+        "department": "Customer Service",
+        "employment_type": "contract",
+        "date_of_joining": "2020-09-04",
+        "nic_number": "200171601687",
+        "work_email": "dilini.herath13@serendib-trading.example",
+        "work_phone": "+94110000530"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0014",
+      "person_id": "P0014",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00014",
+        "full_name": "Thilini Wijesinghe",
+        "designation": "Accounts Clerk",
+        "department": "Accounts",
+        "employment_type": "contract",
+        "date_of_joining": "2023-02-18",
+        "nic_number": "200373608990",
+        "work_location": "Main Showroom",
+        "work_email": "thilini.wijesinghe14@lanka-agro-tools.example",
+        "work_phone": "+94110009610"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0015",
+      "person_id": "P0015",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00015",
+        "full_name": "Shafna Rifka Cassim",
+        "designation": "Logistics Coordinator",
+        "department": "Operations",
+        "employment_type": "permanent",
+        "date_of_joining": "2017-03-17",
+        "nic_number": "199174108834",
+        "work_location": "Head Office – Colombo"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0016",
+      "person_id": "P0016",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00016",
+        "full_name": "Ishara Bandara",
+        "designation": "Sales Executive",
+        "department": "Sales",
+        "employment_type": "permanent",
+        "date_of_joining": "2014-04-27",
+        "nic_number": "938500661V",
+        "work_email": "ishara.bandara16@lanka-agro-tools.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0017",
+      "person_id": "P0017",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00017",
+        "full_name": "Mathumitha Kavitha Rajendran",
+        "designation": "Software Engineer",
+        "department": "Information Technology",
+        "employment_type": "permanent",
+        "date_of_joining": "2010-06-02",
+        "nic_number": "745499255V",
+        "work_location": "Head Office – Colombo",
+        "work_email": "mathumitha.rajendran17@serendib-trading.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0018",
+      "person_id": "P0018",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00018",
+        "full_name": "Prakash Gajan Yogarajah",
+        "designation": "Cashier",
+        "department": "Accounts",
+        "employment_type": "contract",
+        "date_of_joining": "2011-12-31",
+        "nic_number": "751028364V",
+        "work_location": "Field Operations"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0019",
+      "person_id": "P0019",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00019",
+        "full_name": "Tharindu Senanayake",
+        "designation": "Finance Executive",
+        "department": "Finance",
+        "employment_type": "permanent",
+        "date_of_joining": "2023-03-16",
+        "work_email": "tharindu.senanayake19@serendib-trading.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0020",
+      "person_id": "P0020",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00020",
+        "full_name": "Nuwan Ruwan Senanayake",
+        "designation": "Cashier",
+        "department": "Accounts",
+        "employment_type": "permanent",
+        "date_of_joining": "2026-05-02",
+        "nic_number": "200524300301",
+        "work_location": "Field Operations"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0021",
+      "person_id": "P0021",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00021",
+        "full_name": "Shafna Marikar",
+        "designation": "Call Centre Agent",
+        "department": "Customer Service",
+        "employment_type": "probationary",
+        "date_of_joining": "2026-07-19",
+        "work_location": "Kandy Branch",
+        "work_email": "shafna.marikar21@serendib-trading.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0022",
+      "person_id": "P0022",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00022",
+        "full_name": "Kasun Silva",
+        "designation": "Accounts Clerk",
+        "department": "Accounts",
+        "employment_type": "contract",
+        "date_of_joining": "2021-08-20",
+        "nic_number": "200110707337",
+        "work_location": "Warehouse",
+        "work_email": "kasun.silva22@lanka-agro-tools.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0023",
+      "person_id": "P0023",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00023",
+        "full_name": "Ayesha Rahuman",
+        "designation": "Logistics Coordinator",
+        "department": "Operations",
+        "employment_type": "permanent",
+        "date_of_joining": "2019-11-26",
+        "nic_number": "798271443V",
+        "work_location": "Galle Branch",
+        "work_email": "ayesha.rahuman23@serendib-trading.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0024",
+      "person_id": "P0024",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00024",
+        "full_name": "Piumi Ishara Fernando",
+        "designation": "Sales Assistant",
+        "department": "Sales",
+        "employment_type": "contract",
+        "date_of_joining": "2018-01-27",
+        "nic_number": "197670909041",
+        "work_location": "Field Operations",
+        "work_email": "piumi.fernando24@lanka-agro-tools.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0025",
+      "person_id": "P0025",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00025",
+        "full_name": "Sanduni Kavindi Dissanayake",
+        "designation": "Branch Supervisor",
+        "department": "Operations",
+        "employment_type": "permanent",
+        "date_of_joining": "2014-09-20",
+        "nic_number": "199578906479",
+        "work_location": "Head Office – Colombo",
+        "work_phone": "+94110008334"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0026",
+      "person_id": "P0026",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00026",
+        "full_name": "Nadeesha Thilini Bandara",
+        "designation": "Sales Assistant",
+        "department": "Sales",
+        "employment_type": "permanent",
+        "date_of_joining": "2023-09-06",
+        "nic_number": "197952205648",
+        "work_location": "Main Showroom",
+        "work_email": "nadeesha.bandara26@lanka-agro-tools.example",
+        "work_phone": "+94110002159"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0027",
+      "person_id": "P0027",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00027",
+        "full_name": "Keerthana Rajendran",
+        "designation": "Customer Service Officer",
+        "department": "Customer Service",
+        "employment_type": "permanent",
+        "date_of_joining": "2021-02-18",
+        "work_location": "Kandy Branch",
+        "work_email": "keerthana.rajendran27@serendib-trading.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0028",
+      "person_id": "P0028",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00028",
+        "full_name": "Sanduni Fernando",
+        "designation": "Field Technician",
+        "department": "Field Services",
+        "employment_type": "probationary",
+        "date_of_joining": "2026-06-01",
+        "nic_number": "200585100434",
+        "work_location": "Main Showroom",
+        "work_email": "sanduni.fernando28@lanka-agro-tools.example",
+        "work_phone": "+94110006774"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0029",
+      "person_id": "P0029",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00029",
+        "full_name": "Rashmi Chamodi Silva",
+        "designation": "Senior Accountant",
+        "department": "Finance",
+        "employment_type": "permanent",
+        "date_of_joining": "2024-12-29",
+        "nic_number": "200557001342",
+        "work_location": "Galle Branch",
+        "work_email": "rashmi.silva29@serendib-trading.example",
+        "work_phone": "+94110006170"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0030",
+      "person_id": "P0030",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00030",
+        "full_name": "Chamara Dinuka Dissanayake",
+        "designation": "Showroom Manager",
+        "department": "Sales",
+        "employment_type": "permanent",
+        "date_of_joining": "2011-09-27",
+        "nic_number": "710299106V",
+        "work_email": "chamara.dissanayake30@lanka-agro-tools.example",
+        "work_phone": "+94110009441"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0031",
+      "person_id": "P0031",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00031",
+        "full_name": "Arun Thevarajah",
+        "designation": "Operations Executive",
+        "department": "Operations",
+        "employment_type": "permanent",
+        "date_of_joining": "2025-07-03",
+        "nic_number": "200634605653",
+        "work_email": "arun.thevarajah31@serendib-trading.example",
+        "work_phone": "+94110006379"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0032",
+      "person_id": "P0032",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00032",
+        "full_name": "Chathura Dissanayake",
+        "designation": "Sales Executive",
+        "department": "Sales",
+        "employment_type": "permanent",
+        "date_of_joining": "2025-11-08",
+        "nic_number": "200528805339",
+        "work_email": "chathura.dissanayake32@lanka-agro-tools.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0033",
+      "person_id": "P0033",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00033",
+        "full_name": "Dilini Thilini Rathnayake",
+        "designation": "Systems Administrator",
+        "department": "Information Technology",
+        "employment_type": "permanent",
+        "date_of_joining": "2022-07-03",
+        "work_location": "Kandy Branch",
+        "work_email": "dilini.rathnayake33@serendib-trading.example",
+        "work_phone": "+94110004652"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0034",
+      "person_id": "P0034",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00034",
+        "full_name": "Rashmi Sachini Herath",
+        "designation": "Field Technician",
+        "department": "Field Services",
+        "employment_type": "permanent",
+        "date_of_joining": "2013-06-15",
+        "nic_number": "745130373V",
+        "work_location": "Warehouse",
+        "work_email": "rashmi.herath34@lanka-agro-tools.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0035",
+      "person_id": "P0035",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00035",
+        "full_name": "Sachini Nadeesha Wijesinghe",
+        "designation": "Software Engineer",
+        "department": "Information Technology",
+        "employment_type": "contract",
+        "date_of_joining": "2015-12-15",
+        "nic_number": "838088998V",
+        "work_location": "Kandy Branch",
+        "work_email": "sachini.wijesinghe35@serendib-trading.example",
+        "work_phone": "+94110007914"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0036",
+      "person_id": "P0036",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00036",
+        "full_name": "Niroshan Kanagaratnam",
+        "designation": "Cashier",
+        "department": "Accounts",
+        "employment_type": "permanent",
+        "date_of_joining": "2018-09-24",
+        "nic_number": "880047801V",
+        "work_location": "Main Showroom"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0037",
+      "person_id": "P0037",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00037",
+        "full_name": "Piumi Fernando",
+        "designation": "Software Engineer",
+        "department": "Information Technology",
+        "employment_type": "contract",
+        "date_of_joining": "2023-07-05",
+        "work_location": "Kurunegala Branch",
+        "work_email": "piumi.fernando37@serendib-trading.example",
+        "work_phone": "+94110006322"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0038",
+      "person_id": "P0038",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00038",
+        "full_name": "Chamodi Sachini Wickramaratne",
+        "designation": "Cashier",
+        "department": "Accounts",
+        "employment_type": "contract",
+        "date_of_joining": "2019-02-21",
+        "nic_number": "765269434V",
+        "work_location": "Field Operations",
+        "work_email": "chamodi.wickramaratne38@lanka-agro-tools.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0039",
+      "person_id": "P0039",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00039",
+        "full_name": "Karthik Paramanathan",
+        "designation": "Customer Service Officer",
+        "department": "Customer Service",
+        "employment_type": "permanent",
+        "date_of_joining": "2014-09-21",
+        "nic_number": "912146580V",
+        "work_location": "Kandy Branch",
+        "work_email": "karthik.paramanathan39@serendib-trading.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0040",
+      "person_id": "P0040",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00040",
+        "full_name": "Sahan Lahiru Gunawardena",
+        "designation": "Accounts Clerk",
+        "department": "Accounts",
+        "employment_type": "permanent",
+        "date_of_joining": "2015-02-09",
+        "work_email": "sahan.gunawardena40@lanka-agro-tools.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0041",
+      "person_id": "P0041",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00041",
+        "full_name": "Nusra Hameed",
+        "designation": "Finance Executive",
+        "department": "Finance",
+        "employment_type": "permanent",
+        "date_of_joining": "2021-02-04",
+        "nic_number": "957645753V",
+        "work_location": "Head Office – Colombo",
+        "work_email": "nusra.hameed41@serendib-trading.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0042",
+      "person_id": "P0042",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00042",
+        "full_name": "Thilini Chamodi Silva",
+        "designation": "Sales Assistant",
+        "department": "Sales",
+        "employment_type": "permanent",
+        "date_of_joining": "2021-03-31",
+        "nic_number": "199486001544",
+        "work_location": "Main Showroom"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0043",
+      "person_id": "P0043",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00043",
+        "full_name": "Piumi Sachini Senanayake",
+        "designation": "Systems Administrator",
+        "department": "Information Technology",
+        "employment_type": "permanent",
+        "date_of_joining": "2018-04-11",
+        "nic_number": "977309591V",
+        "work_location": "Galle Branch",
+        "work_email": "piumi.senanayake43@serendib-trading.example"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0044",
+      "person_id": "P0044",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00044",
+        "full_name": "Dinuka Silva",
+        "designation": "Storekeeper",
+        "department": "Warehouse",
+        "employment_type": "contract",
+        "date_of_joining": "2021-10-16",
+        "nic_number": "200113209832",
+        "work_location": "Field Operations"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0045",
+      "person_id": "P0045",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00045",
+        "full_name": "Sanduni Piumi Dissanayake",
+        "designation": "Software Engineer",
+        "department": "Information Technology",
+        "employment_type": "contract",
+        "date_of_joining": "2023-12-28",
+        "work_location": "Galle Branch",
+        "work_email": "sanduni.dissanayake45@serendib-trading.example",
+        "work_phone": "+94110009143"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0046",
+      "person_id": "P0046",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00046",
+        "full_name": "Sanduni Wijesinghe",
+        "designation": "Accounts Clerk",
+        "department": "Accounts",
+        "employment_type": "permanent",
+        "date_of_joining": "2018-01-03",
+        "nic_number": "777171379V",
+        "work_location": "Main Showroom",
+        "work_email": "sanduni.wijesinghe46@lanka-agro-tools.example",
+        "work_phone": "+94110000171"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0047",
+      "person_id": "P0047",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00047",
+        "full_name": "Shafna Ayesha Marikar",
+        "designation": "Customer Service Officer",
+        "department": "Customer Service",
+        "employment_type": "permanent",
+        "date_of_joining": "2018-08-07",
+        "nic_number": "200070901000",
+        "work_email": "shafna.marikar47@serendib-trading.example",
+        "work_phone": "+94110000016"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0048",
+      "person_id": "P0048",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00048",
+        "full_name": "Keerthana Mathumitha Navaratnam",
+        "designation": "Cashier",
+        "department": "Accounts",
+        "employment_type": "permanent",
+        "date_of_joining": "2021-03-04",
+        "nic_number": "197771405618",
+        "work_location": "Field Operations",
+        "work_phone": "+94110005073"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0049",
+      "person_id": "P0049",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00049",
+        "full_name": "Nuwan Pasindu Jayasinghe",
+        "designation": "Branch Supervisor",
+        "department": "Operations",
+        "employment_type": "permanent",
+        "date_of_joining": "2023-04-28",
+        "nic_number": "199828103552"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0050",
+      "person_id": "P0050",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00050",
+        "full_name": "Nirosha Janani Yogarajah",
+        "designation": "Warehouse Assistant",
+        "department": "Warehouse",
+        "employment_type": "contract",
+        "date_of_joining": "2015-12-22",
+        "work_location": "Main Showroom",
+        "work_email": "nirosha.yogarajah50@lanka-agro-tools.example"
+      }
+    }
+  ]
+}

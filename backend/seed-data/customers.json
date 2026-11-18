@@ -1,0 +1,1557 @@
+{
+  "_synthetic": true,
+  "generator": "scripts/generate-synthetic-data.mjs",
+  "seed": 2026,
+  "as_of": "2026-11-20",
+  "schema_version": "1.0",
+  "notice": "Fictional test data for the UniVault prototype. Not real people or organisations.",
+  "count": 50,
+  "records": [
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0001",
+      "person_id": "P0001",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-04-25",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Lahiru Silva",
+        "id_document_type": "nic",
+        "id_document_number": "199935300063",
+        "date_of_birth": "1999-12-18",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 142/2, Station Road",
+          "city": "Matale",
+          "district": "Matale",
+          "postal_code": "21000",
+          "country": "LK"
+        },
+        "mobile_number": "+94710001349",
+        "email": "lahiru.silva1@example.com",
+        "occupation": "Employee",
+        "employer_name": "Serendib Trading Company (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0002",
+      "person_id": "P0002",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-04-06",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Keerthana Janani Navaratnam",
+        "id_document_type": "nic",
+        "id_document_number": "846886839V",
+        "date_of_birth": "1984-07-06",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 242, Park Avenue",
+          "city": "Matale",
+          "district": "Matale",
+          "postal_code": "21000",
+          "country": "LK"
+        },
+        "mobile_number": "+94700003773",
+        "residential_address": {
+          "line1": "No. 120, School Lane",
+          "city": "Trincomalee",
+          "district": "Trincomalee",
+          "postal_code": "31000",
+          "country": "LK"
+        },
+        "residence_proof_type": "fixed_line_telephone_bill",
+        "email": "keerthana.navaratnam2@example.com",
+        "occupation": "Employee",
+        "employer_name": "Lanka Agro Tools Enterprises (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0003",
+      "person_id": "P0003",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-01-08",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Malith Wijesinghe",
+        "id_document_type": "nic",
+        "id_document_number": "197834501968",
+        "date_of_birth": "1978-12-10",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 145, Galle Road",
+          "city": "Hambantota",
+          "district": "Hambantota",
+          "postal_code": "82000",
+          "country": "LK"
+        },
+        "mobile_number": "+94750004577",
+        "residential_address": {
+          "line1": "No. 33, Hospital Road",
+          "city": "Trincomalee",
+          "district": "Trincomalee",
+          "postal_code": "31000",
+          "country": "LK"
+        },
+        "residence_proof_type": "fixed_line_telephone_bill",
+        "email": "malith.wijesinghe3@example.com",
+        "occupation": "Employee",
+        "employer_name": "Serendib Trading Company (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0004",
+      "person_id": "P0004",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-03-26",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Chamara Wijesinghe",
+        "id_document_type": "nic",
+        "id_document_number": "197433904529",
+        "date_of_birth": "1974-12-04",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 150, Temple Road",
+          "city": "Negombo",
+          "district": "Gampaha",
+          "postal_code": "11500",
+          "country": "LK"
+        },
+        "mobile_number": "+94700009682",
+        "email": "chamara.wijesinghe4@example.com",
+        "occupation": "Employee",
+        "employer_name": "Lanka Agro Tools Enterprises (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0005",
+      "person_id": "P0005",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-03-20",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Hafsa Mohamed",
+        "id_document_type": "nic",
+        "id_document_number": "200562004028",
+        "date_of_birth": "2005-04-29",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 249, Lake Road",
+          "city": "Matara",
+          "district": "Matara",
+          "postal_code": "81000",
+          "country": "LK"
+        },
+        "mobile_number": "+94780005104",
+        "occupation": "Employee",
+        "employer_name": "Serendib Trading Company (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0006",
+      "person_id": "P0006",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-04-13",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Piumi Dissanayake",
+        "id_document_type": "driving_licence",
+        "id_document_number": "B1248808",
+        "date_of_birth": "1969-12-14",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 100, Old Kandy Road",
+          "city": "Kurunegala",
+          "district": "Kurunegala",
+          "postal_code": "60000",
+          "country": "LK"
+        },
+        "mobile_number": "+94720001930",
+        "id_document_expiry": "2034-02-16",
+        "residential_address": {
+          "line1": "No. 203, Galle Road",
+          "city": "Matara",
+          "district": "Matara",
+          "postal_code": "81000",
+          "country": "LK"
+        },
+        "residence_proof_type": "electricity_bill",
+        "email": "piumi.dissanayake6@example.com",
+        "occupation": "Employee",
+        "employer_name": "Lanka Agro Tools Enterprises (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0007",
+      "person_id": "P0007",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-03-10",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Nusra Shafna Cassim",
+        "id_document_type": "passport",
+        "id_document_number": "N8810814",
+        "date_of_birth": "1977-02-11",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 22/1, Park Avenue",
+          "city": "Nugegoda",
+          "district": "Colombo",
+          "postal_code": "10250",
+          "country": "LK"
+        },
+        "mobile_number": "+94700001139",
+        "id_document_expiry": "2034-05-02",
+        "residential_address": {
+          "line1": "No. 51, Temple Road",
+          "city": "Ratnapura",
+          "district": "Ratnapura",
+          "postal_code": "70000",
+          "country": "LK"
+        },
+        "residence_proof_type": "electricity_bill",
+        "occupation": "Employee",
+        "employer_name": "Serendib Trading Company (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0008",
+      "person_id": "P0008",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2023-12-12",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Thilini Gunawardena",
+        "id_document_type": "nic",
+        "id_document_number": "200283504671",
+        "date_of_birth": "2002-11-30",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 87/5, Hospital Road",
+          "city": "Hambantota",
+          "district": "Hambantota",
+          "postal_code": "82000",
+          "country": "LK"
+        },
+        "mobile_number": "+94730004411",
+        "email": "thilini.gunawardena8@example.com",
+        "occupation": "Employee",
+        "employer_name": "Lanka Agro Tools Enterprises (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0009",
+      "person_id": "P0009",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-04-21",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Isuru Ruwan Herath",
+        "id_document_type": "nic",
+        "id_document_number": "721108987V",
+        "date_of_birth": "1972-04-19",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 241, Hospital Road",
+          "city": "Kalutara",
+          "district": "Kalutara",
+          "postal_code": "12000",
+          "country": "LK"
+        },
+        "mobile_number": "+94720003953",
+        "residential_address": {
+          "line1": "No. 154, Station Road",
+          "city": "Nuwara Eliya",
+          "district": "Nuwara Eliya",
+          "postal_code": "22200",
+          "country": "LK"
+        },
+        "residence_proof_type": "water_bill",
+        "email": "isuru.herath9@example.com",
+        "occupation": "Employee",
+        "employer_name": "Serendib Trading Company (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0010",
+      "person_id": "P0010",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-05-14",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Rashmi Sachini Wijesinghe",
+        "id_document_type": "nic",
+        "id_document_number": "718431103V",
+        "date_of_birth": "1971-12-08",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 95/4, School Lane",
+          "city": "Nuwara Eliya",
+          "district": "Nuwara Eliya",
+          "postal_code": "22200",
+          "country": "LK"
+        },
+        "mobile_number": "+94760004050",
+        "email": "rashmi.wijesinghe10@example.com",
+        "occupation": "Employee",
+        "employer_name": "Lanka Agro Tools Enterprises (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0011",
+      "person_id": "P0051",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-06-01",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-08-21"
+      },
+      "claims": {
+        "full_name": "Lahiru Chathura Wickramaratne",
+        "id_document_type": "nic",
+        "id_document_number": "201023407334",
+        "date_of_birth": "2010-08-21",
+        "age_over_18": false,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 15, Lake Road",
+          "city": "Polonnaruwa",
+          "district": "Polonnaruwa",
+          "postal_code": "51000",
+          "country": "LK"
+        },
+        "mobile_number": "+94710004254",
+        "email": "lahiru.wickramaratne11@example.com",
+        "occupation": "Student"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0012",
+      "person_id": "P0052",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-05-21",
+      "issuance_hints": {
+        "suggested_valid_until": "2027-10-12"
+      },
+      "claims": {
+        "full_name": "Nuwan Herath",
+        "id_document_type": "nic",
+        "id_document_number": "200928602077",
+        "date_of_birth": "2009-10-12",
+        "age_over_18": false,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 20, Station Road",
+          "city": "Badulla",
+          "district": "Badulla",
+          "postal_code": "90000",
+          "country": "LK"
+        },
+        "mobile_number": "+94710009117",
+        "residential_address": {
+          "line1": "No. 98, Hill Street",
+          "city": "Hambantota",
+          "district": "Hambantota",
+          "postal_code": "82000",
+          "country": "LK"
+        },
+        "residence_proof_type": "electricity_bill",
+        "email": "nuwan.herath12@example.com",
+        "occupation": "Student"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0013",
+      "person_id": "P0053",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-01-28",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Shalini Priya Thevarajah",
+        "id_document_type": "driving_licence",
+        "id_document_number": "B7362501",
+        "date_of_birth": "1993-02-14",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 149, Church Road",
+          "city": "Gampaha",
+          "district": "Gampaha",
+          "postal_code": "11000",
+          "country": "LK"
+        },
+        "mobile_number": "+94770003911",
+        "id_document_expiry": "2032-07-08",
+        "email": "shalini.thevarajah13@example.com",
+        "occupation": "Electrician",
+        "public_position": "Divisional Secretariat Officer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0014",
+      "person_id": "P0054",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-09-21",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Chamodi Jayasinghe",
+        "id_document_type": "nic",
+        "id_document_number": "199683108821",
+        "date_of_birth": "1996-11-26",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 62, Old Kandy Road",
+          "city": "Galle",
+          "district": "Galle",
+          "postal_code": "80000",
+          "country": "LK"
+        },
+        "mobile_number": "+94720008230",
+        "occupation": "Accountant"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0015",
+      "person_id": "P0055",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-09-28",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Pasindu Fernando",
+        "id_document_type": "passport",
+        "id_document_number": "N9777118",
+        "date_of_birth": "1974-10-08",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 209/4, Hill Street",
+          "city": "Kalutara",
+          "district": "Kalutara",
+          "postal_code": "12000",
+          "country": "LK"
+        },
+        "mobile_number": "+94760006524",
+        "id_document_expiry": "2033-01-25",
+        "email": "pasindu.fernando15@example.com"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0016",
+      "person_id": "P0056",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-09-03",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Dilini Dissanayake",
+        "id_document_type": "nic",
+        "id_document_number": "197273801120",
+        "date_of_birth": "1972-08-25",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 200, Hill Street",
+          "city": "Polonnaruwa",
+          "district": "Polonnaruwa",
+          "postal_code": "51000",
+          "country": "LK"
+        },
+        "mobile_number": "+94760002792",
+        "email": "dilini.dissanayake16@example.com",
+        "occupation": "Tailor"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0017",
+      "person_id": "P0057",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2023-12-14",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Sahan Chamara Senanayake",
+        "id_document_type": "nic",
+        "id_document_number": "200132900234",
+        "date_of_birth": "2001-11-24",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 241, Flower Road",
+          "city": "Kurunegala",
+          "district": "Kurunegala",
+          "postal_code": "60000",
+          "country": "LK"
+        },
+        "mobile_number": "+94740002938",
+        "email": "sahan.senanayake17@example.com",
+        "occupation": "Civil Engineer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0018",
+      "person_id": "P0058",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-05-25",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Ishara Nadeesha Bandara",
+        "id_document_type": "passport",
+        "id_document_number": "N7260608",
+        "date_of_birth": "1988-06-06",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 113, Station Road",
+          "city": "Ratnapura",
+          "district": "Ratnapura",
+          "postal_code": "70000",
+          "country": "LK"
+        },
+        "mobile_number": "+94750008499",
+        "id_document_expiry": "2034-11-24",
+        "occupation": "Software Engineer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0019",
+      "person_id": "P0059",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-06-16",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Imran Nazeer Cassim",
+        "id_document_type": "nic",
+        "id_document_number": "199024601382",
+        "date_of_birth": "1990-09-02",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 72, Hill Street",
+          "city": "Puttalam",
+          "district": "Puttalam",
+          "postal_code": "61300",
+          "country": "LK"
+        },
+        "mobile_number": "+94740000796",
+        "occupation": "Civil Engineer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0020",
+      "person_id": "P0060",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-01-21",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Keerthana Selvaraj",
+        "id_document_type": "nic",
+        "id_document_number": "795469837V",
+        "date_of_birth": "1979-02-15",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 181/1, School Lane",
+          "city": "Kurunegala",
+          "district": "Kurunegala",
+          "postal_code": "60000",
+          "country": "LK"
+        },
+        "mobile_number": "+94740003066",
+        "occupation": "Shop Owner"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0021",
+      "person_id": "P0061",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-11-24",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Hafsa Fathima Mohamed",
+        "id_document_type": "nic",
+        "id_document_number": "847871386V",
+        "date_of_birth": "1984-10-13",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 84/4, Galle Road",
+          "city": "Puttalam",
+          "district": "Puttalam",
+          "postal_code": "61300",
+          "country": "LK"
+        },
+        "mobile_number": "+94700003958",
+        "residential_address": {
+          "line1": "No. 216, Flower Road",
+          "city": "Jaffna",
+          "district": "Jaffna",
+          "postal_code": "40000",
+          "country": "LK"
+        },
+        "residence_proof_type": "fixed_line_telephone_bill",
+        "email": "hafsa.mohamed21@example.com",
+        "occupation": "Software Engineer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0022",
+      "person_id": "P0062",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-01-07",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Tharshika Thevarajah",
+        "id_document_type": "passport",
+        "id_document_number": "N3021698",
+        "date_of_birth": "1973-12-20",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 1/2, Lake Road",
+          "city": "Kandy",
+          "district": "Kandy",
+          "postal_code": "20000",
+          "country": "LK"
+        },
+        "mobile_number": "+94730003184",
+        "id_document_expiry": "2029-03-27",
+        "email": "tharshika.thevarajah22@example.com",
+        "occupation": "Accountant"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0023",
+      "person_id": "P0063",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-09-08",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Chamodi Gunawardena",
+        "id_document_type": "nic",
+        "id_document_number": "200262403665",
+        "date_of_birth": "2002-05-03",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 91, Hill Street",
+          "city": "Kandy",
+          "district": "Kandy",
+          "postal_code": "20000",
+          "country": "LK"
+        },
+        "mobile_number": "+94730003905",
+        "email": "chamodi.gunawardena23@example.com",
+        "occupation": "Graphic Designer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0024",
+      "person_id": "P0064",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2023-12-31",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Rifka Cassim",
+        "id_document_type": "nic",
+        "id_document_number": "777333209V",
+        "date_of_birth": "1977-08-20",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 222/4, Hospital Road",
+          "city": "Nuwara Eliya",
+          "district": "Nuwara Eliya",
+          "postal_code": "22200",
+          "country": "LK"
+        },
+        "mobile_number": "+94780001504",
+        "residential_address": {
+          "line1": "No. 108, Temple Road",
+          "city": "Nugegoda",
+          "district": "Colombo",
+          "postal_code": "10250",
+          "country": "LK"
+        },
+        "residence_proof_type": "fixed_line_telephone_bill",
+        "email": "rifka.cassim24@example.com",
+        "occupation": "Student"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0025",
+      "person_id": "P0065",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-06-19",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Nuwan Bandara",
+        "id_document_type": "nic",
+        "id_document_number": "731146574V",
+        "date_of_birth": "1973-04-23",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 67/6, Old Kandy Road",
+          "city": "Polonnaruwa",
+          "district": "Polonnaruwa",
+          "postal_code": "51000",
+          "country": "LK"
+        },
+        "mobile_number": "+94720000811",
+        "email": "nuwan.bandara25@example.com"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0026",
+      "person_id": "P0066",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-12-17",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Sanduni Rathnayake",
+        "id_document_type": "driving_licence",
+        "id_document_number": "B5597081",
+        "date_of_birth": "2006-11-12",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 105, Galle Road",
+          "city": "Puttalam",
+          "district": "Puttalam",
+          "postal_code": "61300",
+          "country": "LK"
+        },
+        "mobile_number": "+94740007386",
+        "id_document_expiry": "2032-06-15",
+        "email": "sanduni.rathnayake26@example.com",
+        "occupation": "Tailor"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0027",
+      "person_id": "P0067",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-05-01",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Kavindi Sachini Silva",
+        "id_document_type": "passport",
+        "id_document_number": "N9833724",
+        "date_of_birth": "1970-01-02",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 195/8, Old Kandy Road",
+          "city": "Colombo 03",
+          "district": "Colombo",
+          "postal_code": "00300",
+          "country": "LK"
+        },
+        "mobile_number": "+94760000487",
+        "id_document_expiry": "2029-09-16",
+        "residential_address": {
+          "line1": "No. 62, Main Street",
+          "city": "Nuwara Eliya",
+          "district": "Nuwara Eliya",
+          "postal_code": "22200",
+          "country": "LK"
+        },
+        "residence_proof_type": "water_bill",
+        "email": "kavindi.silva27@example.com",
+        "occupation": "Farmer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0028",
+      "person_id": "P0068",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-11-16",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Dilini Dissanayake",
+        "id_document_type": "nic",
+        "id_document_number": "715718468V",
+        "date_of_birth": "1971-03-11",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 98, Hill Street",
+          "city": "Negombo",
+          "district": "Gampaha",
+          "postal_code": "11500",
+          "country": "LK"
+        },
+        "mobile_number": "+94730001384",
+        "occupation": "Nurse"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0029",
+      "person_id": "P0069",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-05-21",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Priya Kavitha Thevarajah",
+        "id_document_type": "nic",
+        "id_document_number": "199851201741",
+        "date_of_birth": "1998-01-12",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 60, Hospital Road",
+          "city": "Matale",
+          "district": "Matale",
+          "postal_code": "21000",
+          "country": "LK"
+        },
+        "mobile_number": "+94720001583",
+        "occupation": "Graphic Designer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0030",
+      "person_id": "P0070",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-06-07",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Kavindi Senanayake",
+        "id_document_type": "nic",
+        "id_document_number": "200661404533",
+        "date_of_birth": "2006-04-23",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 24, Hill Street",
+          "city": "Jaffna",
+          "district": "Jaffna",
+          "postal_code": "40000",
+          "country": "LK"
+        },
+        "mobile_number": "+94750007774",
+        "occupation": "Student"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0031",
+      "person_id": "P0071",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-10-07",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Kasun Tharindu Silva",
+        "id_document_type": "nic",
+        "id_document_number": "199236002981",
+        "date_of_birth": "1992-12-25",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 199, Hill Street",
+          "city": "Kandy",
+          "district": "Kandy",
+          "postal_code": "20000",
+          "country": "LK"
+        },
+        "mobile_number": "+94700006106",
+        "email": "kasun.silva31@example.com",
+        "occupation": "Software Engineer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0032",
+      "person_id": "P0072",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-05-18",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Dilini Thilini Wijesinghe",
+        "id_document_type": "nic",
+        "id_document_number": "705939651V",
+        "date_of_birth": "1970-04-02",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 60/1, Main Street",
+          "city": "Galle",
+          "district": "Galle",
+          "postal_code": "80000",
+          "country": "LK"
+        },
+        "mobile_number": "+94750004123",
+        "occupation": "Driver"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0033",
+      "person_id": "P0073",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-01-29",
+      "issuance_hints": {
+        "suggested_valid_until": "2027-11-22"
+      },
+      "claims": {
+        "full_name": "Pasindu Wickramaratne",
+        "id_document_type": "driving_licence",
+        "id_document_number": "B5656953",
+        "date_of_birth": "1974-06-19",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 99, Church Road",
+          "city": "Kalutara",
+          "district": "Kalutara",
+          "postal_code": "12000",
+          "country": "LK"
+        },
+        "mobile_number": "+94780000498",
+        "id_document_expiry": "2027-11-22",
+        "occupation": "Farmer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0034",
+      "person_id": "P0074",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-10-19",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Kavitha Janani Yogarajah",
+        "id_document_type": "nic",
+        "id_document_number": "200779107351",
+        "date_of_birth": "2007-10-17",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 89/2, Church Road",
+          "city": "Puttalam",
+          "district": "Puttalam",
+          "postal_code": "61300",
+          "country": "LK"
+        },
+        "mobile_number": "+94700003777",
+        "email": "kavitha.yogarajah34@example.com",
+        "occupation": "Tailor"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0035",
+      "person_id": "P0075",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-11-22",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Chamara Bandara",
+        "id_document_type": "nic",
+        "id_document_number": "872444625V",
+        "date_of_birth": "1987-08-31",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 89/2, Station Road",
+          "city": "Colombo 03",
+          "district": "Colombo",
+          "postal_code": "00300",
+          "country": "LK"
+        },
+        "mobile_number": "+94760007756",
+        "email": "chamara.bandara35@example.com",
+        "occupation": "Sales Representative"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0036",
+      "person_id": "P0076",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-06-08",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Nimesha Perera",
+        "id_document_type": "passport",
+        "id_document_number": "N0285735",
+        "date_of_birth": "1998-03-02",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 197, Old Kandy Road",
+          "city": "Kegalle",
+          "district": "Kegalle",
+          "postal_code": "71000",
+          "country": "LK"
+        },
+        "mobile_number": "+94760000893",
+        "id_document_expiry": "2033-04-01",
+        "email": "nimesha.perera36@example.com"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0037",
+      "person_id": "P0077",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-03-10",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Nazeer Fazil Rahuman",
+        "id_document_type": "nic",
+        "id_document_number": "770217979V",
+        "date_of_birth": "1977-01-21",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 197, Hill Street",
+          "city": "Colombo 03",
+          "district": "Colombo",
+          "postal_code": "00300",
+          "country": "LK"
+        },
+        "mobile_number": "+94720007799"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0038",
+      "person_id": "P0078",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-08-16",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Sanduni Nadeesha Bandara",
+        "id_document_type": "passport",
+        "id_document_number": "N1471792",
+        "date_of_birth": "2003-11-08",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 178/9, Lake Road",
+          "city": "Kegalle",
+          "district": "Kegalle",
+          "postal_code": "71000",
+          "country": "LK"
+        },
+        "mobile_number": "+94770008911",
+        "id_document_expiry": "2035-07-01",
+        "occupation": "Accountant"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0039",
+      "person_id": "P0079",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-07-28",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Gajan Sivakumar",
+        "id_document_type": "nic",
+        "id_document_number": "198433601904",
+        "date_of_birth": "1984-12-01",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 58, Station Road",
+          "city": "Ratnapura",
+          "district": "Ratnapura",
+          "postal_code": "70000",
+          "country": "LK"
+        },
+        "mobile_number": "+94720008704",
+        "residential_address": {
+          "line1": "No. 141, Galle Road",
+          "city": "Ratnapura",
+          "district": "Ratnapura",
+          "postal_code": "70000",
+          "country": "LK"
+        },
+        "residence_proof_type": "water_bill",
+        "occupation": "Accountant"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0040",
+      "person_id": "P0080",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-04-11",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Kavitha Priya Thevarajah",
+        "id_document_type": "passport",
+        "id_document_number": "N6705991",
+        "date_of_birth": "1975-12-14",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 42/6, Hill Street",
+          "city": "Matara",
+          "district": "Matara",
+          "postal_code": "81000",
+          "country": "LK"
+        },
+        "mobile_number": "+94770002596",
+        "id_document_expiry": "2034-11-10",
+        "email": "kavitha.thevarajah40@example.com",
+        "occupation": "Software Engineer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0041",
+      "person_id": "P0081",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-12-20",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Thilini Piumi Jayasinghe",
+        "id_document_type": "nic",
+        "id_document_number": "200171506151",
+        "date_of_birth": "2001-08-02",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 62, Hill Street",
+          "city": "Kandy",
+          "district": "Kandy",
+          "postal_code": "20000",
+          "country": "LK"
+        },
+        "mobile_number": "+94760001575",
+        "occupation": "Electrician"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0042",
+      "person_id": "P0082",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-11-18",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Ishara Sachini Dissanayake",
+        "id_document_type": "driving_licence",
+        "id_document_number": "B9229397",
+        "date_of_birth": "1996-01-03",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 172/8, Flower Road",
+          "city": "Nugegoda",
+          "district": "Colombo",
+          "postal_code": "10250",
+          "country": "LK"
+        },
+        "mobile_number": "+94770005732",
+        "id_document_expiry": "2031-05-25",
+        "email": "ishara.dissanayake42@example.com",
+        "occupation": "Driver"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0043",
+      "person_id": "P0083",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2025-07-15",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Nuwan Chathura Gunawardena",
+        "id_document_type": "driving_licence",
+        "id_document_number": "B7784729",
+        "date_of_birth": "1996-08-08",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 19, School Lane",
+          "city": "Kegalle",
+          "district": "Kegalle",
+          "postal_code": "71000",
+          "country": "LK"
+        },
+        "mobile_number": "+94770002545",
+        "id_document_expiry": "2030-12-26",
+        "occupation": "Graphic Designer"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0044",
+      "person_id": "P0084",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-10-16",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Priya Paramanathan",
+        "id_document_type": "nic",
+        "id_document_number": "838433927V",
+        "date_of_birth": "1983-12-08",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 9, Church Road",
+          "city": "Colombo 03",
+          "district": "Colombo",
+          "postal_code": "00300",
+          "country": "LK"
+        },
+        "mobile_number": "+94740008654",
+        "residential_address": {
+          "line1": "No. 5, Hospital Road",
+          "city": "Trincomalee",
+          "district": "Trincomalee",
+          "postal_code": "31000",
+          "country": "LK"
+        },
+        "residence_proof_type": "electricity_bill",
+        "email": "priya.paramanathan44@example.com"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0045",
+      "person_id": "P0085",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-10-26",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Sahan Herath",
+        "id_document_type": "nic",
+        "id_document_number": "199809505397",
+        "date_of_birth": "1998-04-04",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 80, Hospital Road",
+          "city": "Matara",
+          "district": "Matara",
+          "postal_code": "81000",
+          "country": "LK"
+        },
+        "mobile_number": "+94720009484",
+        "residential_address": {
+          "line1": "No. 144, Old Kandy Road",
+          "city": "Jaffna",
+          "district": "Jaffna",
+          "postal_code": "40000",
+          "country": "LK"
+        },
+        "residence_proof_type": "fixed_line_telephone_bill",
+        "occupation": "Accountant"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0046",
+      "person_id": "P0086",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-02-14",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Isuru Rathnayake",
+        "id_document_type": "nic",
+        "id_document_number": "710206383V",
+        "date_of_birth": "1971-01-20",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 224, Hill Street",
+          "city": "Matale",
+          "district": "Matale",
+          "postal_code": "21000",
+          "country": "LK"
+        },
+        "mobile_number": "+94760005049",
+        "email": "isuru.rathnayake46@example.com",
+        "occupation": "Student"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0047",
+      "person_id": "P0087",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-06-30",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Chamodi Silva",
+        "id_document_type": "nic",
+        "id_document_number": "197254403192",
+        "date_of_birth": "1972-02-13",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 156, School Lane",
+          "city": "Gampaha",
+          "district": "Gampaha",
+          "postal_code": "11000",
+          "country": "LK"
+        },
+        "mobile_number": "+94760003071",
+        "occupation": "Sales Representative"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0048",
+      "person_id": "P0088",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-04-26",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Dilini Silva",
+        "id_document_type": "nic",
+        "id_document_number": "765236419V",
+        "date_of_birth": "1976-01-23",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 43/2, Hill Street",
+          "city": "Batticaloa",
+          "district": "Batticaloa",
+          "postal_code": "30000",
+          "country": "LK"
+        },
+        "mobile_number": "+94760005286",
+        "occupation": "Sales Representative"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0049",
+      "person_id": "P0089",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-05-27",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Isuru Gunawardena",
+        "id_document_type": "nic",
+        "id_document_number": "199111806107",
+        "date_of_birth": "1991-04-27",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 20, Church Road",
+          "city": "Negombo",
+          "district": "Gampaha",
+          "postal_code": "11500",
+          "country": "LK"
+        },
+        "mobile_number": "+94780007909",
+        "email": "isuru.gunawardena49@example.com"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0050",
+      "person_id": "P0090",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-03-09",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Rizwan Fazil Ismail",
+        "id_document_type": "nic",
+        "id_document_number": "199930408884",
+        "date_of_birth": "1999-10-30",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 227, School Lane",
+          "city": "Kandy",
+          "district": "Kandy",
+          "postal_code": "20000",
+          "country": "LK"
+        },
+        "mobile_number": "+94750002466",
+        "email": "rizwan.ismail50@example.com",
+        "occupation": "Civil Engineer"
+      }
+    }
+  ]
+}

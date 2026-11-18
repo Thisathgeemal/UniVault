@@ -1,0 +1,27 @@
+{
+  "_synthetic": true,
+  "generator": "scripts/generate-synthetic-data.mjs",
+  "seed": 2026,
+  "as_of": "2026-11-20",
+  "schema_version": "1.0",
+  "notice": "Fictional test data for the UniVault prototype. Not real people or organisations.",
+  "issuers": [
+    {
+      "issuer_key": "employer-a",
+      "issuer_type": "employer",
+      "name": "Serendib Trading Company (Demo)",
+      "email_domain": "serendib-trading.example"
+    },
+    {
+      "issuer_key": "employer-b",
+      "issuer_type": "employer",
+      "name": "Lanka Agro Tools Enterprises (Demo)",
+      "email_domain": "lanka-agro-tools.example"
+    },
+    {
+      "issuer_key": "bank-a",
+      "issuer_type": "bank",
+      "name": "UniVault Demo Bank"
+    }
+  ]
+}
