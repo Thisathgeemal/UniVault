@@ -1,0 +1,18 @@
+# Normalise line endings to LF in the repo and the working tree on every OS,
+# so Prettier/EditorConfig (end_of_line = lf) agree with Git on Windows.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files: never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.joblib binary
+*.pkl binary

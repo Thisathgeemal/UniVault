@@ -84,6 +84,11 @@ UniVault/
 └── .gitignore         # Files excluded from Git tracking
 ```
 
+## Development Setup
+
+See [docs/development-setup.md](docs/development-setup.md) for prerequisites, ports,
+environment variables and the shared lint/format/secrets scripts.
+
 ## Development Roadmap
 
 The development follows an Agile methodology adapted for a solo developer, organised into five sprints.
