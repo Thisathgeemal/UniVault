@@ -1,0 +1,2 @@
+# Contains the main backend application, REST APIs,
+# business logic, database integration and authentication services.
