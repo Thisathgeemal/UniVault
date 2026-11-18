@@ -1,0 +1,116 @@
+
+# ==========================================
+# UniVault - Git Ignore Configuration
+# ==========================================
+
+# ------------------------------------------
+# Environment variables and secrets
+# ------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Private cryptographic keys and certificates
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+
+# Local secret and key directories
+**/secrets/
+**/private-keys/
+**/keys/
+
+# ------------------------------------------
+# Node.js dependencies
+# ------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Package manager temporary files
+.npm/
+.pnpm-store/
+
+# ------------------------------------------
+# React.js / Node.js build outputs
+# ------------------------------------------
+dist/
+build/
+.next/
+out/
+coverage/
+
+# ------------------------------------------
+# React Native / Expo
+# ------------------------------------------
+.expo/
+.expo-shared/
+web-build/
+*.jsbundle
+
+# ------------------------------------------
+# Python / Flask
+# ------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# Python testing and tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+htmlcov/
+
+# ------------------------------------------
+# Machine learning generated files
+# ------------------------------------------
+*.joblib
+*.pkl
+*.pickle
+
+# ------------------------------------------
+# Logs and temporary files
+# ------------------------------------------
+logs/
+*.log
+tmp/
+temp/
+
+# ------------------------------------------
+# Database files and local backups
+# ------------------------------------------
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.bak
+
+# ------------------------------------------
+# Operating system files
+# ------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ------------------------------------------
+# IDE and editor settings
+# ------------------------------------------
+.vscode/
+.idea/
+*.suo
+*.user
+
+# ------------------------------------------
+# Test and coverage outputs
+# ------------------------------------------
+.nyc_output/
