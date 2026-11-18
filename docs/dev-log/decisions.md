@@ -303,3 +303,125 @@ An `age_over_18` value of `true` will indicate that the holder met the 18-year a
 - The verifier must validate the credential signature and disclosed claim before making an eligibility decision.
 - The system must correctly handle the 18th birthday boundary and under-18 cases.
 - The claim represents age eligibility at issuance time; it must not be treated as a permanent guarantee of the holder's current age.
+
+# Decision 006: SD-JWT Library Selection (@sd-jwt/core)
+
+- **Date:** 19 November 2026
+- **Sprint:** S1
+- **Status:** Accepted
+
+### Context
+
+UniVault uses SD-JWT selective disclosure for credential issuance, presentation and verification. The same SD-JWT logic is needed in two different environments:
+
+- The backend (Node.js), which issues credentials and verifies presentations.
+- The mobile wallet (React Native / Expo), which stores credentials and builds selective-disclosure presentations.
+
+React Native runs on the Hermes JavaScript engine, which does not provide Node.js built-in modules (such as `crypto` and `Buffer`) or the browser WebCrypto API (`crypto.subtle`). Many JavaScript cryptography and JWT libraries depend on these and therefore do not work in Expo.
+
+A spike was conducted to determine whether an existing SD-JWT library could be reused in both environments, or whether a custom implementation was required. The full results are documented in `docs/spikes/sd-jwt/README.md`.
+
+### Options considered
+
+1. **@sd-jwt/core (OpenWallet Foundation):** Implements SD-JWT issuance, presentation, key binding and verification. Cryptographic operations (hashing, salt generation, signing, verification) are supplied by the application, so platform-specific crypto can be injected for Node.js and Expo.
+
+2. **@sd-jwt/sd-jwt-vc (OpenWallet Foundation):** Builds on @sd-jwt/core and adds SD-JWT VC type metadata and the IETF Token Status List. It also brings additional dependencies (`cbor-x`, `pako`) for status-list features that UniVault does not use.
+
+3. **Custom SD-JWT module:** Implement salt generation, disclosure construction, Base64URL encoding, SHA-256 digests, the `_sd` array and RS256 signing manually.
+
+### Decision
+
+Use **@sd-jwt/core**, pinned to exact version **0.25.0**, in both the backend and the mobile wallet.
+
+The library will be wrapped by UniVault's `crypto-core` module, which will inject platform-specific cryptographic functions:
+
+| Function | Backend (Node.js) | Wallet (Expo) |
+|---|---|---|
+| SHA-256 hashing | @noble/hashes or node:crypto | @noble/hashes (pure JavaScript) |
+| Random salts | crypto.getRandomValues | expo-crypto getRandomBytes |
+| Issuer signing | RS256 via node:crypto | Not required |
+| Key-binding signing | Verification only | ES256 via @noble/curves (Decision 007) |
+
+A custom module will not be developed. It remains a documented fallback.
+
+### Reason
+
+- Tested successfully in Node.js: 14/14 checks passed, covering issuance, selective presentation, verification, replay protection, audience checks, forged disclosures, tampered credentials, stolen credentials and missing key binding.
+- Tested successfully on a real Android device in Expo Go: 10/10 checks passed, including library loading on Hermes, key generation (212 ms), credential decoding (2 ms) and presentation building (9 ms).
+- A presentation built on the phone was verified successfully on Node.js, confirming cross-platform compatibility.
+- The library has no dependency on Node.js built-in modules or `Buffer`, and it does not require WebCrypto.
+- The custom implementation was built and verified against the library during the spike, confirming it is feasible. However, it would require re-implementing parsing, presentation, key binding and verification edge cases that the library already handles and tests.
+- @sd-jwt/sd-jwt-vc also bundles for Android, but it adds approximately 0.4 MB of status-list code that UniVault does not need, because UniVault uses its own status endpoint (FR-BAK-01).
+
+### Consequences
+
+- `@sd-jwt/core` will be a dependency of `crypto-core`, the backend and the wallet, pinned to an exact version (no `^` range), because the library is pre-1.0 and was recently restructured.
+- The library does not validate the `cnf` (holder key) or `status` claims. UniVault's verifier must verify the key-binding JWT against `cnf.jwk` and check revocation through `status.status_uri` (FR-VER-02).
+- The wallet must polyfill `crypto.getRandomValues` using expo-crypto, because Hermes does not provide it.
+- The wallet will not verify the issuer's RS256 signature when receiving a credential. This is acceptable because credentials are received from the issuer over HTTPS and the verifier always checks the RS256 signature.
+- SD-JWT reveals the number of undisclosed claims (digest count). This known limitation will be reported in the evaluation. Decoy digests, which the library supports, are a possible mitigation.
+- Library upgrades must be deliberate and re-tested against the spike scripts.
+
+# Decision 007: ES256 for Holder Key Binding
+
+- **Date:** 19 November 2026
+- **Sprint:** S1
+- **Status:** Proposed (to be confirmed at the Sprint 1 review on 22 November 2026)
+
+### Context
+
+NFR-01 in the mid-point report states that all credential and disclosure exchanges shall use RS256 digital signatures.
+
+UniVault uses two different signatures:
+
+1. **Issuer signature:** The issuer (employer or bank) signs each credential. This happens on the backend (Node.js).
+2. **Holder key-binding signature:** When presenting a credential, the wallet signs a key-binding JWT containing the verifier's nonce and audience. This proves the presentation comes from the legitimate holder and prevents replay. This happens on the mobile phone.
+
+For key binding, the wallet must generate its own key pair on the device and sign with it during every presentation.
+
+The SD-JWT spike found the following platform constraints in Expo Go:
+
+- expo-crypto provides SHA digests, random bytes and AES encryption, but no RSA or ECDSA signing.
+- Hermes does not provide WebCrypto (`crypto.subtle`).
+- Pure-JavaScript RSA-2048 key generation took approximately 1.2 seconds on a server, and is expected to be several times slower on a mobile phone.
+- Pure-JavaScript ES256 (P-256) key generation took approximately 0.6 ms on the server and 212 ms on the test phone, including one-time initialisation.
+
+### Options considered
+
+1. **RS256 for holder key binding using pure JavaScript:** Complies literally with NFR-01, but RSA key generation on the phone is slow and unpredictable, and affects the onboarding experience.
+
+2. **RS256 for holder key binding using a native module (react-native-quick-crypto):** Provides fast native RSA, but requires an Expo development build instead of Expo Go. This adds build setup and slows down development iteration.
+
+3. **ES256 (ECDSA P-256) for holder key binding using @noble/curves:** Fast, pure JavaScript, audited, and works in Expo Go. Issuer signatures remain RS256.
+
+### Decision
+
+Use **ES256 (ECDSA with P-256 and SHA-256)** for the holder key-binding JWT, implemented with @noble/curves.
+
+Issuer credential signatures **remain RS256**, as specified in the mid-point report.
+
+| Signature | Algorithm | Where it runs |
+|---|---|---|
+| Issuer credential signature | RS256 | Backend (Node.js native crypto) |
+| Holder key-binding JWT | ES256 | Mobile wallet (@noble/curves) |
+
+The verifier will accept only RS256 for issuer signatures and only ES256 for key-binding JWTs (`allowedIssuerAlgorithms` and `allowedKeyBindingAlgorithms`).
+
+NFR-01 is refined as follows: *issuer-signed credentials shall use RS256; holder key-binding proofs shall use ES256.*
+
+### Reason
+
+- RSA key generation in pure JavaScript is too slow for a good onboarding experience on mobile devices, particularly lower-end phones.
+- ES256 key generation and signing are fast in pure JavaScript and work in Expo Go without native modules.
+- ES256 is a widely used JOSE algorithm (RFC 7518) and is commonly used for key binding in SD-JWT VC and digital identity wallet implementations.
+- Keeping RS256 for issuer signatures preserves the design described in the mid-point report for the trust relationship between issuers and verifiers.
+- Staying with Expo Go keeps the development workflow simple within the five-week development window.
+- The spike verified the complete flow: RS256 issuance, ES256 key binding on a real phone, and successful verification on Node.js.
+
+### Consequences
+
+- The wallet generates a P-256 key pair during onboarding and stores the private key in the device's secure store (Sprint 2).
+- Issued credentials include the holder's ES256 public key in the `cnf.jwk` claim.
+- The verifier must support two algorithms: RS256 for the issuer signature and ES256 for key binding.
+- The final report must document NFR-01 as refined, with the justification above.
+- If the supervisor requires RS256 for key binding, Option 2 (native module with an Expo development build) is the fallback, with additional setup effort in Sprint 2.
