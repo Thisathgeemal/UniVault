@@ -160,6 +160,7 @@ export function validateDisclosures(
  * The issuer signature is NOT checked here – use verifySdJwt() for that.
  */
 export function decodeDisclosures(sdJwt: string): DisclosureValidationResult {
+  if (typeof sdJwt !== 'string') throw new TypeError('sdJwt must be a string');
   const parts = sdJwt.split('~');
   const payloadSegment = (parts[0] ?? '').split('.')[1];
   if (parts.length < 2 || !payloadSegment || !B64URL.test(payloadSegment)) {

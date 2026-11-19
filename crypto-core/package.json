@@ -27,10 +27,13 @@
     "test:watch": "vitest",
     "demo:issue": "npm run build && node examples/issue-demo.mjs",
     "demo:verify": "npm run build && node examples/verify-demo.mjs",
-    "demo:disclosures": "npm run build && node examples/disclosures-demo.mjs"
+    "demo:disclosures": "npm run build && node examples/disclosures-demo.mjs",
+    "test:coverage": "vitest run --coverage",
+    "test:report": "vitest run --coverage --reporter=verbose"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
+    "@vitest/coverage-v8": "5.1.1",
     "typescript": "5.9.3",
     "vitest": "5.1.1"
   },

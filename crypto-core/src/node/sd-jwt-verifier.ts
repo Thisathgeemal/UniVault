@@ -97,6 +97,9 @@ export async function verifySdJwt(
   publicKey: IssuerPublicJwk | KeyObject,
   options: VerifySdJwtOptions = {},
 ): Promise<SdJwtVerificationResult> {
+  if (publicKey === null || typeof publicKey !== 'object') {
+    throw new TypeError('publicKey must be an issuer public JWK or a Node.js KeyObject');
+  }
   const checks: VerificationCheck[] = [];
   const add = (
     name: CheckName,
