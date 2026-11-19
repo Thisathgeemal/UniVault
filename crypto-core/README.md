@@ -15,6 +15,7 @@ npm install
 npm test          # vitest
 npm run typecheck # tsc --noEmit
 npm run build     # compile to dist/
+npm run demo:issue # build, create a sample credential and print its contents
 ```
 
 ## Issuer keys (`./node`)
@@ -47,3 +48,36 @@ const signingKey = await loadIssuerPrivateKey(dir, keys.kid, passphrase);
     `*.pem`).
   - The passphrase lives in the backend `.env` (`ISSUER_KEY_PASSPHRASE`) and is
     never committed or logged.
+
+## Creating credentials (`createSdJwt`)
+
+```ts
+import { createSdJwt, decodeSdJwt, loadIssuerPrivateKey } from '@univault/crypto-core/node';
+
+const privateKey = await loadIssuerPrivateKey(keysDir, kid, passphrase);
+const sdJwt = await createSdJwt(
+  { iss, issuer_name, vct, schema_version, jti, iat, exp, cnf, status, ...subjectClaims },
+  schema['x-univault'].selectivelyDisclosable, // fields to hide behind _sd digests
+  { kid, privateKey },
+);
+const { header, payload, disclosures, claims } = await decodeSdJwt(sdJwt); // inspect
+```
+
+For each disclosable field, `@sd-jwt/core` (Decision 006) does the following:
+
+1. Generates a random 128-bit salt.
+2. Builds the disclosure `[salt, name, value]`.
+3. Base64URL-encodes it.
+4. Takes its SHA-256 digest and puts it in `_sd` (with `_sd_alg: "sha-256"`).
+
+The JWT is then signed with **RS256**, with header `{ alg: "RS256", typ: "dc+sd-jwt", kid }`.
+
+- **Output:** `<JWT>~<disclosure 1>~…~<disclosure n>~`
+- **Rules enforced:** `iss` is required; every disclosable field must exist in the
+  claims; there must be no duplicates; envelope claims (`iss`, `exp`, `nbf`, `cnf`,
+  `vct`, `status`, `iat`, `jti`, `sub`, `issuer_name`, `schema_version`,
+  `kyc_verification_date`) can never be disclosable; the key must be an RSA
+  private key.
+- **Object values** (e.g. `permanent_address`) are disclosed as one unit.
+- **`decodeSdJwt`** does not verify the signature. It only decodes for display,
+  debugging and tests. Verification belongs to the verifier.
