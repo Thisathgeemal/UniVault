@@ -3,3 +3,4 @@
 export * from '../index.js';
 export * from './issuer-keys.js';
 export * from './sd-jwt-issuer.js';
+export * from './sd-jwt-verifier.js';

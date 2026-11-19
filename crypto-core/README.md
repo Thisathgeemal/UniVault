@@ -16,6 +16,7 @@ npm test          # vitest
 npm run typecheck # tsc --noEmit
 npm run build     # compile to dist/
 npm run demo:issue # build, create a sample credential and print its contents
+npm run demo:verify # build, verify a genuine and three tampered credentials
 ```
 
 ## Issuer keys (`./node`)
@@ -81,3 +82,32 @@ The JWT is then signed with **RS256**, with header `{ alg: "RS256", typ: "dc+sd-
 - **Object values** (e.g. `permanent_address`) are disclosed as one unit.
 - **`decodeSdJwt`** does not verify the signature. It only decodes for display,
   debugging and tests. Verification belongs to the verifier.
+
+## Verifying credentials (`verifySdJwt`)
+
+```ts
+import { verifySdJwt } from '@univault/crypto-core/node';
+
+const result = await verifySdJwt(token, issuerPublicJwk); // JWK from GET /issuers/:id/keys
+if (result.valid) use(result.claims);
+else log(result.errors); // e.g. ['INVALID_SIGNATURE']
+```
+
+The function never throws for a bad token. It returns `valid`, plus one entry
+per check, so the verifier portal can show a checklist:
+
+| Check         | Fails with                                                                         | Catches                                       |
+| ------------- | ---------------------------------------------------------------------------------- | --------------------------------------------- |
+| `format`      | `MALFORMED_TOKEN`                                                                  | broken or truncated tokens                    |
+| `algorithm`   | `UNSUPPORTED_ALGORITHM`                                                            | `alg: none` / HS256 substitution              |
+| `key_id`      | `KEY_ID_MISMATCH`                                                                  | header `kid` not matching the issuer key      |
+| `signature`   | `INVALID_SIGNATURE`                                                                | modified payload, wrong key, forged signature |
+| `disclosures` | `DISCLOSURE_NOT_IN_SD`, `DUPLICATE_…`, `MALFORMED_…`, `UNSUPPORTED_HASH_ALGORITHM` | forged or edited disclosures                  |
+| `expiry`      | `EXPIRED`                                                                          | `exp` passed (60 s clock skew allowed)        |
+| `not_before`  | `NOT_YET_VALID`                                                                    | used before `nbf`                             |
+
+- **`claims`** (visible + disclosed claims) is returned only when `valid` is
+  true.
+- **Presentations:** a token with a key-binding JWT attached is accepted, and
+  `hasKeyBinding` is set. Key binding, nonce, audience, revocation status and
+  request policy are checked by `verifyPresentation()` (Sprint 3).
