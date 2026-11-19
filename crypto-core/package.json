@@ -1,0 +1,30 @@
+{
+  "name": "@univault/crypto-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UniVault shared cryptography: SD-JWT issuance, presentation and verification helpers",
+  "type": "module",
+  "exports": {
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "default": "./dist/node/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3",
+    "vitest": "5.1.1"
+  }
+}
