@@ -1,0 +1,74 @@
+import { describe, expect, it } from 'vitest';
+import { ConfigError, loadConfig } from '../src/config/env.js';
+
+describe('environment configuration', () => {
+  it('applies safe defaults for local development', () => {
+    const config = loadConfig({});
+    expect(config).toMatchObject({
+      NODE_ENV: 'development',
+      PORT: 4000,
+      LOG_LEVEL: 'info',
+      CORS_ORIGINS: ['http://localhost:5173', 'http://localhost:5174'],
+      AI_SERVICE_URL: 'http://localhost:5001',
+      CREDENTIAL_OFFER_TTL_SECONDS: 600,
+    });
+  });
+
+  it('reads and converts values from the environment', () => {
+    const config = loadConfig({
+      PORT: '8080',
+      CORS_ORIGINS: ' http://a.example , http://b.example ',
+      AI_SERVICE_TIMEOUT_MS: '2500',
+    });
+    expect(config.PORT).toBe(8080);
+    expect(config.CORS_ORIGINS).toEqual(['http://a.example', 'http://b.example']);
+    expect(config.AI_SERVICE_TIMEOUT_MS).toBe(2500);
+  });
+
+  it('treats empty values (as copied from .env.example) as not set', () => {
+    const config = loadConfig({ JWT_SECRET: '', DATABASE_URL: '', PORT: '' });
+    expect(config.JWT_SECRET).toBeUndefined();
+    expect(config.PORT).toBe(4000);
+  });
+
+  it('rejects invalid values and names every problem variable', () => {
+    try {
+      loadConfig({ PORT: 'abc', CORS_ORIGINS: 'not-a-url', LOG_LEVEL: 'loud' });
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ConfigError);
+      const message = (err as ConfigError).message;
+      expect(message).toMatch(/PORT/);
+      expect(message).toMatch(/CORS_ORIGINS/);
+      expect(message).toMatch(/LOG_LEVEL/);
+    }
+  });
+
+  it('requires secrets in production', () => {
+    expect(() => loadConfig({ NODE_ENV: 'production' })).toThrow(
+      /JWT_SECRET: is required in production[\s\S]*ISSUER_KEY_PASSPHRASE[\s\S]*DATABASE_URL/,
+    );
+  });
+
+  it('accepts a complete production configuration', () => {
+    const config = loadConfig({
+      NODE_ENV: 'production',
+      JWT_SECRET: 'x'.repeat(32),
+      ISSUER_KEY_PASSPHRASE: 'a-long-passphrase',
+      DATABASE_URL: 'postgres://localhost/univault',
+    });
+    expect(config.NODE_ENV).toBe('production');
+  });
+
+  it('never includes secret values in error messages', () => {
+    try {
+      loadConfig({ JWT_SECRET: 'too-short-secret-value', ISSUER_KEY_PASSPHRASE: 'shortpass' });
+      expect.fail('should have thrown');
+    } catch (err) {
+      const message = (err as Error).message;
+      expect(message).toMatch(/JWT_SECRET: must be at least 32 characters/);
+      expect(message).not.toContain('too-short-secret-value');
+      expect(message).not.toContain('shortpass');
+    }
+  });
+});
