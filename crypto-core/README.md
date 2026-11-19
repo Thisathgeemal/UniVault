@@ -17,6 +17,7 @@ npm run typecheck # tsc --noEmit
 npm run build     # compile to dist/
 npm run demo:issue # build, create a sample credential and print its contents
 npm run demo:verify # build, verify a genuine and three tampered credentials
+npm run demo:disclosures # build, decode disclosures and show tampering being rejected
 ```
 
 ## Issuer keys (`./node`)
@@ -111,3 +112,38 @@ per check, so the verifier portal can show a checklist:
 - **Presentations:** a token with a key-binding JWT attached is accepted, and
   `hasKeyBinding` is set. Key binding, nonce, audience, revocation status and
   request policy are checked by `verifyPresentation()` (Sprint 3).
+
+## Decoding and checking disclosures (`decodeDisclosures`)
+
+Runs on Node.js **and** the phone. It is the single place disclosures are
+checked: `verifySdJwt` uses it too.
+
+```ts
+import { decodeDisclosures, validateDisclosures } from '@univault/crypto-core';
+
+const r = decodeDisclosures(sdJwt); // reads _sd from the token's payload
+r.disclosures; // [{ salt, name, value, digest, encoded }] – only those that passed
+r.errors; // [{ index, code, message }] – one per rejected disclosure
+r.undisclosedDigests; // claims the holder did not reveal
+```
+
+For each disclosure it does the following:
+
+1. Base64URL-decodes it.
+2. Checks that it is a `[salt, name, value]` array with a non-empty string salt
+   and name.
+3. Recalculates its SHA-256 digest and requires that digest to be in `_sd`.
+
+It also rejects:
+
+- **`DUPLICATE_DISCLOSURE`:** the same disclosure sent twice.
+- **`DUPLICATE_CLAIM_NAME`:** two disclosures for one claim.
+- **`CLAIM_NAME_CONFLICT`:** a disclosure that would overwrite a visible claim.
+- **`RESERVED_CLAIM_NAME`:** reserved names (`_sd`, `...`, `_sd_alg`).
+- **`UNSUPPORTED_HASH_ALGORITHM`:** any `_sd_alg` other than `sha-256`.
+- **`MALFORMED_DISCLOSURE`:** anything that doesn't decode to the required array.
+- **`DISCLOSURE_NOT_IN_SD`:** a tampered or forged disclosure whose digest isn't
+  in `_sd`.
+
+`decodeDisclosures` does **not** check the issuer signature. Without that check,
+`_sd` itself could be fake, so use `verifySdJwt` whenever trust matters.

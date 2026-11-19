@@ -9,10 +9,11 @@
  * Holder key binding, nonce/audience, revocation status and request policy are
  * checked later by verifyPresentation() (Sprint 3), which builds on this.
  */
-import { createHash, createVerify, type KeyObject } from 'node:crypto';
+import { createVerify, type KeyObject } from 'node:crypto';
 import { Disclosure, getClaims } from '@sd-jwt/core';
 import { SD_HASH_ALG } from '../common/constants.js';
 import { sha256Hasher } from '../common/hash.js';
+import { validateDisclosures, type DisclosureErrorCode } from '../common/disclosures.js';
 import { ISSUER_KEY_ALG, issuerPublicKeyFromJwk, type IssuerPublicJwk } from './issuer-keys.js';
 
 export type CheckName =
@@ -25,10 +26,7 @@ export type VerificationErrorCode =
   | 'UNSUPPORTED_ALGORITHM'
   | 'KEY_ID_MISMATCH'
   | 'INVALID_SIGNATURE'
-  | 'UNSUPPORTED_HASH_ALGORITHM'
-  | 'DISCLOSURE_NOT_IN_SD'
-  | 'DUPLICATE_DISCLOSURE'
-  | 'MALFORMED_DISCLOSURE'
+  | DisclosureErrorCode
   | 'EXPIRED'
   | 'NOT_YET_VALID';
 
@@ -75,10 +73,6 @@ function parseJsonSegment(segment: string): Record<string, unknown> {
     throw new Error('not a JSON object');
   }
   return value as Record<string, unknown>;
-}
-
-function digestOf(encodedDisclosure: string): string {
-  return createHash('sha256').update(encodedDisclosure, 'ascii').digest('base64url');
 }
 
 function failResult(checks: VerificationCheck[], hasKeyBinding = false): SdJwtVerificationResult {
@@ -180,49 +174,16 @@ export async function verifySdJwt(
     add('signature', 'fail', 'Not verified: unsupported algorithm', 'INVALID_SIGNATURE');
   }
 
-  // 5. Disclosures: each must be well formed, unique and referenced by a digest in _sd
-  const sd = Array.isArray(payload._sd)
-    ? payload._sd.filter((x): x is string => typeof x === 'string')
-    : [];
-  const disclosedNames: string[] = [];
-  let disclosuresOk = true;
-  let disclosureDetail = `${encodedDisclosures.length} disclosure(s) match _sd digests`;
-  let disclosureCode: VerificationErrorCode | undefined;
-  if (encodedDisclosures.length > 0 && payload._sd_alg !== SD_HASH_ALG) {
-    disclosuresOk = false;
-    disclosureCode = 'UNSUPPORTED_HASH_ALGORITHM';
-    disclosureDetail = `_sd_alg must be "${SD_HASH_ALG}", got "${String(payload._sd_alg)}"`;
+  // 5. Disclosures: decoded and checked against _sd by validateDisclosures()
+  const disclosureResult = validateDisclosures(encodedDisclosures, payload);
+  const firstError = disclosureResult.errors[0];
+  if (!firstError) {
+    add('disclosures', 'pass', `${encodedDisclosures.length} disclosure(s) match _sd digests`);
   } else {
-    const seen = new Set<string>();
-    for (const encoded of encodedDisclosures) {
-      const digest = digestOf(encoded);
-      let decoded: unknown;
-      try {
-        decoded = parseDisclosure(encoded);
-      } catch {
-        disclosuresOk = false;
-        disclosureCode = 'MALFORMED_DISCLOSURE';
-        disclosureDetail = 'A disclosure is not a valid [salt, name, value] array';
-        break;
-      }
-      if (seen.has(digest)) {
-        disclosuresOk = false;
-        disclosureCode = 'DUPLICATE_DISCLOSURE';
-        disclosureDetail = 'The same disclosure appears more than once';
-        break;
-      }
-      seen.add(digest);
-      if (!sd.includes(digest)) {
-        disclosuresOk = false;
-        disclosureCode = 'DISCLOSURE_NOT_IN_SD';
-        disclosureDetail = `Disclosure for "${(decoded as [string, string])[1]}" is not signed by the issuer (digest not in _sd)`;
-        break;
-      }
-      disclosedNames.push((decoded as [string, string])[1]);
-    }
+    const more =
+      disclosureResult.errors.length > 1 ? ` (+${disclosureResult.errors.length - 1} more)` : '';
+    add('disclosures', 'fail', `${firstError.message}${more}`, firstError.code);
   }
-  if (disclosuresOk) add('disclosures', 'pass', disclosureDetail);
-  else add('disclosures', 'fail', disclosureDetail, disclosureCode);
 
   // 6–7. Validity period
   const checkTime = options.checkTime ?? true;
@@ -255,29 +216,15 @@ export async function verifySdJwt(
     errors: checks.flatMap((c) => (c.status === 'fail' && c.code ? [c.code] : [])),
     header,
     payload,
-    disclosedClaimNames: disclosedNames,
-    undisclosedCount: Math.max(sd.length - disclosedNames.length, 0),
+    disclosedClaimNames: disclosureResult.disclosures.map((d) => d.name),
+    undisclosedCount: disclosureResult.undisclosedDigests.length,
     hasKeyBinding,
   };
   if (valid) {
-    const disclosures = encodedDisclosures.map((encoded) =>
+    const disclosures = disclosureResult.disclosures.map(({ encoded }) =>
       Disclosure.fromEncodeSync(encoded, { hasher: sha256Hasher, alg: SD_HASH_ALG }),
     );
     result.claims = await getClaims<Record<string, unknown>>(payload, disclosures, sha256Hasher);
   }
   return result;
-}
-
-function parseDisclosure(encoded: string): [string, string, unknown] {
-  if (!B64URL.test(encoded)) throw new Error('not Base64URL');
-  const value: unknown = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
-  if (
-    !Array.isArray(value) ||
-    value.length !== 3 ||
-    typeof value[0] !== 'string' ||
-    typeof value[1] !== 'string'
-  ) {
-    throw new Error('expected [salt, name, value]');
-  }
-  return value as [string, string, unknown];
 }

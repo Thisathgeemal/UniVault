@@ -2,3 +2,4 @@
 export * from './common/constants.js';
 export * from './common/hash.js';
 export * from './common/decode.js';
+export * from './common/disclosures.js';

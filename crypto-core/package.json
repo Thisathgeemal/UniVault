@@ -26,7 +26,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "demo:issue": "npm run build && node examples/issue-demo.mjs",
-    "demo:verify": "npm run build && node examples/verify-demo.mjs"
+    "demo:verify": "npm run build && node examples/verify-demo.mjs",
+    "demo:disclosures": "npm run build && node examples/disclosures-demo.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
