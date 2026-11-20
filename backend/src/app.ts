@@ -13,6 +13,7 @@ import helmet from 'helmet';
 import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
 import type { AppConfig } from './config/env.js';
+import type { Database } from './db/client.js';
 import { AppError } from './lib/errors.js';
 import { createErrorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { apiRouter } from './routes/index.js';
@@ -21,7 +22,11 @@ export const API_PREFIX = '/api/v1';
 export const APP_VERSION = '0.1.0';
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
 
-export function createApp(config: AppConfig, logger: Logger): Express {
+export interface AppDependencies {
+  database?: Database;
+}
+
+export function createApp(config: AppConfig, logger: Logger, deps: AppDependencies = {}): Express {
   const app = express();
   app.disable('x-powered-by');
 
@@ -75,7 +80,14 @@ export function createApp(config: AppConfig, logger: Logger): Express {
   app.use(express.json({ limit: config.REQUEST_BODY_LIMIT }));
 
   // 5. Routes
-  app.use(API_PREFIX, apiRouter({ version: APP_VERSION, environment: config.NODE_ENV }));
+  app.use(
+    API_PREFIX,
+    apiRouter({
+      version: APP_VERSION,
+      environment: config.NODE_ENV,
+      ...(deps.database ? { database: deps.database } : {}),
+    }),
+  );
 
   // 6. Unknown routes and all errors
   app.use(notFoundHandler);

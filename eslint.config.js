@@ -15,6 +15,7 @@ export default defineConfig([
     '**/build/',
     '**/.expo/',
     '**/coverage/',
+    '**/.data/',
     'ai-service/', // Python: linted with Ruff (see ai-service/pyproject.toml)
     'docs/spikes/**', // Throwaway spike code, not held to lint rules
   ]),

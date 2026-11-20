@@ -9,6 +9,8 @@ import 'dotenv/config';
 import type { Server } from 'node:http';
 import { createApp } from './app.js';
 import { ConfigError, loadConfig, type AppConfig } from './config/env.js';
+import { createDatabase } from './db/client.js';
+import { runMigrations } from './db/migrate.js';
 import { createLogger } from './lib/logger.js';
 
 function readConfig(): AppConfig {
@@ -25,7 +27,16 @@ function readConfig(): AppConfig {
 
 const config = readConfig();
 const logger = createLogger(config);
-const app = createApp(config, logger);
+
+const database = await createDatabase(config.DATABASE_URL);
+if (config.DB_AUTO_MIGRATE) {
+  const migrations = await runMigrations(database);
+  if (migrations.applied.length)
+    logger.info({ applied: migrations.applied }, 'Database migrations applied');
+}
+logger.info(`Database connected (${database.driver})`);
+
+const app = createApp(config, logger, { database });
 
 const server: Server = app.listen(config.PORT, () => {
   logger.info(
@@ -46,8 +57,10 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 function shutdown(signal: string): void {
   logger.info(`${signal} received – shutting down`);
   server.close(() => {
-    logger.info('Server stopped');
-    process.exit(0);
+    void database.close().finally(() => {
+      logger.info('Server stopped');
+      process.exit(0);
+    });
   });
   // Force exit if connections do not close in time
   setTimeout(() => process.exit(1), 10_000).unref();

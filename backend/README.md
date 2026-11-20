@@ -33,6 +33,13 @@ src/
   middleware/validate.ts request validation (body / query / params) with zod
   middleware/error-handler.ts  404 handler + central error handler
   routes/                one router per resource, mounted under /api/v1
+  db/schema.ts           Drizzle table definitions and relations
+  db/client.ts           database connection (embedded PGlite or PostgreSQL server)
+  db/migrate.ts          SQL migration runner
+  db/seed.ts             loads seed-data/ (issuers, staff, holders)
+  db/cli.ts              db:* commands
+  lib/passwords.ts       scrypt password hashing
+migrations/              versioned SQL migrations (source of truth for the schema)
 test/                    config, HTTP (supertest) and server-process tests
 ```
 
@@ -111,3 +118,20 @@ required.
 - **Logs:** coloured and readable in development, JSON in production.
 - **Redaction:** authorisation headers, cookies, passphrases, private keys and
   tokens are redacted from logs.
+
+## Database
+
+PostgreSQL. In development and tests it runs **embedded** (PGlite), with
+nothing to install:
+
+- **Development:** `DATABASE_URL=pglite://./.data/univault`, kept in
+  `backend/.data/`, which is git-ignored.
+- **Tests:** an in-memory database.
+- **Deployment:** set `DATABASE_URL=postgres://…` (e.g. Neon or Supabase).
+  Production refuses the embedded database.
+
+The server applies new migrations at start-up (`DB_AUTO_MIGRATE=true`), and
+`/health` reports `"database": "up"`.
+
+See `docs/database/database-design.md` for the ER diagram and the rules each
+table enforces.

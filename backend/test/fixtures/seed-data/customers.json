@@ -1,0 +1,79 @@
+{
+  "_synthetic": true,
+  "generator": "scripts/generate-synthetic-data.mjs",
+  "seed": 2026,
+  "as_of": "2026-11-20",
+  "schema_version": "1.0",
+  "notice": "Fictional test data for the UniVault prototype. Not real people or organisations.",
+  "count": 2,
+  "records": [
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0001",
+      "person_id": "P0001",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2024-04-25",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Lahiru Silva",
+        "id_document_type": "nic",
+        "id_document_number": "199935300063",
+        "date_of_birth": "1999-12-18",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 142/2, Station Road",
+          "city": "Matale",
+          "district": "Matale",
+          "postal_code": "21000",
+          "country": "LK"
+        },
+        "mobile_number": "+94710001349",
+        "email": "lahiru.silva1@example.com",
+        "occupation": "Employee",
+        "employer_name": "Serendib Trading Company (Demo)"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "KYC-REC-0002",
+      "person_id": "P0002",
+      "issuer_key": "bank-a",
+      "credential_type": "KYCCredential",
+      "kyc_verification_date": "2026-04-06",
+      "issuance_hints": {
+        "suggested_valid_until": "2028-11-20"
+      },
+      "claims": {
+        "full_name": "Keerthana Janani Navaratnam",
+        "id_document_type": "nic",
+        "id_document_number": "846886839V",
+        "date_of_birth": "1984-07-06",
+        "age_over_18": true,
+        "nationality": "LK",
+        "permanent_address": {
+          "line1": "No. 242, Park Avenue",
+          "city": "Matale",
+          "district": "Matale",
+          "postal_code": "21000",
+          "country": "LK"
+        },
+        "mobile_number": "+94700003773",
+        "residential_address": {
+          "line1": "No. 120, School Lane",
+          "city": "Trincomalee",
+          "district": "Trincomalee",
+          "postal_code": "31000",
+          "country": "LK"
+        },
+        "residence_proof_type": "fixed_line_telephone_bill",
+        "email": "keerthana.navaratnam2@example.com",
+        "occupation": "Employee",
+        "employer_name": "Lanka Agro Tools Enterprises (Demo)"
+      }
+    }
+  ]
+}

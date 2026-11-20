@@ -94,6 +94,7 @@ temp/
 *.db
 *.dump
 *.bak
+.data/
 
 # ------------------------------------------
 # Operating system files

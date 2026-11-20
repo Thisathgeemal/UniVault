@@ -28,7 +28,17 @@ const envSchema = z
       .default('info'),
     PUBLIC_BASE_URL: z.url().default('http://localhost:4000'),
     CORS_ORIGINS: csvList.default(['http://localhost:5173', 'http://localhost:5174']),
-    DATABASE_URL: z.string().min(1).optional(),
+    // pglite://<folder> (embedded PostgreSQL, development), pglite://memory (tests)
+    // or postgres://user:password@host:5432/db (a PostgreSQL server)
+    DATABASE_URL: z
+      .string()
+      .regex(/^(pglite:\/\/.+|postgres(ql)?:\/\/.+)$/, 'must start with pglite:// or postgres://')
+      .default('pglite://./.data/univault'),
+    // Apply new SQL migrations automatically when the server starts
+    DB_AUTO_MIGRATE: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
     JWT_SECRET: z.string().min(32, 'must be at least 32 characters').optional(),
     ISSUER_KEYS_DIR: z.string().min(1).default('./keys'),
     ISSUER_KEY_PASSPHRASE: z.string().min(12, 'must be at least 12 characters').optional(),
@@ -41,10 +51,18 @@ const envSchema = z
   .superRefine((env, ctx) => {
     // Secrets that are optional while developing become mandatory in production
     if (env.NODE_ENV === 'production') {
-      for (const key of ['JWT_SECRET', 'ISSUER_KEY_PASSPHRASE', 'DATABASE_URL'] as const) {
+      for (const key of ['JWT_SECRET', 'ISSUER_KEY_PASSPHRASE'] as const) {
         if (!env[key]) {
           ctx.addIssue({ code: 'custom', path: [key], message: 'is required in production' });
         }
+      }
+      // The embedded database is for development only
+      if (!/^postgres(ql)?:\/\//.test(env.DATABASE_URL)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['DATABASE_URL'],
+          message: 'must be a postgres:// URL in production',
+        });
       }
     }
   });

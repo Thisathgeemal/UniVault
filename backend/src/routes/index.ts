@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Database } from '../db/client.js';
 import { credentialOffersRouter } from './credential-offers.routes.js';
 import { credentialsRouter } from './credentials.routes.js';
 import { healthRouter } from './health.routes.js';
@@ -8,7 +9,11 @@ import { statusRouter } from './status.routes.js';
 import { verificationsRouter } from './verifications.routes.js';
 
 /** All API routes, mounted under /api/v1 by app.ts. */
-export function apiRouter(info: { version: string; environment: string }): Router {
+export function apiRouter(info: {
+  version: string;
+  environment: string;
+  database?: Database;
+}): Router {
   const router = Router();
   router.use('/health', healthRouter(info));
   router.use('/issuers', issuersRouter());

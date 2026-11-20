@@ -60,6 +60,33 @@ describe('environment configuration', () => {
     expect(config.NODE_ENV).toBe('production');
   });
 
+  it('uses the embedded development database by default and auto-migrates', () => {
+    const config = loadConfig({});
+    expect(config.DATABASE_URL).toBe('pglite://./.data/univault');
+    expect(config.DB_AUTO_MIGRATE).toBe(true);
+    expect(loadConfig({ DB_AUTO_MIGRATE: 'false' }).DB_AUTO_MIGRATE).toBe(false);
+  });
+
+  it('accepts pglite and postgres URLs and rejects others', () => {
+    expect(loadConfig({ DATABASE_URL: 'pglite://memory' }).DATABASE_URL).toBe('pglite://memory');
+    expect(
+      loadConfig({ DATABASE_URL: 'postgresql://u:p@db.example:5432/univault' }).DATABASE_URL,
+    ).toMatch(/^postgresql/);
+    expect(() => loadConfig({ DATABASE_URL: 'mysql://localhost/db' })).toThrow(
+      /DATABASE_URL: must start with/,
+    );
+  });
+
+  it('refuses the embedded database in production', () => {
+    expect(() =>
+      loadConfig({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'x'.repeat(32),
+        ISSUER_KEY_PASSPHRASE: 'a-long-passphrase',
+      }),
+    ).toThrow(/DATABASE_URL: must be a postgres:\/\/ URL in production/);
+  });
+
   it('never includes secret values in error messages', () => {
     try {
       loadConfig({ JWT_SECRET: 'too-short-secret-value', ISSUER_KEY_PASSPHRASE: 'shortpass' });

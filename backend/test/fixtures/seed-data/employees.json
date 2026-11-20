@@ -1,0 +1,66 @@
+{
+  "_synthetic": true,
+  "generator": "scripts/generate-synthetic-data.mjs",
+  "seed": 2026,
+  "as_of": "2026-11-20",
+  "schema_version": "1.0",
+  "notice": "Fictional test data for the UniVault prototype. Not real people or organisations.",
+  "count": 3,
+  "records": [
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0001",
+      "person_id": "P0001",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00001",
+        "full_name": "Lahiru Silva",
+        "designation": "Logistics Coordinator",
+        "department": "Operations",
+        "employment_type": "contract",
+        "date_of_joining": "2019-07-03",
+        "nic_number": "199935300063",
+        "work_location": "Galle Branch",
+        "work_phone": "+94110001844"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0002",
+      "person_id": "P0002",
+      "issuer_key": "employer-b",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "LAT-00002",
+        "full_name": "Keerthana Janani Navaratnam",
+        "designation": "Forklift Operator",
+        "department": "Warehouse",
+        "employment_type": "contract",
+        "date_of_joining": "2023-05-11",
+        "nic_number": "846886839V",
+        "work_location": "Warehouse",
+        "work_email": "keerthana.navaratnam2@lanka-agro-tools.example",
+        "work_phone": "+94110009119"
+      }
+    },
+    {
+      "_synthetic": true,
+      "record_id": "EMP-REC-0003",
+      "person_id": "P0003",
+      "issuer_key": "employer-a",
+      "credential_type": "EmploymentCredential",
+      "claims": {
+        "employee_id": "STC-00003",
+        "full_name": "Malith Wijesinghe",
+        "designation": "HR Executive",
+        "department": "Human Resources",
+        "employment_type": "permanent",
+        "date_of_joining": "2013-12-07",
+        "nic_number": "197834501968",
+        "work_location": "Kandy Branch",
+        "work_email": "malith.wijesinghe3@serendib-trading.example"
+      }
+    }
+  ]
+}

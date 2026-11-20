@@ -19,6 +19,7 @@ function startServer(env: Record<string, string>) {
       PATH: process.env.PATH ?? '',
       SystemRoot: process.env.SystemRoot ?? '',
       DOTENV_CONFIG_PATH: 'test/does-not-exist.env',
+      DATABASE_URL: 'pglite://memory', // never touch the developer's .data folder
       ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -48,10 +49,11 @@ describe('server process', () => {
     const port = String(4500 + Math.floor(Math.random() * 400));
     const server = startServer({ NODE_ENV: 'test', LOG_LEVEL: 'info', PORT: port });
     await server.waitFor('UniVault backend listening');
+    expect(server.output()).toContain('Database migrations applied');
 
     const res = await fetch(`http://localhost:${port}/api/v1/health`);
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { status: string }).status).toBe('ok');
+    expect(await res.json()).toMatchObject({ status: 'ok', database: 'up' });
 
     server.child.kill('SIGTERM');
     const code = await server.exited;

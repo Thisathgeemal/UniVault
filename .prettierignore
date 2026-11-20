@@ -5,6 +5,7 @@ build/
 coverage/
 .expo/
 web-build/
+.data/
 
 # Python service is formatted by Ruff, not Prettier
 ai-service/
