@@ -21,7 +21,11 @@ describe('migrations', () => {
 
   it('creates all tables on an empty database', async () => {
     const result = await runMigrations(database);
-    expect(result.applied).toEqual(['0001_initial_schema.sql', '0002_staff_login_protection.sql']);
+    expect(result.applied).toEqual([
+      '0001_initial_schema.sql',
+      '0002_staff_login_protection.sql',
+      '0003_holder_audit.sql',
+    ]);
     const tables = await rows<{ table_name: string }>(
       database,
       sql`select table_name from information_schema.tables where table_schema = 'public' order by 1`,
@@ -41,7 +45,11 @@ describe('migrations', () => {
     const result = await runMigrations(database);
     expect(result).toEqual({
       applied: [],
-      alreadyApplied: ['0001_initial_schema.sql', '0002_staff_login_protection.sql'],
+      alreadyApplied: [
+        '0001_initial_schema.sql',
+        '0002_staff_login_protection.sql',
+        '0003_holder_audit.sql',
+      ],
     });
   });
 

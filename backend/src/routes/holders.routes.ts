@@ -1,29 +1,59 @@
 import { Router } from 'express';
-import type { AuthMiddleware } from '../auth/middleware.js';
 import { z } from 'zod';
-import { notImplemented } from '../lib/errors.js';
-import { validate } from '../middleware/validate.js';
+import type { AuthMiddleware } from '../auth/middleware.js';
+import { AppError } from '../lib/errors.js';
+import { getValidated, validate } from '../middleware/validate.js';
+import type { HoldersService } from '../services/holders.service.js';
 
-// No issuerId: the issuer always comes from the logged-in staff member's token
+// No issuerId or recordType: both come from the logged-in staff member's issuer.
+// Claims are checked in detail against the credential schema by the service.
 export const createHolderBody = z.object({
-  recordType: z.enum(['employee', 'customer']),
+  externalRef: z.string().trim().min(1).max(30).optional(),
   claims: z.record(z.string(), z.unknown()),
 });
 
 export const listHoldersQuery = z.object({
-  search: z.string().max(100).optional(),
+  search: z.string().trim().min(1).max(100).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).max(100_000).default(0),
+  sort: z.enum(['newest', 'name']).default('newest'),
 });
 
-/** /api/v1/holders – holder records managed by issuer staff (issuer portal). Requires login. */
-export function holdersRouter(auth: AuthMiddleware): Router {
+export const holderIdParams = z.object({ holderId: z.uuid('must be a UUID') });
+
+/**
+ * /api/v1/holders – the issuer's employee / customer records (issuer portal). Requires login.
+ *   POST /             create a holder record (claims validated against the credential schema)
+ *   GET  /             list (search, paging) – summaries only, no personal claims
+ *   GET  /:holderId    one record with its full claims
+ */
+export function holdersRouter(auth: AuthMiddleware, holders?: HoldersService): Router {
   const router = Router();
   router.use(auth.requireAuth);
-  router.get('/', validate({ query: listHoldersQuery }), () => {
-    throw notImplemented('Sprint 1 – holder records');
+  const service = () => {
+    if (!holders) throw new AppError(503, 'SERVICE_UNAVAILABLE', 'Holder service is not available');
+    return holders;
+  };
+
+  router.get('/', validate({ query: listHoldersQuery }), async (req, res) => {
+    const { query } = getValidated<{ query: z.infer<typeof listHoldersQuery> }>(res);
+    res.json(await service().list(req.auth!, query));
   });
-  router.post('/', validate({ body: createHolderBody }), () => {
-    throw notImplemented('Sprint 1 – holder records');
+
+  router.post('/', validate({ body: createHolderBody }), async (req, res) => {
+    const { body } = getValidated<{ body: z.infer<typeof createHolderBody> }>(res);
+    const holder = await service().create(req.auth!, body);
+    // Log identifiers only – never the holder's personal claims
+    req.log?.info(
+      { holderId: holder.id, issuerId: holder.issuerId, staffId: req.auth?.id },
+      'Holder record created',
+    );
+    res.status(201).location(`${req.baseUrl}/${holder.id}`).json(holder);
   });
+
+  router.get('/:holderId', validate({ params: holderIdParams }), async (req, res) => {
+    res.json(await service().get(req.auth!, String(req.params.holderId)));
+  });
+
   return router;
 }

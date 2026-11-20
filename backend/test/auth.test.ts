@@ -144,7 +144,7 @@ describe('AC3 – protected endpoints require valid authentication', () => {
     const res = await request(t.app)
       .get('/api/v1/holders')
       .set(bearer(await t.tokenFor(STAFF.employerOfficer)));
-    expect(res.status).toBe(501); // authenticated – reached the planned handler
+    expect(res.status).toBe(200); // authenticated – holder list returned
   });
 
   it('rejects an expired token with TOKEN_EXPIRED', async () => {

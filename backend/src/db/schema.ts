@@ -80,6 +80,7 @@ export const holders = pgTable('holders', {
   fullName: text('full_name').notNull(),
   claims: jsonb('claims').$type<Record<string, unknown>>().notNull(),
   subjectRef: text('subject_ref'),
+  createdByStaffId: uuid('created_by_staff_id').references(() => issuerStaff.id),
   ...timestamps,
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -145,6 +146,7 @@ export const issuerStaffRelations = relations(issuerStaff, ({ one }) => ({
 
 export const holdersRelations = relations(holders, ({ one, many }) => ({
   issuer: one(issuers, { fields: [holders.issuerId], references: [issuers.id] }),
+  createdBy: one(issuerStaff, { fields: [holders.createdByStaffId], references: [issuerStaff.id] }),
   credentials: many(credentialRecords),
 }));
 

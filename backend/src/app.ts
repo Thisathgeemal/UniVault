@@ -20,6 +20,8 @@ import type { Database } from './db/client.js';
 import { AppError } from './lib/errors.js';
 import { createErrorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { apiRouter } from './routes/index.js';
+import { loadCredentialSchemas } from './services/credential-schemas.js';
+import { createHoldersService } from './services/holders.service.js';
 import { createIssuerKeysService } from './services/issuer-keys.service.js';
 
 export const API_PREFIX = '/api/v1';
@@ -99,6 +101,9 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
         publicBaseUrl: config.PUBLIC_BASE_URL,
       })
     : undefined;
+  // Credential schemas are loaded at start-up: a missing or broken schema stops the server early
+  const schemas = loadCredentialSchemas(config.CREDENTIAL_SCHEMAS_DIR);
+  const holders = deps.database ? createHoldersService(deps.database.db, schemas) : undefined;
   app.use(
     API_PREFIX,
     apiRouter({
@@ -112,6 +117,7 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
       ...(deps.database ? { database: deps.database } : {}),
       ...(authService ? { authService } : {}),
       ...(issuerKeys ? { issuerKeys } : {}),
+      ...(holders ? { holders } : {}),
     }),
   );
 

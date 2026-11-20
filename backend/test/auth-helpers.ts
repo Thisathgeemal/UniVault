@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { pino } from 'pino';
+import { pino, type Logger } from 'pino';
 import request from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../src/app.js';
@@ -28,6 +28,7 @@ export interface AuthedTestApp {
 /** App with a fresh seeded database (3 issuers, 6 staff) and login helpers. */
 export async function authedTestApp(
   overrides: Record<string, string> = {},
+  logger: Logger = pino({ level: 'silent' }),
 ): Promise<AuthedTestApp> {
   const database = await freshDatabase();
   await seedDatabase(database.db, { dataDir: FIXTURES, staffPassword: PASSWORD });
@@ -37,7 +38,7 @@ export async function authedTestApp(
       LOGIN_RATE_LIMIT_MAX: '1000', // tests log in many times; the rate-limit test overrides this
       ...overrides,
     }),
-    pino({ level: 'silent' }),
+    logger,
     { database },
   );
   const login = (email: string, password = PASSWORD) =>

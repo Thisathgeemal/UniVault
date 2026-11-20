@@ -29,7 +29,7 @@ function startServer(env: Record<string, string>) {
   child.stdout?.on('data', (d) => (output += String(d)));
   child.stderr?.on('data', (d) => (output += String(d)));
   const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)));
-  const waitFor = async (text: string, timeoutMs = 15_000) => {
+  const waitFor = async (text: string, timeoutMs = 60_000) => {
     const start = Date.now();
     while (!output.includes(text)) {
       if (Date.now() - start > timeoutMs)
@@ -62,7 +62,7 @@ describe('server process', () => {
       expect(code).toBe(0);
       expect(server.output()).toContain('Server stopped');
     }
-  }, 30_000);
+  }, 90_000);
 
   it('refuses to start with invalid configuration and explains why', async () => {
     const server = startServer({ NODE_ENV: 'test', PORT: 'not-a-port' });
@@ -70,5 +70,5 @@ describe('server process', () => {
     expect(code).toBe(1);
     expect(server.output()).toContain('Invalid environment configuration');
     expect(server.output()).toContain('PORT');
-  }, 30_000);
+  }, 90_000);
 });

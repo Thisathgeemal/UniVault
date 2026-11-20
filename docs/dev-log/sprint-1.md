@@ -111,3 +111,19 @@ Record the tests that show the sprint goal is met, with links to output in `evid
 - **Cause (second time):** The same npm bug recurred when new dependencies were installed on top of the existing `node_modules`.
 - **Resolution (second time):** [describe what fixed it – e.g. clean reinstall with `npm cache verify`]
 - **Lesson:** Never share lock files generated on another operating system. After adding dependencies, do a clean reinstall if native-binding errors appear.
+
+### Issue 3: Seed command failed with "Password must be at least 10 characters" (20 Nov 2026)
+
+- **Task:** Backend database design and implementation
+- **Symptom:** `npm run db:seed` applied the migration, then stopped with `Password must be at least 10 characters`.
+- **Cause:** `SEED_STAFF_PASSWORD=` was left empty in `.env` (as in `.env.example`). The seed command used the `??` operator, which treats an empty string as a real value, so it tried to hash an empty password instead of using the default.
+- **Resolution:** Changed `??` to `||` in `src/db/cli.ts`, so an empty value falls back to the default password.
+- **Lesson:** Environment variables copied from `.env.example` are often empty strings, not missing. Every place that reads `process.env` must treat empty as unset.
+
+### Issue 4: Two backend tests timed out on Windows (20 Nov 2026)
+
+- **Task:** Holder records API (full backend test run)
+- **Symptom:** `test/server.test.ts` timed out waiting for "UniVault backend listening", and a migration test in `test/db/schema.test.ts` exceeded the 5 s default timeout. The other 184 tests passed.
+- **Cause:** Each test file starts its own embedded PostgreSQL (PGlite, WebAssembly) and Vitest runs the files in parallel. On the development laptop, database start-up plus migrations under parallel load took longer than the test time limits.
+- **Resolution:** Raised Vitest `testTimeout` to 30 s and `hookTimeout` to 60 s, and the server-process test wait to 60 s. No application code changed.
+- **Lesson:** Time limits tuned on one machine can be too tight on another. Integration tests that start real services need generous timeouts.

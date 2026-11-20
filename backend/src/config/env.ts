@@ -48,6 +48,8 @@ const envSchema = z
     CREDENTIAL_OFFER_TTL_SECONDS: z.coerce.number().int().positive().default(600),
     VERIFICATION_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(300),
     REQUEST_BODY_LIMIT: z.string().default('100kb'),
+    // Folder with the credential JSON Schemas (default: <repo>/docs/schemas)
+    CREDENTIAL_SCHEMAS_DIR: z.string().min(1).optional(),
     // Issuer staff authentication
     JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().min(300).max(86400).default(3600),
     LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),

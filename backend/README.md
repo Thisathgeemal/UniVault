@@ -40,6 +40,8 @@ src/
   db/cli.ts              db:* commands
   lib/passwords.ts       scrypt password hashing
   services/issuer-keys.service.ts  key generation, rotation, JWKS publication
+  services/holders.service.ts      holder records (schema-validated, issuer-scoped)
+  services/credential-schemas.ts   loads docs/schemas and validates claims
   auth/tokens.ts         JWT access tokens (issue / verify)
   auth/auth-service.ts   staff login, account lockout
   auth/middleware.ts     requireAuth, requireRole, requireOwnIssuer
@@ -56,7 +58,7 @@ JSON body (size-limited) → `/api/v1` routes → 404 → error handler.
 | -------- | ----------------------------------------------- | ------------------------------- |
 | GET      | `/health`                                       | ✅ Implemented                  |
 | GET      | `/issuers`, `/issuers/:issuerId/keys`           | 501 – Sprint 1 (key management) |
-| GET/POST | `/holders`                                      | 501 – Sprint 1 (holder records) |
+| GET/POST | `/holders`, GET `/holders/:holderId`            | ✅ Implemented (login)          |
 | POST     | `/credentials`                                  | 501 – Sprint 1 (issuance)       |
 | POST     | `/credentials/:credentialId/revoke`, `/reissue` | 501 – Sprint 1                  |
 | POST     | `/credential-offers`                            | 501 – Sprint 1                  |
