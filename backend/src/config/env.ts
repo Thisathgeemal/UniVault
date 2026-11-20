@@ -7,6 +7,7 @@
  * refuses to start with a clear message if anything is missing or invalid.
  * Secret values are never included in error messages or logs.
  */
+import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
 const csvList = z
@@ -47,6 +48,12 @@ const envSchema = z
     CREDENTIAL_OFFER_TTL_SECONDS: z.coerce.number().int().positive().default(600),
     VERIFICATION_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(300),
     REQUEST_BODY_LIMIT: z.string().default('100kb'),
+    // Issuer staff authentication
+    JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().min(300).max(86400).default(3600),
+    LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
+    LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
+    LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(20),
+    LOGIN_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).default(15),
   })
   .superRefine((env, ctx) => {
     // Secrets that are optional while developing become mandatory in production
@@ -67,7 +74,12 @@ const envSchema = z
     }
   });
 
-export type AppConfig = z.infer<typeof envSchema>;
+export type AppConfig = z.infer<typeof envSchema> & {
+  /** Always set after loadConfig(). */
+  JWT_SECRET: string;
+  /** True when no JWT_SECRET was configured and a temporary one was generated (dev/test only). */
+  JWT_SECRET_IS_EPHEMERAL: boolean;
+};
 
 export class ConfigError extends Error {
   constructor(public readonly problems: string[]) {
@@ -92,5 +104,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       result.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`),
     );
   }
-  return result.data;
+  // Outside production a missing JWT_SECRET is replaced by a random one for this run only:
+  // logins work, but every restart signs everyone out. Production requires a real secret.
+  const ephemeral = !result.data.JWT_SECRET;
+  return {
+    ...result.data,
+    JWT_SECRET: result.data.JWT_SECRET ?? randomBytes(48).toString('base64url'),
+    JWT_SECRET_IS_EPHEMERAL: ephemeral,
+  };
 }

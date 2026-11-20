@@ -1,9 +1,10 @@
 import express from 'express';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { AppError } from '../src/lib/errors.js';
 import { createErrorHandler } from '../src/middleware/error-handler.js';
+import { authedTestApp, STAFF, type AuthedTestApp } from './auth-helpers.js';
 import { captureLogger, testApp, testConfig } from './helpers.js';
 
 const UUID = '6f1c2b1e-1b7a-4a43-9a51-0d0f0d1c0e11';
@@ -25,17 +26,31 @@ describe('server and routing', () => {
   it.each([
     ['GET', '/api/v1/issuers'],
     ['GET', '/api/v1/issuers/employer-a/keys'],
-    ['GET', '/api/v1/holders'],
     ['GET', `/api/v1/status/${UUID}`],
-    ['POST', `/api/v1/credentials/${UUID}/reissue`],
     ['POST', '/api/v1/credential-offers/token'],
     ['POST', '/api/v1/verifications'],
     ['GET', `/api/v1/verifications/${UUID}/result`],
-  ])('%s %s is routed (501 until its sprint)', async (method, path) => {
+  ])('public route %s %s is routed (501 until its sprint)', async (method, path) => {
     const res = await request(app)[method === 'GET' ? 'get' : 'post'](path);
     expect(res.status).toBe(501);
     expect(res.body.error.code).toBe('NOT_IMPLEMENTED');
     expect(res.body.error.message).toMatch(/planned for Sprint \d/);
+  });
+
+  it.each([
+    ['GET', '/api/v1/holders'],
+    ['POST', '/api/v1/holders'],
+    ['POST', '/api/v1/credentials'],
+    ['POST', `/api/v1/credentials/${UUID}/revoke`],
+    ['POST', `/api/v1/credentials/${UUID}/reissue`],
+    ['POST', '/api/v1/credential-offers'],
+    ['POST', '/api/v1/issuers/employer-a/keys'],
+    ['GET', '/api/v1/staff'],
+    ['GET', '/api/v1/auth/me'],
+  ])('protected route %s %s is routed and requires login (401)', async (method, path) => {
+    const res = await request(app)[method === 'GET' ? 'get' : 'post'](path);
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('UNAUTHENTICATED');
   });
 
   it('returns a JSON 404 for unknown routes', async () => {
@@ -74,19 +89,35 @@ describe('request IDs', () => {
 });
 
 describe('request validation', () => {
+  let authed: AuthedTestApp;
+  let officer: string;
+  let admin: string;
+  beforeAll(async () => {
+    authed = await authedTestApp();
+    [officer, admin] = await Promise.all([
+      authed.tokenFor(STAFF.employerOfficer),
+      authed.tokenFor(STAFF.employerAdmin),
+    ]);
+  });
+  afterAll(() => authed.database.close());
+
   it('rejects a body with missing and invalid fields, listing each problem', async () => {
-    const res = await request(app).post('/api/v1/credentials').send({ credentialType: 'Passport' });
+    const res = await request(authed.app)
+      .post('/api/v1/credentials')
+      .set('Authorization', `Bearer ${officer}`)
+      .send({ credentialType: 'Passport' });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
     const paths = res.body.error.details.map((d: { path: string }) => d.path);
-    expect(paths).toEqual(expect.arrayContaining(['issuerId', 'holderId', 'credentialType']));
+    expect(paths).toEqual(expect.arrayContaining(['holderId', 'credentialType']));
   });
 
   it('lets a valid body through to the handler', async () => {
-    const res = await request(app)
+    const res = await request(authed.app)
       .post('/api/v1/credentials')
-      .send({ issuerId: 'employer-a', holderId: 'P0001', credentialType: 'EmploymentCredential' });
-    expect(res.status).toBe(501); // passed validation, reached the (planned) handler
+      .set('Authorization', `Bearer ${officer}`)
+      .send({ holderId: 'P0001', credentialType: 'EmploymentCredential' });
+    expect(res.status).toBe(501); // passed auth + validation, reached the (planned) handler
   });
 
   it('validates route parameters', async () => {
@@ -99,22 +130,27 @@ describe('request validation', () => {
   });
 
   it('validates query parameters', async () => {
-    const res = await request(app).get('/api/v1/holders?limit=500');
+    const res = await request(authed.app)
+      .get('/api/v1/holders?limit=500')
+      .set('Authorization', `Bearer ${officer}`);
     expect(res.status).toBe(400);
     expect(res.body.error.details[0].path).toBe('limit');
   });
 
   it('validates parameters and body together', async () => {
-    const res = await request(app).post('/api/v1/credentials/bad-id/revoke').send({});
+    const res = await request(authed.app)
+      .post('/api/v1/credentials/bad-id/revoke')
+      .set('Authorization', `Bearer ${admin}`)
+      .send({});
     expect(res.status).toBe(400);
     expect(res.body.error.details[0].path).toBe('credentialId');
   });
 
   it('rejects malformed JSON with 400 INVALID_JSON', async () => {
     const res = await request(app)
-      .post('/api/v1/credentials')
+      .post('/api/v1/auth/login')
       .set('Content-Type', 'application/json')
-      .send('{"issuerId": ');
+      .send('{"email": ');
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('INVALID_JSON');
   });

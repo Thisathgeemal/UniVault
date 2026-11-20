@@ -1,25 +1,46 @@
 import { Router } from 'express';
+import type { AuthService } from '../auth/auth-service.js';
+import type { AuthMiddleware } from '../auth/middleware.js';
 import type { Database } from '../db/client.js';
+import { authRouter } from './auth.routes.js';
 import { credentialOffersRouter } from './credential-offers.routes.js';
 import { credentialsRouter } from './credentials.routes.js';
 import { healthRouter } from './health.routes.js';
 import { holdersRouter } from './holders.routes.js';
 import { issuersRouter } from './issuers.routes.js';
+import { staffRouter } from './staff.routes.js';
 import { statusRouter } from './status.routes.js';
 import { verificationsRouter } from './verifications.routes.js';
 
-/** All API routes, mounted under /api/v1 by app.ts. */
-export function apiRouter(info: {
+export interface ApiRouterDeps {
   version: string;
   environment: string;
   database?: Database;
-}): Router {
+  authService?: AuthService;
+  auth: AuthMiddleware;
+  loginRateLimit: { max: number; windowMinutes: number };
+}
+
+/** All API routes, mounted under /api/v1 by app.ts. */
+export function apiRouter(deps: ApiRouterDeps): Router {
   const router = Router();
-  router.use('/health', healthRouter(info));
-  router.use('/issuers', issuersRouter());
-  router.use('/holders', holdersRouter());
-  router.use('/credentials', credentialsRouter());
-  router.use('/credential-offers', credentialOffersRouter());
+  router.use('/health', healthRouter(deps));
+  router.use(
+    '/auth',
+    authRouter({
+      auth: deps.auth,
+      rateLimit: deps.loginRateLimit,
+      ...(deps.authService ? { authService: deps.authService } : {}),
+    }),
+  );
+  router.use(
+    '/staff',
+    staffRouter({ auth: deps.auth, ...(deps.database ? { db: deps.database.db } : {}) }),
+  );
+  router.use('/issuers', issuersRouter(deps.auth));
+  router.use('/holders', holdersRouter(deps.auth));
+  router.use('/credentials', credentialsRouter(deps.auth));
+  router.use('/credential-offers', credentialOffersRouter(deps.auth));
   router.use('/status', statusRouter());
   router.use('/verifications', verificationsRouter());
   return router;

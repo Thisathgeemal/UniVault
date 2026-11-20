@@ -39,6 +39,9 @@ src/
   db/seed.ts             loads seed-data/ (issuers, staff, holders)
   db/cli.ts              db:* commands
   lib/passwords.ts       scrypt password hashing
+  auth/tokens.ts         JWT access tokens (issue / verify)
+  auth/auth-service.ts   staff login, account lockout
+  auth/middleware.ts     requireAuth, requireRole, requireOwnIssuer
 migrations/              versioned SQL migrations (source of truth for the schema)
 test/                    config, HTTP (supertest) and server-process tests
 ```
@@ -135,3 +138,25 @@ The server applies new migrations at start-up (`DB_AUTO_MIGRATE=true`), and
 
 See `docs/database/database-design.md` for the ER diagram and the rules each
 table enforces.
+
+## Authentication
+
+Issuer staff log in with `POST /api/v1/auth/login` and send the returned
+token as `Authorization: Bearer <token>`. The holder, credential, offer, staff
+and key-management routes require login:
+
+- **Officers:** can issue and reissue credentials.
+- **Admins:** can also revoke credentials, manage keys and list staff.
+- **Isolation:** staff can only act for their own issuer.
+
+**Security measures:**
+
+- account lockout after repeated failures
+- a per-IP rate limit on login attempts
+- the same error for every failed login, so accounts can't be discovered
+- role and active status re-checked on every request
+
+See `docs/security/issuer-staff-authentication.md`.
+
+**Development logins** (after `npm run db:seed`): `admin@…` / `officer@…` for
+each issuer, with password `UniVault-Dev-2026!` (or `SEED_STAFF_PASSWORD`).

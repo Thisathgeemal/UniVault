@@ -27,7 +27,8 @@ describe('environment configuration', () => {
 
   it('treats empty values (as copied from .env.example) as not set', () => {
     const config = loadConfig({ JWT_SECRET: '', DATABASE_URL: '', PORT: '' });
-    expect(config.JWT_SECRET).toBeUndefined();
+    expect(config.JWT_SECRET_IS_EPHEMERAL).toBe(true); // empty → treated as unset
+    expect(config.DATABASE_URL).toBe('pglite://./.data/univault');
     expect(config.PORT).toBe(4000);
   });
 
@@ -85,6 +86,26 @@ describe('environment configuration', () => {
         ISSUER_KEY_PASSPHRASE: 'a-long-passphrase',
       }),
     ).toThrow(/DATABASE_URL: must be a postgres:\/\/ URL in production/);
+  });
+
+  it('generates a temporary JWT secret outside production when none is set', () => {
+    const a = loadConfig({});
+    const b = loadConfig({});
+    expect(a.JWT_SECRET_IS_EPHEMERAL).toBe(true);
+    expect(a.JWT_SECRET.length).toBeGreaterThanOrEqual(32);
+    expect(a.JWT_SECRET).not.toBe(b.JWT_SECRET);
+    const fixed = loadConfig({ JWT_SECRET: 'x'.repeat(40) });
+    expect(fixed).toMatchObject({ JWT_SECRET: 'x'.repeat(40), JWT_SECRET_IS_EPHEMERAL: false });
+  });
+
+  it('applies login protection defaults', () => {
+    expect(loadConfig({})).toMatchObject({
+      JWT_EXPIRES_IN_SECONDS: 3600,
+      LOGIN_MAX_FAILED_ATTEMPTS: 5,
+      LOGIN_LOCKOUT_MINUTES: 15,
+      LOGIN_RATE_LIMIT_MAX: 20,
+    });
+    expect(() => loadConfig({ JWT_EXPIRES_IN_SECONDS: '60' })).toThrow(/JWT_EXPIRES_IN_SECONDS/);
   });
 
   it('never includes secret values in error messages', () => {

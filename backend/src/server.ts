@@ -27,6 +27,11 @@ function readConfig(): AppConfig {
 
 const config = readConfig();
 const logger = createLogger(config);
+if (config.JWT_SECRET_IS_EPHEMERAL) {
+  logger.warn(
+    'JWT_SECRET is not set – using a temporary secret; staff will be signed out on every restart',
+  );
+}
 
 const database = await createDatabase(config.DATABASE_URL);
 if (config.DB_AUTO_MIGRATE) {

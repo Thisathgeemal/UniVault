@@ -12,6 +12,9 @@ import express, { type Express } from 'express';
 import helmet from 'helmet';
 import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
+import { createAuthService } from './auth/auth-service.js';
+import { createAuthMiddleware } from './auth/middleware.js';
+import { createTokenService } from './auth/tokens.js';
 import type { AppConfig } from './config/env.js';
 import type { Database } from './db/client.js';
 import { AppError } from './lib/errors.js';
@@ -80,12 +83,26 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
   app.use(express.json({ limit: config.REQUEST_BODY_LIMIT }));
 
   // 5. Routes
+  const tokens = createTokenService(config.JWT_SECRET, config.JWT_EXPIRES_IN_SECONDS);
+  const authService = deps.database
+    ? createAuthService(deps.database.db, tokens, {
+        maxFailedAttempts: config.LOGIN_MAX_FAILED_ATTEMPTS,
+        lockoutMinutes: config.LOGIN_LOCKOUT_MINUTES,
+      })
+    : undefined;
+  const auth = createAuthMiddleware({ tokens, ...(authService ? { authService } : {}) });
   app.use(
     API_PREFIX,
     apiRouter({
       version: APP_VERSION,
       environment: config.NODE_ENV,
+      auth,
+      loginRateLimit: {
+        max: config.LOGIN_RATE_LIMIT_MAX,
+        windowMinutes: config.LOGIN_RATE_LIMIT_WINDOW_MINUTES,
+      },
       ...(deps.database ? { database: deps.database } : {}),
+      ...(authService ? { authService } : {}),
     }),
   );
 
