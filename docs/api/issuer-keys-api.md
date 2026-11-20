@@ -97,7 +97,8 @@ format (RFC 7517), so any verifier can fetch them without logging in.
 | Situation                                 | Status                                                   |
 | ----------------------------------------- | -------------------------------------------------------- |
 | No login                                  | 401                                                      |
-| An officer, or an admin of another issuer | 403                                                      |
+| Malformed issuer ID                       | 400 `VALIDATION_ERROR`                                   |
+| An officer, or an admin of another issuer | 403 `FORBIDDEN`                                          |
 | `ISSUER_KEY_PASSPHRASE` not configured    | 503 `KEY_PASSPHRASE_NOT_CONFIGURED` (nothing is written) |
 
 ## 3. How a verifier uses it
@@ -107,8 +108,9 @@ format (RFC 7517), so any verifier can fetch them without logging in.
 3. Pick the key whose `kid` matches.
 4. Verify the RS256 signature with it (`verifySdJwt` in `crypto-core`).
 
-The test suite performs exactly these steps end to end, with a credential signed
-by the stored private key.
+The test suites perform exactly these steps end to end: `issuer-keys.test.ts`
+with a credential signed by the stored private key, and `credentials.test.ts`
+with credentials signed by the issuance service.
 
 ## 4. Key generation and storage
 
@@ -131,7 +133,10 @@ Generating a new key for an issuer that already has one:
 Both steps run in **one database transaction**, so there's never a moment with
 zero or two active keys. Retired keys stay in the key set, so **credentials
 signed before the rotation keep verifying**. New credentials are signed with the
-new key.
+new key: `signCredential()` always loads the issuer's **active** key, and
+`backend/test/credentials.test.ts` checks that a credential signed after a
+rotation carries the new `kid` and verifies, while an older one still verifies
+with the retired key.
 
 If the database step fails, the newly written key files are deleted, so no
 unpublished private key is left on disk.

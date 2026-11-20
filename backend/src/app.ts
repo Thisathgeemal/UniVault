@@ -21,6 +21,7 @@ import { AppError } from './lib/errors.js';
 import { createErrorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { apiRouter } from './routes/index.js';
 import { loadCredentialSchemas } from './services/credential-schemas.js';
+import { createCredentialsService } from './services/credentials.service.js';
 import { createHoldersService } from './services/holders.service.js';
 import { createIssuerKeysService } from './services/issuer-keys.service.js';
 
@@ -104,6 +105,13 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
   // Credential schemas are loaded at start-up: a missing or broken schema stops the server early
   const schemas = loadCredentialSchemas(config.CREDENTIAL_SCHEMAS_DIR);
   const holders = deps.database ? createHoldersService(deps.database.db, schemas) : undefined;
+  const credentials = deps.database
+    ? createCredentialsService(deps.database.db, schemas, {
+        keysDir: config.ISSUER_KEYS_DIR,
+        passphrase: config.ISSUER_KEY_PASSPHRASE,
+        publicBaseUrl: config.PUBLIC_BASE_URL,
+      })
+    : undefined;
   app.use(
     API_PREFIX,
     apiRouter({
@@ -118,6 +126,7 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
       ...(authService ? { authService } : {}),
       ...(issuerKeys ? { issuerKeys } : {}),
       ...(holders ? { holders } : {}),
+      ...(credentials ? { credentials } : {}),
     }),
   );
 

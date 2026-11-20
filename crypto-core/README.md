@@ -3,16 +3,22 @@
 Shared cryptography for UniVault. It wraps `@sd-jwt/core` (Decision 006) and
 holds the key-management helpers used by the backend.
 
-| Entry point                  | Runs on      | Contents                                              |
-| ---------------------------- | ------------ | ----------------------------------------------------- |
-| `@univault/crypto-core/node` | Node.js only | Issuer RS256 key generation, JWKS export, key storage |
-| _(planned)_ universal entry  | Node + Expo  | SD-JWT issue / present / verify wrappers              |
+| Entry point                  | Runs on                         | Contents                                                                                                                                                                                                                        |
+| ---------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@univault/crypto-core`      | Node.js and React Native (Expo) | `decodeDisclosures`, `validateDisclosures`, `decodeDisclosure`, `disclosureDigest`, `decodeSdJwt`, `sha256Hasher`, `computeEcJwkThumbprint`, constants (`SD_HASH_ALG`, `SD_JWT_VC_TYP`, `SALT_BYTES`, `NON_DISCLOSABLE_CLAIMS`) |
+| `@univault/crypto-core/node` | Node.js only                    | Everything above, plus issuer RS256 key generation, JWKS export, key storage (`generateIssuerKeys`, `saveIssuerKeyPair`, `loadIssuerPrivateKey`, `toJwks`, `computeRsaJwkThumbprint`, …), `createSdJwt`, `verifySdJwt`          |
+
+Holder presentation and key-binding verification (`verifyPresentation`) are
+planned for Sprint 3.
 
 ## Scripts
 
 ```
 npm install
-npm test          # vitest
+npm test          # vitest (158 tests)
+npm run test:coverage # tests + coverage table (fails below the thresholds)
+npm run test:report # tests + coverage, listing every test name
+npm run test:watch # vitest in watch mode
 npm run typecheck # tsc --noEmit
 npm run build     # compile to dist/
 npm run demo:issue # build, create a sample credential and print its contents
@@ -147,3 +153,27 @@ It also rejects:
 
 `decodeDisclosures` does **not** check the issuer signature. Without that check,
 `_sd` itself could be fake, so use `verifySdJwt` whenever trust matters.
+
+## Holder key thumbprints (`computeEcJwkThumbprint`)
+
+Runs on Node.js **and** the phone (pure JavaScript, no `node:crypto`).
+
+```ts
+import { computeEcJwkThumbprint } from '@univault/crypto-core';
+
+const thumbprint = computeEcJwkThumbprint({ kty: 'EC', crv: 'P-256', x, y });
+// e.g. "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s" (43-character Base64URL)
+```
+
+- **What it is:** the RFC 7638 JWK thumbprint, i.e. SHA-256 over
+  `{"crv","kty","x","y"}` in that order, Base64URL-encoded.
+- **Where it is used:** the backend stores the thumbprint of the wallet key in
+  a credential's `cnf.jwk` as `holder_key_thumbprint`. The wallet can compute
+  the same value to identify its key.
+- **Other members** (`kid`, `alg`, `use`, even `d`) are ignored. The function
+  does not check that the key is public: callers that accept keys from outside,
+  like the backend's `signCredential`, must reject `d` themselves.
+- **Errors:** throws for a non-EC key, a missing `crv`, `x` or `y`, or
+  coordinates that are not Base64URL.
+- **RSA keys:** use `computeRsaJwkThumbprint` from `./node`. Issuer `kid`s are
+  computed with it.

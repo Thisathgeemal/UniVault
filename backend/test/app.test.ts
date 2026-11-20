@@ -114,8 +114,10 @@ describe('request validation', () => {
     const res = await request(authed.app)
       .post('/api/v1/credentials')
       .set('Authorization', `Bearer ${officer}`)
-      .send({ holderId: 'P0001', credentialType: 'EmploymentCredential' });
-    expect(res.status).toBe(501); // passed auth + validation, reached the (planned) handler
+      .send({ holderId: UUID, credentialType: 'EmploymentCredential' });
+    // passed auth + validation and reached the handler, which looks the holder up
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('HOLDER_NOT_FOUND');
   });
 
   it('validates route parameters', async () => {

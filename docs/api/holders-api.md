@@ -13,7 +13,8 @@ A **holder record** is an issuer's own record of a person:
 - a bank's customer
 
 Issuer staff create and look up these records in the issuer portal. Credentials
-are issued from them in the next task.
+are issued from them with `POST /api/v1/credentials` (see
+[credentials-api.md](credentials-api.md)).
 
 ## 2. Endpoints (login required, officer or admin)
 

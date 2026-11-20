@@ -1,8 +1,10 @@
 # Development Setup
 
 How to get a UniVault development environment running and which shared tooling the repository
-uses. The individual apps are scaffolded in later sprints; each app's own README will add
-app-specific steps.
+uses. `crypto-core/` and `backend/` exist and have their own READMEs
+([crypto-core/README.md](../crypto-core/README.md), [backend/README.md](../backend/README.md)).
+The portals, wallet and AI service are scaffolded in later sprints; each app's own README will
+add app-specific steps.
 
 ## Prerequisites
 
@@ -49,7 +51,10 @@ For wallet testing on a phone, the phone and the laptop must be on the same Wi-F
    Windows (PowerShell): `Copy-Item backend/.env.example backend/.env`
 
 3. Fill in the values. Every variable is documented by a comment in its template. In particular:
-   - `backend/.env`: set `DATABASE_URL` and generate a random `JWT_SECRET`.
+   - `backend/.env`: generate a random `JWT_SECRET` and set `ISSUER_KEY_PASSPHRASE` (at least
+     12 characters; needed by `npm run keys:init` and for signing credentials). Leave
+     `DATABASE_URL` empty to use the embedded development database (PGlite in
+     `backend/.data/`); set a `postgres://` URL only for a real PostgreSQL server.
    - `wallet/.env`: set `EXPO_PUBLIC_API_BASE_URL` to the laptop's **LAN IP**
      (e.g. `http://192.168.1.20:4000`), not `localhost`. On a phone, `localhost` is the phone.
      Find the IP with `ipconfig` (Windows) or `ipconfig getifaddr en0` (macOS).
@@ -64,7 +69,16 @@ For wallet testing on a phone, the phone and the laptop must be on the same Wi-F
    python -m pip install ruff
    ```
 
-5. Check that no secrets are tracked before your first commit:
+5. Set up the backend database and issuer signing keys (inside `backend/`):
+
+   ```bash
+   npm install
+   npm run db:seed     # migrations + synthetic issuers, staff and holders
+   npm run keys:init   # one signing key per issuer
+   npm run dev         # http://localhost:4000/api/v1/health
+   ```
+
+6. Check that no secrets are tracked before your first commit:
 
    ```bash
    npm run check:secrets
@@ -99,6 +113,11 @@ Run these from the repository root.
 | `npm run format`        | Formats all supported files with Prettier                                            |
 | `npm run format:check`  | Checks formatting without changing files (use before committing)                     |
 | `npm run check:secrets` | Fails if any `.env` (except `.env.example`), `.pem` or `.key` file is tracked by Git |
+| `npm run seed:generate` | Regenerates the synthetic data in `backend/seed-data/` and formats it                |
+
+Package tests run inside each package: `cd crypto-core && npm test` and
+`cd backend && npm test`. **On Windows, run them from PowerShell or cmd, not Git Bash**:
+under Git Bash, Vitest fails in every test file because of how the drive path is reported.
 
 Python (run inside `ai-service/` with the virtual environment active):
 

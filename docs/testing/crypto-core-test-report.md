@@ -1,14 +1,14 @@
 # Test Report – crypto-core (shared cryptographic core)
 
-|                          |                                                                                                  |
-| ------------------------ | ------------------------------------------------------------------------------------------------ |
-| **Component**            | `crypto-core/` (`@univault/crypto-core`)                                                         |
-| **Sprint**               | Sprint 1 (16–21 Nov 2026)                                                                        |
-| **Test run date**        | _fill in: date of your run_                                                                      |
-| **Environment**          | _fill in: e.g. Windows 11, Node.js 22.x_ · Vitest 5.1.1 · TypeScript 5.9.3 · @sd-jwt/core 0.25.0 |
-| **Command**              | `cd crypto-core && npm run test:coverage`                                                        |
-| **Result**               | **148 / 148 tests passed · 0 failed**                                                            |
-| **Requirements covered** | FR-ISS-02, FR-WAL-06, FR-VER-02, NFR-01, NFR-06                                                  |
+|                          |                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| **Component**            | `crypto-core/` (`@univault/crypto-core`)                                                 |
+| **Sprint**               | Sprint 1 (16–21 Nov 2026)                                                                |
+| **Test run date**        | 20 November 2026                                                                         |
+| **Environment**          | Windows 11 Home, Node.js 26.13.1 · Vitest 5.1.1 · TypeScript 5.9.3 · @sd-jwt/core 0.25.0 |
+| **Command**              | `cd crypto-core && npm run test:coverage`                                                |
+| **Result**               | **158 / 158 tests passed · 0 failed**                                                    |
+| **Requirements covered** | FR-ISS-02, FR-WAL-06, FR-VER-02, NFR-01, NFR-06                                          |
 
 ## 1. Purpose and scope
 
@@ -30,6 +30,7 @@ This supports the security and privacy success criterion of the evaluation
 - Issuer signature and integrity verification (`verifySdJwt`)
 - Disclosure decoding and validation (`decodeDisclosures`, `validateDisclosures`)
 - Inspection (`decodeSdJwt`)
+- Holder key thumbprints (`computeEcJwkThumbprint`, RFC 7638)
 
 **Out of scope (tested in later sprints):**
 
@@ -46,7 +47,8 @@ This supports the security and privacy success criterion of the evaluation
 | `sd-jwt-verifier.test.ts`    | Signature, algorithm, kid, disclosures, expiry checks; tampering; malformed tokens    | 31      | 31      |
 | `disclosures.test.ts`        | Disclosure decoding, value extraction, digest validation, tampering rejection         | 33      | 33      |
 | `security-scenarios.test.ts` | End-to-end acceptance scenarios S1–S5 (TC-01 to TC-36)                                | 36      | 36      |
-| **Total**                    |                                                                                       | **148** | **148** |
+| `jwk-thumbprint.test.ts`     | RFC 7638 thumbprint of the holder's EC P-256 key (scenario S6)                        | 10      | 10      |
+| **Total**                    |                                                                                       | **158** | **158** |
 
 ## 3. Required scenarios: results
 
@@ -109,18 +111,35 @@ the same behaviour.
 | TC-35         | Tampered public key file (key swapped, kid kept)                                | Detected on load              | ✅ Pass |
 | TC-36         | Hasher with unsupported algorithm / binary input                                | Rejected / correct digest     | ✅ Pass |
 
+### S6 – Holder key thumbprint (added with the credential issuance API)
+
+The backend stores the RFC 7638 thumbprint of the wallet key in `cnf.jwk` as
+`holder_key_thumbprint`. These cases are in `jwk-thumbprint.test.ts`.
+
+| ID    | Test case                                                                         | Expected                                      | Result  |
+| ----- | --------------------------------------------------------------------------------- | --------------------------------------------- | ------- |
+| TP-01 | RFC 7517 A.1 P-256 example key (value cross-checked with jose)                    | `cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s` | ✅ Pass |
+| TP-02 | Members hashed as `{"crv","kty","x","y"}` whatever the input order                | Equals SHA-256 of the canonical JSON          | ✅ Pass |
+| TP-03 | Extra members (`kid`, `alg`, `use`, `d`) are ignored                              | Same thumbprint                               | ✅ Pass |
+| TP-04 | Two generated keys                                                                | 43-character Base64URL, different values      | ✅ Pass |
+| TP-05 | Non-EC key, missing `crv` / `x` / `y`, non-Base64URL coordinate, non-object input | Clear error                                   | ✅ Pass |
+
 ## 4. Code coverage
 
 Measured with `@vitest/coverage-v8` over `crypto-core/src`. The run fails if
 coverage drops below the thresholds (statements 95%, branches 90%, functions
 100%, lines 95%).
 
-| Metric     | Coverage | Threshold |
-| ---------- | -------- | --------- |
-| Statements | 97.51%   | 95%       |
-| Branches   | 93.46%   | 90%       |
-| Functions  | 100%     | 100%      |
-| Lines      | 99.09%   | 95%       |
+| Metric     | Coverage           | Threshold |
+| ---------- | ------------------ | --------- |
+| Statements | 97.63% (248 / 254) | 95%       |
+| Branches   | 93.89% (200 / 213) | 90%       |
+| Functions  | 100% (41 / 41)     | 100%      |
+| Lines      | 99.14% (231 / 233) | 95%       |
+
+Per file (lines): `jwk-thumbprint.ts`, `disclosures.ts`, `decode.ts`, `hash.ts`,
+`constants.ts` and `sd-jwt-issuer.ts` 100%; `sd-jwt-verifier.ts` 98.63%;
+`issuer-keys.ts` 97.67%.
 
 Before this task, coverage was 94.51% statements, 89.11% branches and 96.8%
 lines. The scenario suite added tests for previously unexercised error paths.
@@ -151,7 +170,7 @@ npm run test:report     # same, listing every test name
 
 ## 7. Conclusion
 
-All 148 tests pass, covering all five required scenarios:
+All 158 tests pass, covering all five required scenarios:
 
 - **Valid credentials** verify.
 - **Tampering is detected.** Any change to the signed payload fails signature
@@ -159,5 +178,6 @@ All 148 tests pass, covering all five required scenarios:
   rejected, even when the issuer signature is intact.
 - **Invalid input** is handled with clear error codes and no crashes.
 
-The core is ready for use by the backend issuance API and the verifier in
-later sprints.
+The core is now used by the backend credential issuance API:
+`backend/test/credentials.test.ts` verifies backend-signed credentials with
+`verifySdJwt` and `decodeDisclosures`. The verifier will use it in Sprint 3.

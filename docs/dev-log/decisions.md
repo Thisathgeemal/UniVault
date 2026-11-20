@@ -110,6 +110,7 @@ The credential will separate information into two categories:
 These claims describe the credential itself rather than the personal information of the holder.
 
 Examples:
+
 - `iss` – Issuer identifier.
 - `iat` – Credential issuance time.
 - `exp` – Credential expiration time.
@@ -123,6 +124,7 @@ These claims remain visible to support credential identification, issuer verific
 These claims contain information about the credential holder.
 
 Examples:
+
 - Employment credential: employee ID, designation, department and joining date.
 - KYC credential: name, date of birth, nationality and derived age-related information.
 
@@ -181,6 +183,7 @@ The following principles will be applied:
 Include information necessary to establish the holder's employment relationship and relevant employment details.
 
 Examples:
+
 - Employee ID.
 - Designation.
 - Department.
@@ -194,6 +197,7 @@ Unrelated personal or administrative information from the original employment re
 Include information necessary to establish the customer's identity and support the intended verification activities.
 
 Examples:
+
 - Full name.
 - Date of birth, where required for deriving age-related claims.
 - Nationality.
@@ -335,12 +339,12 @@ Use **@sd-jwt/core**, pinned to exact version **0.25.0**, in both the backend an
 
 The library will be wrapped by UniVault's `crypto-core` module, which will inject platform-specific cryptographic functions:
 
-| Function | Backend (Node.js) | Wallet (Expo) |
-|---|---|---|
-| SHA-256 hashing | @noble/hashes or node:crypto | @noble/hashes (pure JavaScript) |
-| Random salts | crypto.getRandomValues | expo-crypto getRandomBytes |
-| Issuer signing | RS256 via node:crypto | Not required |
-| Key-binding signing | Verification only | ES256 via @noble/curves (Decision 007) |
+| Function            | Backend (Node.js)            | Wallet (Expo)                          |
+| ------------------- | ---------------------------- | -------------------------------------- |
+| SHA-256 hashing     | @noble/hashes or node:crypto | @noble/hashes (pure JavaScript)        |
+| Random salts        | crypto.getRandomValues       | expo-crypto getRandomBytes             |
+| Issuer signing      | RS256 via node:crypto        | Not required                           |
+| Key-binding signing | Verification only            | ES256 via @noble/curves (Decision 007) |
 
 A custom module will not be developed. It remains a documented fallback.
 
@@ -400,14 +404,14 @@ Use **ES256 (ECDSA with P-256 and SHA-256)** for the holder key-binding JWT, imp
 
 Issuer credential signatures **remain RS256**, as specified in the mid-point report.
 
-| Signature | Algorithm | Where it runs |
-|---|---|---|
-| Issuer credential signature | RS256 | Backend (Node.js native crypto) |
-| Holder key-binding JWT | ES256 | Mobile wallet (@noble/curves) |
+| Signature                   | Algorithm | Where it runs                   |
+| --------------------------- | --------- | ------------------------------- |
+| Issuer credential signature | RS256     | Backend (Node.js native crypto) |
+| Holder key-binding JWT      | ES256     | Mobile wallet (@noble/curves)   |
 
 The verifier will accept only RS256 for issuer signatures and only ES256 for key-binding JWTs (`allowedIssuerAlgorithms` and `allowedKeyBindingAlgorithms`).
 
-NFR-01 is refined as follows: *issuer-signed credentials shall use RS256; holder key-binding proofs shall use ES256.*
+NFR-01 is refined as follows: _issuer-signed credentials shall use RS256; holder key-binding proofs shall use ES256._
 
 ### Reason
 
@@ -425,3 +429,127 @@ NFR-01 is refined as follows: *issuer-signed credentials shall use RS256; holder
 - The verifier must support two algorithms: RS256 for the issuer signature and ES256 for key binding.
 - The final report must document NFR-01 as refined, with the justification above.
 - If the supervisor requires RS256 for key binding, Option 2 (native module with an Expo development build) is the fallback, with additional setup effort in Sprint 2.
+
+# Decision 008: PostgreSQL, with Embedded PGlite for Development and Hand-Written Migrations
+
+- **Date:** 20 November 2026
+- **Sprint:** S1
+- **Status:** Draft – review
+
+### Context
+
+The backend stores issuers, signing-key metadata, staff, holder records, credential records and offers. These records have real relationships (issuer → holder → credential → offer, and reissue chains between credentials), and several integrity rules matter for security: one active signing key per issuer, a credential that is not pending must record the key it was signed with, and pre-authorised codes are stored only as hashes.
+
+The developer works on Windows, on a five-week schedule, and wanted no database server to install or run during development and tests. Claims differ between the Employment and KYC credentials, so part of the data is document-shaped.
+
+### Options considered
+
+1. **PostgreSQL server for all environments:** the real database everywhere, but it must be installed and running for every development session and test run.
+2. **SQLite for development, PostgreSQL in production:** easy locally, but a different SQL dialect, so constraints and queries could behave differently in production.
+3. **PostgreSQL, with PGlite (PostgreSQL compiled to WebAssembly) for development and tests:** the same database engine everywhere, with nothing to install locally.
+4. **A document database (e.g. MongoDB):** flexible claims, but integrity rules would have to live in application code.
+
+For schema changes: **drizzle-kit generated migrations** or **hand-written SQL migrations**.
+
+### Decision
+
+Use **PostgreSQL**. Development uses an embedded **PGlite** database (`DATABASE_URL=pglite://./.data/univault`), tests use an in-memory PGlite database (`pglite://memory`), and production requires a `postgres://` URL.
+
+Schema changes are **hand-written SQL files** in `backend/migrations/` (`NNNN_description.sql`), applied in order, each in a transaction, and protected by a checksum. Queries use **Drizzle ORM**; `src/db/schema.ts` mirrors the SQL and a test checks the two agree. drizzle-kit is not used.
+
+### Reason
+
+- Integrity rules are enforced by the database itself (foreign keys, CHECK constraints, partial unique indexes), not only by application code.
+- `jsonb` stores the claims, which differ per credential type, without giving up relational integrity.
+- PGlite is genuine PostgreSQL, so development, tests and production run the same SQL, with no native binaries to install on Windows.
+- Each test file gets a fresh in-memory database, so tests are isolated and repeatable.
+- Hand-written DDL is easy to review and can be quoted in the report; drizzle-kit would add extra native binaries.
+
+### Consequences
+
+- Production refuses the embedded database (`DATABASE_URL` must be `postgres://…`).
+- Applied migrations must never be edited; every change is a new migration file, and `schema.ts` must be updated to match.
+- PGlite has a single connection and runs one transaction at a time: code inside a transaction must use the transaction handle (`tx`), or it waits on itself (see Sprint 1, Issues and resolutions).
+- PGlite start-up is slow on Windows, so the test timeouts are generous.
+
+# Decision 009: Issuer Staff Authentication (JWT, Database Re-Check and Lockout)
+
+- **Date:** 20 November 2026
+- **Sprint:** S1
+- **Status:** Draft – review
+
+### Context
+
+Issuer staff (officers and admins at employers and banks) must log in to the issuer portal before they can create holder records, issue credentials or manage signing keys. Each staff member belongs to exactly one issuer, and one issuer must never see or act on another issuer's data. Verifiers and wallets do not log in as staff.
+
+### Options considered
+
+1. **Server-side sessions with a cookie:** easy to revoke, but needs a session store and CSRF protection, and is awkward for a separate portal origin.
+2. **Stateless JWT access tokens only:** simple and scalable, but a disabled account or a changed role keeps working until the token expires.
+3. **Short-lived JWT access tokens, with the staff member reloaded from the database on every request:** stateless tokens, but changes to an account take effect immediately.
+4. **An external identity provider (OAuth/OIDC):** strong, but too much setup for the prototype.
+
+### Decision
+
+Use option 3:
+
+- Login with email and password returns a **HS256 JWT** (1 hour by default, `JWT_EXPIRES_IN_SECONDS`) with issuer `univault-backend` and audience `univault-issuer-portal`. Only HS256 is accepted.
+- `requireAuth` verifies the token and **reloads the staff member from the database** on every request; role, active status and issuer come from the database, not from the token.
+- **Roles:** officers manage holders and issue credentials; admins can also revoke, manage keys and list staff.
+- **Isolation:** the issuer always comes from the login, never from the request body. Another issuer's records return `404`; a wrong `:issuerId` in the URL returns `403`.
+- **Brute-force protection:** an account is locked for 15 minutes after 5 consecutive failed logins (`423`), and a per-IP rate limit allows 20 login attempts per 15 minutes (`429`).
+- Passwords are stored as **scrypt** hashes; every failed login returns the same `401 INVALID_CREDENTIALS`, and a hash is always checked so response times are similar.
+
+### Reason
+
+- Reloading the staff member on each request removes the main weakness of stateless tokens (disabled users and changed roles) at the cost of one indexed query.
+- Taking the issuer from the login, and answering `404` for other issuers' records, prevents one organisation from discovering or changing another's data.
+- Lockout and rate limiting together slow down guessing against one account and across many accounts.
+- jose and scrypt are well-tested building blocks, so no cryptography is written by hand.
+
+### Consequences
+
+- Logout does not invalidate a token on the server; tokens are short-lived and the portal discards them. A deny-list or refresh tokens could be added later.
+- The rate limiter counts in memory; several backend instances would need a shared store.
+- `JWT_SECRET` is required in production; in development a temporary secret is generated, so everyone is signed out on restart.
+- No multi-factor authentication or password reset in the prototype. Details: `docs/security/issuer-staff-authentication.md`.
+
+# Decision 010: Credential Signing Deferred to Wallet Redemption (Holder Binding)
+
+- **Date:** 20 November 2026
+- **Sprint:** S1
+- **Status:** Draft – review
+
+### Context
+
+Every UniVault credential carries `cnf.jwk`, the public key of the holder's wallet (Decision 007). The verifier later checks a key-binding JWT signed with the matching private key, which stops a copied credential from being presented by someone else.
+
+The wallet key is created on the phone and only reaches the issuer when the holder scans the QR offer and redeems it (Sprint 2). Issuer staff, however, start issuance from the issuer portal before that moment.
+
+### Options considered
+
+1. **Sign when staff click "issue", without `cnf`:** simple, but the credential is not bound to any device and can be replayed by anyone who obtains it.
+2. **Sign when staff click "issue", with a placeholder key, and re-sign later:** two signatures for one credential, and the first one would be unbound.
+3. **Create a pending record when staff issue, and sign at redemption with the wallet's key:** one signature, always bound to the real wallet key.
+
+### Decision
+
+Use option 3:
+
+- `POST /api/v1/credentials` creates a **pending** credential record: claims re-validated against the schema and snapshotted, `age_over_18` recalculated, expiry fixed. Nothing is signed.
+- `signCredential(credentialId, holderPublicJwk)` in `backend/src/services/credentials.service.ts` signs the SD-JWT with the issuer's **active** key when the wallet redeems its offer. It accepts only an EC P-256 **public** JWK, recalculates `age_over_18` on the signing date, and updates the record `WHERE status = 'pending'`, so a credential is signed at most once.
+- The compact SD-JWT is returned to the caller only; it is never stored or logged. The record keeps `issuer_kid` and the RFC 7638 `holder_key_thumbprint`.
+- A holder can have only one `pending` or `valid` credential of each type; the holder row is locked during that check.
+
+### Reason
+
+- A credential is never signed without a holder key, so every credential in circulation is device-bound.
+- Exactly one signature per credential keeps the audit trail simple: `issued_at`, `issuer_kid` and the holder key are recorded together, as the database CHECK constraint requires.
+- Signing at redemption also uses the issuer's current key, so key rotation needs no special handling for credentials issued but not yet collected.
+
+### Consequences
+
+- The Sprint 2 redemption endpoint (`POST /credential-offers/credential`) must call `signCredential` after checking the pre-authorised code; no other code path signs credentials.
+- A pending credential that is never redeemed blocks a new credential of the same type for that holder until it expires. The revoke task must therefore accept `pending` credentials as well as `valid` ones.
+- `kyc_verification_date` is taken from the date the pending record was created, not from the signing date.
+- Details: `docs/api/credentials-api.md`.

@@ -303,8 +303,9 @@ describe('AC5 – issuer role restrictions are enforced', () => {
     const issue = await request(t.app)
       .post('/api/v1/credentials')
       .set(bearer(officer))
-      .send({ holderId: 'x', credentialType: 'EmploymentCredential' });
-    expect(issue.status).toBe(501);
+      .send({ holderId: UUID, credentialType: 'EmploymentCredential' });
+    expect(issue.status).toBe(404); // allowed for officers: reached the holder lookup
+    expect(issue.body.error.code).toBe('HOLDER_NOT_FOUND');
     expect(
       (await request(t.app).post(`/api/v1/credentials/${UUID}/reissue`).set(bearer(officer)))
         .status,

@@ -153,6 +153,10 @@ export const holdersRelations = relations(holders, ({ one, many }) => ({
 export const credentialRecordsRelations = relations(credentialRecords, ({ one, many }) => ({
   issuer: one(issuers, { fields: [credentialRecords.issuerId], references: [issuers.id] }),
   holder: one(holders, { fields: [credentialRecords.holderId], references: [holders.id] }),
+  createdBy: one(issuerStaff, {
+    fields: [credentialRecords.createdByStaffId],
+    references: [issuerStaff.id],
+  }),
   signingKey: one(issuerKeys, {
     fields: [credentialRecords.issuerKid],
     references: [issuerKeys.kid],

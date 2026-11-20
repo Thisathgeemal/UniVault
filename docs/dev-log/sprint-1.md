@@ -127,3 +127,19 @@ Record the tests that show the sprint goal is met, with links to output in `evid
 - **Cause:** Each test file starts its own embedded PostgreSQL (PGlite, WebAssembly) and Vitest runs the files in parallel. On the development laptop, database start-up plus migrations under parallel load took longer than the test time limits.
 - **Resolution:** Raised Vitest `testTimeout` to 30 s and `hookTimeout` to 60 s, and the server-process test wait to 60 s. No application code changed.
 - **Lesson:** Time limits tuned on one machine can be too tight on another. Integration tests that start real services need generous timeouts.
+
+### Issue 5: Credential tests hung on a database deadlock (20 Nov 2026)
+
+- **Task:** SD-JWT credential issuance API
+- **Symptom:** The first run of `test/credentials.test.ts` never finished. No test failed or timed out cleanly; the run had to be stopped after several minutes.
+- **Cause:** Inside the `POST /credentials` database transaction, the check for an active issuer key queried through the main database handle (`db`) instead of the transaction handle (`tx`). PGlite has a single connection and holds it for the whole transaction, so that query waited for the transaction to finish, while the transaction waited for the query. On a PostgreSQL server the same mistake would not hang, but the query would silently run outside the transaction.
+- **Resolution:** The active-key lookup now takes the transaction handle as a parameter, and `create()` passes `tx`. The full file then passed (61 tests).
+- **Lesson:** Every query inside a transaction must use the transaction handle. A hang with no error in a PGlite test points to a query made through `db` while a transaction is open.
+
+### Issue 6: Vitest failed in every test file under Git Bash (20 Nov 2026)
+
+- **Task:** SD-JWT credential issuance API (crypto-core thumbprint tests)
+- **Symptom:** `npm test` in `crypto-core/`, run from Git Bash, reported `TypeError: Cannot read properties of undefined (reading 'config')` at the first `describe` or `beforeAll` of all 6 test files, including files that had not changed, and ran no tests.
+- **Cause:** Not fully confirmed. The same command passed from PowerShell, so the code was not at fault. The likely cause is that Git Bash reports the working directory as `/d/FYP/...` while Vitest resolves files as `D:/FYP/...`, so Vitest's test context did not match the files it loaded.
+- **Resolution:** Ran all tests from PowerShell (158 crypto-core and 247 backend tests passed). Documented the rule in `CLAUDE.md` and `backend/README.md`.
+- **Lesson:** On Windows, run Vitest from PowerShell or cmd. When every test file fails the same way, suspect the environment before the code.

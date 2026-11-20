@@ -42,6 +42,7 @@ public keys, credential status) or one-time pre-authorised codes.
 | ----------------------------------- | ------- | ----- |
 | Log in, view own profile            | ✅      | ✅    |
 | View and create holder records      | ✅      | ✅    |
+| View credentials (list, details)    | ✅      | ✅    |
 | Issue credentials, create QR offers | ✅      | ✅    |
 | Reissue credentials                 | ✅      | ✅    |
 | **Revoke** credentials              | ❌      | ✅    |
@@ -56,11 +57,15 @@ issuer.
 **How it's enforced:**
 
 - The issuer comes from the **logged-in account**, never from the request.
-  Request bodies don't contain `issuerId`.
+  Request bodies don't contain `issuerId`; if one is sent, it is ignored.
 - Routes with an `:issuerId` parameter check it matches the staff member's own
   issuer, using `requireOwnIssuer`.
 
 **Example:** a bank admin can't manage the employer's keys or see its staff.
+
+**Records of another issuer** (holders, credentials) are reported as `404`, not
+`403`, so their existence isn't revealed. A wrong `:issuerId` in the URL gives
+`403 FORBIDDEN` ("You can only access your own organisation").
 
 ## 4. Security measures
 
@@ -87,6 +92,7 @@ issuer.
 | Logged in, but the wrong role or another issuer          | 403    | `FORBIDDEN`                                                  |
 | Account locked                                           | 423    | `ACCOUNT_LOCKED` (`details.lockedUntil`)                     |
 | Too many attempts from one IP                            | 429    | `RATE_LIMITED`                                               |
+| No database connected (authentication unavailable)       | 503    | `AUTH_UNAVAILABLE`                                           |
 
 ## 6. Token contents (JWT, HS256)
 

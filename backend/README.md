@@ -12,14 +12,26 @@ copy .env.example .env      # Windows (macOS/Linux: cp .env.example .env)
 npm run dev                 # http://localhost:4000/api/v1/health
 ```
 
-| Script                  | Purpose                                       |
-| ----------------------- | --------------------------------------------- |
-| `npm run dev`           | Start with auto-restart on file changes (tsx) |
-| `npm run build`         | Compile TypeScript to `dist/`                 |
-| `npm start`             | Run the compiled server (`dist/server.js`)    |
-| `npm test`              | Unit, HTTP and server-process tests (Vitest)  |
-| `npm run test:coverage` | Tests with a coverage report                  |
-| `npm run typecheck`     | Type-check without emitting files             |
+| Script                  | Purpose                                                                     |
+| ----------------------- | --------------------------------------------------------------------------- |
+| `npm run dev`           | Start with auto-restart on file changes (tsx)                               |
+| `npm run build`         | Compile TypeScript to `dist/`                                               |
+| `npm start`             | Run the compiled server (`dist/server.js`)                                  |
+| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 247 tests, 11 files) |
+| `npm run test:coverage` | Tests with a coverage report                                                |
+| `npm run typecheck`     | Type-check without emitting files                                           |
+| `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                            |
+| `npm run db:migrate`    | Apply new SQL migrations                                                    |
+| `npm run db:seed`       | Migrate, then load the synthetic issuers, staff and holders                 |
+| `npm run db:inspect`    | Show tables, row counts and sample rows                                     |
+| `npm run db:reset`      | Delete the embedded development database, then migrate and seed again       |
+| `npm run keys:init`     | Generate a signing key for every issuer without an active one               |
+
+`dev`, `build`, `typecheck`, `test`, `test:coverage` and `keys:init` run
+`build:deps` first (npm `pre` scripts), so crypto-core is always up to date.
+
+**Run the tests from PowerShell** (or cmd), not Git Bash: under Git Bash,
+Vitest fails in every test file because of how the drive path is reported.
 
 ## Structure
 
@@ -30,23 +42,35 @@ src/
   config/env.ts          environment variables → validated, typed config (zod)
   lib/logger.ts          pino logger with secret redaction
   lib/errors.ts          AppError + helpers (badRequest, notFound, notImplemented)
+  lib/passwords.ts       scrypt password hashing
   middleware/validate.ts request validation (body / query / params) with zod
   middleware/error-handler.ts  404 handler + central error handler
-  routes/                one router per resource, mounted under /api/v1
+  auth/tokens.ts         JWT access tokens (issue / verify)
+  auth/auth-service.ts   staff login, account lockout
+  auth/middleware.ts     requireAuth, requireRole, requireOwnIssuer
+  routes/index.ts        mounts every router under /api/v1
+  routes/schemas.ts      shared zod schemas for route parameters
+  routes/health.routes.ts             GET /health
+  routes/auth.routes.ts               login, me, logout (login rate limit)
+  routes/staff.routes.ts              staff list (admin)
+  routes/issuers.routes.ts            issuers, JWKS, key generation
+  routes/holders.routes.ts            holder records
+  routes/credentials.routes.ts        credential issuance (pending), list, get; revoke/reissue planned
+  routes/credential-offers.routes.ts  QR offers and wallet redemption (planned)
+  routes/status.routes.ts             credential status (planned)
+  routes/verifications.routes.ts      verification sessions (planned)
+  services/issuer-keys.service.ts  key generation, rotation, JWKS publication
+  services/holders.service.ts      holder records (schema-validated, issuer-scoped)
+  services/credentials.service.ts  pending credentials, expiry rules, signCredential (SD-JWT)
+  services/credential-schemas.ts   loads docs/schemas and validates claims
   db/schema.ts           Drizzle table definitions and relations
   db/client.ts           database connection (embedded PGlite or PostgreSQL server)
   db/migrate.ts          SQL migration runner
   db/seed.ts             loads seed-data/ (issuers, staff, holders)
-  db/cli.ts              db:* commands
-  lib/passwords.ts       scrypt password hashing
-  services/issuer-keys.service.ts  key generation, rotation, JWKS publication
-  services/holders.service.ts      holder records (schema-validated, issuer-scoped)
-  services/credential-schemas.ts   loads docs/schemas and validates claims
-  auth/tokens.ts         JWT access tokens (issue / verify)
-  auth/auth-service.ts   staff login, account lockout
-  auth/middleware.ts     requireAuth, requireRole, requireOwnIssuer
+  db/cli.ts              db:* and keys:init commands
 migrations/              versioned SQL migrations (source of truth for the schema)
-test/                    config, HTTP (supertest) and server-process tests
+seed-data/               synthetic test data (scripts/generate-synthetic-data.mjs)
+test/                    config, HTTP (supertest), database and server-process tests
 ```
 
 **Middleware order:** request ID + logging → security headers (helmet) → CORS →
@@ -54,17 +78,34 @@ JSON body (size-limited) → `/api/v1` routes → 404 → error handler.
 
 ## API routes (`/api/v1`)
 
-| Method   | Path                                            | Status                          |
-| -------- | ----------------------------------------------- | ------------------------------- |
-| GET      | `/health`                                       | ✅ Implemented                  |
-| GET      | `/issuers`, `/issuers/:issuerId/keys`           | 501 – Sprint 1 (key management) |
-| GET/POST | `/holders`, GET `/holders/:holderId`            | ✅ Implemented (login)          |
-| POST     | `/credentials`                                  | 501 – Sprint 1 (issuance)       |
-| POST     | `/credentials/:credentialId/revoke`, `/reissue` | 501 – Sprint 1                  |
-| POST     | `/credential-offers`                            | 501 – Sprint 1                  |
-| POST     | `/credential-offers/token`, `/credential`       | 501 – Sprint 2 (wallet)         |
-| GET      | `/status/:credentialId`                         | 501 – Sprint 1                  |
-| *        | `/verifications/...`                            | 501 – Sprint 3                  |
+| Method | Path                                         | Access           | Status                               |
+| ------ | -------------------------------------------- | ---------------- | ------------------------------------ |
+| GET    | `/health`                                    | Public           | ✅ Implemented                       |
+| POST   | `/auth/login`                                | Public           | ✅ Implemented (rate-limited)        |
+| GET    | `/auth/me`                                   | Login            | ✅ Implemented                       |
+| POST   | `/auth/logout`                               | Login            | ✅ Implemented                       |
+| GET    | `/staff`                                     | Admin            | ✅ Implemented                       |
+| GET    | `/issuers`                                   | Public           | ✅ Implemented                       |
+| GET    | `/issuers/:issuerId/keys`                    | Public           | ✅ Implemented                       |
+| POST   | `/issuers/:issuerId/keys`                    | Admin (own)      | ✅ Implemented                       |
+| GET    | `/holders`, `/holders/:holderId`             | Login            | ✅ Implemented                       |
+| POST   | `/holders`                                   | Login            | ✅ Implemented                       |
+| POST   | `/credentials`                               | Officer or admin | ✅ Implemented (creates **pending**) |
+| GET    | `/credentials`, `/credentials/:credentialId` | Login            | ✅ Implemented                       |
+| POST   | `/credentials/:credentialId/revoke`          | Admin            | 501 – Sprint 1                       |
+| POST   | `/credentials/:credentialId/reissue`         | Login            | 501 – Sprint 1                       |
+| POST   | `/credential-offers`                         | Login            | 501 – Sprint 1                       |
+| POST   | `/credential-offers/token`                   | Public (code)    | 501 – Sprint 2 (wallet)              |
+| POST   | `/credential-offers/credential`              | Public (code)    | 501 – Sprint 2 (wallet)              |
+| GET    | `/status/:credentialId`                      | Public           | 501 – Sprint 1                       |
+| POST   | `/verifications`                             | Public           | 501 – Sprint 3                       |
+| GET    | `/verifications/:verificationId/request`     | Public           | 501 – Sprint 3                       |
+| POST   | `/verifications/:verificationId/response`    | Public           | 501 – Sprint 3                       |
+| GET    | `/verifications/:verificationId/result`      | Public           | 501 – Sprint 3                       |
+
+Credentials are **signed when the wallet redeems its offer** (Sprint 2), by
+`signCredential()` in `services/credentials.service.ts`; `POST /credentials`
+only creates the pending record. See `docs/api/credentials-api.md`.
 
 Planned routes already validate their input. Each returns `501 NOT_IMPLEMENTED`
 with the sprint it is planned for, until its handler is written.
@@ -97,6 +138,10 @@ Every error, from validation to unknown routes to crashes, has the same shape:
 | `PAYLOAD_TOO_LARGE`       | 413    |
 | `NOT_IMPLEMENTED`         | 501    |
 | `INTERNAL_ERROR`          | 500    |
+
+Feature-specific codes (for example `HOLDER_NOT_FOUND`, `ACTIVE_CREDENTIAL_EXISTS`,
+`ISSUER_KEY_MISSING`, `ACCOUNT_LOCKED`) are listed in each API document in `docs/api/`
+and `docs/security/`.
 
 In production, internal error messages and stack traces are never returned.
 They are only logged.
