@@ -8,19 +8,28 @@
     "node": ">=20"
   },
   "scripts": {
+    "build:deps": "npm --prefix ../crypto-core run build",
+    "predev": "npm run build:deps",
     "dev": "tsx watch src/server.ts",
+    "prebuild": "npm run build:deps",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
+    "pretypecheck": "npm run build:deps",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run build:deps",
     "test": "vitest run",
+    "pretest:coverage": "npm run build:deps",
     "test:coverage": "vitest run --coverage",
     "db:migrate": "tsx src/db/cli.ts migrate",
     "db:seed": "tsx src/db/cli.ts seed",
     "db:inspect": "tsx src/db/cli.ts inspect",
-    "db:reset": "tsx src/db/cli.ts reset"
+    "db:reset": "tsx src/db/cli.ts reset",
+    "prekeys:init": "npm run build:deps",
+    "keys:init": "tsx src/db/cli.ts keys"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.17",
+    "@univault/crypto-core": "file:../crypto-core",
     "cors": "2.8.6",
     "dotenv": "18.0.10",
     "drizzle-orm": "0.45.4",

@@ -20,6 +20,7 @@ import type { Database } from './db/client.js';
 import { AppError } from './lib/errors.js';
 import { createErrorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { apiRouter } from './routes/index.js';
+import { createIssuerKeysService } from './services/issuer-keys.service.js';
 
 export const API_PREFIX = '/api/v1';
 export const APP_VERSION = '0.1.0';
@@ -91,6 +92,13 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
       })
     : undefined;
   const auth = createAuthMiddleware({ tokens, ...(authService ? { authService } : {}) });
+  const issuerKeys = deps.database
+    ? createIssuerKeysService(deps.database.db, {
+        keysDir: config.ISSUER_KEYS_DIR,
+        passphrase: config.ISSUER_KEY_PASSPHRASE,
+        publicBaseUrl: config.PUBLIC_BASE_URL,
+      })
+    : undefined;
   app.use(
     API_PREFIX,
     apiRouter({
@@ -103,6 +111,7 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
       },
       ...(deps.database ? { database: deps.database } : {}),
       ...(authService ? { authService } : {}),
+      ...(issuerKeys ? { issuerKeys } : {}),
     }),
   );
 

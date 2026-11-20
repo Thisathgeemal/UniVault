@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { AuthService } from '../auth/auth-service.js';
 import type { AuthMiddleware } from '../auth/middleware.js';
 import type { Database } from '../db/client.js';
+import type { IssuerKeysService } from '../services/issuer-keys.service.js';
 import { authRouter } from './auth.routes.js';
 import { credentialOffersRouter } from './credential-offers.routes.js';
 import { credentialsRouter } from './credentials.routes.js';
@@ -17,6 +18,7 @@ export interface ApiRouterDeps {
   environment: string;
   database?: Database;
   authService?: AuthService;
+  issuerKeys?: IssuerKeysService;
   auth: AuthMiddleware;
   loginRateLimit: { max: number; windowMinutes: number };
 }
@@ -37,7 +39,7 @@ export function apiRouter(deps: ApiRouterDeps): Router {
     '/staff',
     staffRouter({ auth: deps.auth, ...(deps.database ? { db: deps.database.db } : {}) }),
   );
-  router.use('/issuers', issuersRouter(deps.auth));
+  router.use('/issuers', issuersRouter(deps.auth, deps.issuerKeys));
   router.use('/holders', holdersRouter(deps.auth));
   router.use('/credentials', credentialsRouter(deps.auth));
   router.use('/credential-offers', credentialOffersRouter(deps.auth));

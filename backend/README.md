@@ -39,6 +39,7 @@ src/
   db/seed.ts             loads seed-data/ (issuers, staff, holders)
   db/cli.ts              db:* commands
   lib/passwords.ts       scrypt password hashing
+  services/issuer-keys.service.ts  key generation, rotation, JWKS publication
   auth/tokens.ts         JWT access tokens (issue / verify)
   auth/auth-service.ts   staff login, account lockout
   auth/middleware.ts     requireAuth, requireRole, requireOwnIssuer
@@ -160,3 +161,18 @@ See `docs/security/issuer-staff-authentication.md`.
 
 **Development logins** (after `npm run db:seed`): `admin@…` / `officer@…` for
 each issuer, with password `UniVault-Dev-2026!` (or `SEED_STAFF_PASSWORD`).
+
+## Issuer signing keys
+
+```
+npm run keys:init      # one key per issuer (needs ISSUER_KEY_PASSPHRASE in .env)
+```
+
+- **Private keys:** encrypted, stored in `keys/` (git-ignored).
+- **Public keys:** published at `GET /api/v1/issuers/:issuerId/keys` as a JWK Set.
+- **Rotation:** admins can rotate a key with `POST /api/v1/issuers/:issuerId/keys`.
+
+The backend uses `@univault/crypto-core` (`file:../crypto-core`). `npm run dev`,
+`npm test` and `npm run build` rebuild it automatically first.
+
+See `docs/api/issuer-keys-api.md`.

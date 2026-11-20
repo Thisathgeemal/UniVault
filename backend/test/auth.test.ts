@@ -191,7 +191,9 @@ describe('AC3 – protected endpoints require valid authentication', () => {
 
   it('keeps public endpoints public (verifiers and wallets do not log in)', async () => {
     expect((await request(t.app).get('/api/v1/health')).status).toBe(200);
-    expect((await request(t.app).get('/api/v1/issuers/employer-a/keys')).status).toBe(501);
+    expect((await request(t.app).get('/api/v1/issuers')).status).toBe(200);
+    // No key generated in this test app yet → 404, but never 401
+    expect((await request(t.app).get('/api/v1/issuers/employer-a/keys')).status).toBe(404);
     expect((await request(t.app).get(`/api/v1/status/${UUID}`)).status).toBe(501);
     expect((await request(t.app).post('/api/v1/credential-offers/token')).status).toBe(501);
   });
@@ -342,9 +344,9 @@ describe('AC5 – issuer role restrictions are enforced', () => {
   });
 
   it('admins can manage keys for their own issuer only', async () => {
-    expect(
-      (await request(t.app).post('/api/v1/issuers/employer-a/keys').set(bearer(admin))).status,
-    ).toBe(501);
+    // Own issuer: passes auth and reaches key generation (no passphrase in this test app → 503)
+    const own = await request(t.app).post('/api/v1/issuers/employer-a/keys').set(bearer(admin));
+    expect(own.body.error.code).toBe('KEY_PASSPHRASE_NOT_CONFIGURED');
     const other = await request(t.app).post('/api/v1/issuers/bank-a/keys').set(bearer(admin));
     expect(other.status).toBe(403);
     expect(other.body.error.message).toBe('You can only access your own organisation');
