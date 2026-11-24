@@ -19,7 +19,10 @@ describe('server and routing', () => {
       status: 'ok',
       service: 'univault-backend',
       environment: 'test',
+      database: 'not_configured',
     });
+    // No database: the active keys can't be counted, so no counts are reported
+    expect(res.body.keys).toEqual({ status: 'unknown' });
     expect(typeof res.body.uptimeSeconds).toBe('number');
   });
 

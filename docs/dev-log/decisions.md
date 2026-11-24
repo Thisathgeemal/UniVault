@@ -12,21 +12,22 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 
 ## Decision index
 
-| #                                                                                                 | Decision                                                                           | Date            | Sprint                   | Status         | Related requirements                                          |
-| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | --------------- | ------------------------ | -------------- | ------------------------------------------------------------- |
-| [001](#decision-001-typescript-for-all-javascript-components)                                     | TypeScript for all JavaScript components                                           | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
-| [002](#decision-002-root-level-eslint-9-and-prettier-ruff-for-ai-service)                         | Root-level ESLint 9 and Prettier; Ruff for ai-service                              | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
-| [003](#decision-003-sd-jwt-vc-flat-claim-layout-instead-of-json-ld)                               | SD-JWT VC flat claim layout (W3C VC model); subject claims selectively disclosable | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-02, FR-VER-01, FR-VER-03, FR-BAK-01, NFR-01 |
-| [004](#decision-004-data-minimisation-in-credential-schemas)                                      | Data minimisation in the credential schemas                                        | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-VER-03, NFR-08                                  |
-| [005](#decision-005-derived-age_over_18-claim-and-under-18-handling)                              | Derived `age_over_18` claim and under-18 handling                                  | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-03, FR-VER-03, NFR-08                       |
-| [006](#decision-006-sd-jwt-library-selection-sd-jwtcore)                                          | SD-JWT library: `@sd-jwt/core` pinned to 0.25.0                                    | Thu 19 Nov 2026 | S1                       | Accepted       | FR-ISS-02, FR-VER-02, FR-WAL-06, NFR-01                       |
-| [007](#decision-007-es256-for-holder-key-binding)                                                 | ES256 for holder key binding; issuer signatures stay RS256                         | Thu 19 Nov 2026 | S1                       | Proposed       | NFR-01, FR-WAL-06, FR-VER-02                                  |
-| [008](#decision-008-postgresql-with-embedded-pglite-for-development-and-hand-written-migrations)  | PostgreSQL, with embedded PGlite for development and hand-written migrations       | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08 |
-| [009](#decision-009-issuer-staff-authentication-jwt-database-re-check-and-lockout)                | Issuer staff authentication (JWT, database re-check and lockout)                   | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
-| [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)              | Credential signing deferred to wallet redemption (holder binding)                  | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
-| [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                  | OpenID4VCI pre-authorised code offer format                                        | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
-| [012](#decision-012-reissue-supersedes-immediately-status-changes-recorded-as-append-only-events) | Reissue supersedes immediately; status changes recorded as append-only events      | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-03, FR-BAK-01, NFR-06, NFR-08                          |
-| [013](#decision-013-per-credential-status-endpoint-ietf-token-status-list-as-future-work)         | Per-credential status endpoint; IETF Token Status List as future work              | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06, NFR-08    |
+| #                                                                                                                           | Decision                                                                                                  | Date            | Sprint                   | Status         | Related requirements                                          |
+| --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------- | ------------------------ | -------------- | ------------------------------------------------------------- |
+| [001](#decision-001-typescript-for-all-javascript-components)                                                               | TypeScript for all JavaScript components                                                                  | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
+| [002](#decision-002-root-level-eslint-9-and-prettier-ruff-for-ai-service)                                                   | Root-level ESLint 9 and Prettier; Ruff for ai-service                                                     | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
+| [003](#decision-003-sd-jwt-vc-flat-claim-layout-instead-of-json-ld)                                                         | SD-JWT VC flat claim layout (W3C VC model); subject claims selectively disclosable                        | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-02, FR-VER-01, FR-VER-03, FR-BAK-01, NFR-01 |
+| [004](#decision-004-data-minimisation-in-credential-schemas)                                                                | Data minimisation in the credential schemas                                                               | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-VER-03, NFR-08                                  |
+| [005](#decision-005-derived-age_over_18-claim-and-under-18-handling)                                                        | Derived `age_over_18` claim and under-18 handling                                                         | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-03, FR-VER-03, NFR-08                       |
+| [006](#decision-006-sd-jwt-library-selection-sd-jwtcore)                                                                    | SD-JWT library: `@sd-jwt/core` pinned to 0.25.0                                                           | Thu 19 Nov 2026 | S1                       | Accepted       | FR-ISS-02, FR-VER-02, FR-WAL-06, NFR-01                       |
+| [007](#decision-007-es256-for-holder-key-binding)                                                                           | ES256 for holder key binding; issuer signatures stay RS256                                                | Thu 19 Nov 2026 | S1                       | Proposed       | NFR-01, FR-WAL-06, FR-VER-02                                  |
+| [008](#decision-008-postgresql-with-embedded-pglite-for-development-and-hand-written-migrations)                            | PostgreSQL, with embedded PGlite for development and hand-written migrations                              | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08 |
+| [009](#decision-009-issuer-staff-authentication-jwt-database-re-check-and-lockout)                                          | Issuer staff authentication (JWT, database re-check and lockout)                                          | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
+| [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)                                        | Credential signing deferred to wallet redemption (holder binding)                                         | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
+| [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                                            | OpenID4VCI pre-authorised code offer format                                                               | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
+| [012](#decision-012-reissue-supersedes-immediately-status-changes-recorded-as-append-only-events)                           | Reissue supersedes immediately; status changes recorded as append-only events                             | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-03, FR-BAK-01, NFR-06, NFR-08                          |
+| [013](#decision-013-per-credential-status-endpoint-ietf-token-status-list-as-future-work)                                   | Per-credential status endpoint; IETF Token Status List as future work                                     | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06, NFR-08    |
+| [014](#decision-014-encrypted-key-file-or-encrypted-env-bundle-decrypted-once-in-a-central-key-store-kmshsm-as-future-work) | Encrypted key file or encrypted env bundle, decrypted once in a central key store; KMS/HSM as future work | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-01, FR-ISS-02, NFR-08                                     |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -595,6 +596,8 @@ proofs shall use ES256._
   (migrations, checksums, Drizzle schema matches the SQL),
   [`backend/test/db/records.test.ts`](../../backend/test/db/records.test.ts) (constraints),
   [`backend/test/db/seed.test.ts`](../../backend/test/db/seed.test.ts),
+  [`backend/test/db/seed-disk.test.ts`](../../backend/test/db/seed-disk.test.ts) (on-disk
+  database; split out of `seed.test.ts` on 24 Nov 2026),
   [`backend/test/config.test.ts`](../../backend/test/config.test.ts) (production requires
   `postgres://`); [s1-database-tests-96-pass.png](evidence/s1-database-tests-96-pass.png),
   [s1-database-inspect-tables.png](evidence/s1-database-inspect-tables.png),
@@ -1114,3 +1117,120 @@ expires_at`) and computed, never stored. The issuer portal's `effectiveStatus` f
   `DEV_SIMULATE_REDEMPTION` guards) exists only to demonstrate `expired`. It needs a
   `valid → valid` event with reason `dev_simulated_expiry`, which migration 0007 allows.
   The route is removed in Sprint 2 with simulate-redemption; the migration stays.
+
+## Decision 014: Encrypted key file or encrypted env bundle, decrypted once in a central key store; KMS/HSM as future work
+
+- **Date:** Tue 24 Nov 2026
+- **Sprint:** S2 (Sprint 1 carry-over)
+- **Status:** Draft – review
+- **Requirements:** NFR-01, FR-ISS-02, NFR-08
+- **Related:** [issuer-key-management.md](../security/issuer-key-management.md),
+  [issuer-keys-api.md](../api/issuer-keys-api.md), Decision 006 (library), Decision 010 (signing
+  at redemption), `backend/src/keys/key-store.ts`, `backend/src/keys/startup-check.ts`,
+  `scripts/check-secrets.js`
+- **Evidence:** [`backend/test/key-store.test.ts`](../../backend/test/key-store.test.ts)
+  (sources, every error code, 503 mapping, decrypt-once, rotation, degraded and strict
+  start-up, public-only JWKS, leak scan, single owner),
+  [`backend/test/key-startup.test.ts`](../../backend/test/key-startup.test.ts) (real
+  processes: strict exits, degraded start, env mode, production configuration, keys:bundle),
+  [`backend/test/check-secrets.test.ts`](../../backend/test/check-secrets.test.ts); evidence
+  script `scripts/evidence/s1-keys.ps1` (sections 1–8)
+
+### Context
+
+Issuer private keys sign every credential (NFR-01, FR-ISS-02). Until now they were encrypted
+PEM files in `ISSUER_KEYS_DIR`, and `signCredential()` read and decrypted the file on every
+signing. The final demo runs on a cloud host with an **ephemeral filesystem**: files written at
+runtime vanish on restart, and the repository must never contain keys. There was also no check
+that a loaded key really belonged to its published `kid`. A key problem showed as 500 or 503
+depending on where it happened.
+
+### Options considered
+
+1. **Plain PEM in an environment variable:** simplest on any host. But the raw key sits in the
+   host dashboard, in shell history and in any environment dump, and one leak is a full
+   compromise. Rejected.
+2. **Encrypted key file only:** what existed. Safe at rest, but it doesn't work on an
+   ephemeral filesystem without a persistent volume, which the demo host does not offer.
+3. **Encrypted key file or encrypted env bundle, through one key store:** files locally, and a
+   base64 bundle of the _encrypted_ keys as a host secret in the cloud. The passphrase is a
+   separate secret. Both modes share one loader, one set of checks and one cache.
+4. **Cloud KMS** (AWS KMS, Google Cloud KMS, Azure Key Vault): the key never leaves the
+   service, which signs on request. Best practice, but it needs a cloud account and billing,
+   per-signature network calls, and a signer interface `@sd-jwt/core` would have to support.
+   Too much for the sprint.
+5. **HSM:** the strongest protection (a tamper-resistant device), but hardware or a costly
+   cloud HSM. Out of scope for a student prototype.
+
+### Decision
+
+- **Option 3.** `ISSUER_KEY_SOURCE=file` (default) reads encrypted PKCS#8 files.
+  `ISSUER_KEY_SOURCE=env` reads `ISSUER_KEYS_BUNDLE` (base64 JSON
+  `[{ issuerId, kid, encryptedPrivateKeyPem }]`, zod-validated), written by
+  `npm run keys:bundle`. In both modes:
+  - unencrypted keys are refused;
+  - the passphrase comes from `ISSUER_KEY_PASSPHRASE`.
+- **One owner:** `src/keys/key-store.ts` is the only code that reads key files, the bundle or
+  the passphrase. Signing, generation and rotation, the start-up check, `/health` and the CLI go
+  through it. A test enforces this.
+- **Decrypt once:** each key is decrypted once, checked (RFC 7638 thumbprint = stored kid;
+  derived public key = stored JWK) and kept as a `KeyObject` in a private map. Rotation clears
+  and reloads the entry.
+- **Errors:** `KeyStoreError` carries only a code, the issuer id and the kid:
+  `KEY_NOT_FOUND`, `KEY_DECRYPT_FAILED`, `KEY_UNENCRYPTED`, `KEY_KID_MISMATCH`,
+  `KEY_PUBLIC_MISMATCH`, `KEY_SOURCE_INVALID`. The API answers `503 ISSUER_KEY_UNAVAILABLE`
+  with a generic message, and the code is logged.
+- **Start-up check:** run before listening. **Strict** (exit 1) always in production, or with
+  `ISSUER_KEYS_STRICT_STARTUP=true`. Otherwise it warns and starts degraded: only the affected
+  issuer's signing fails, and `/health` reports `degraded` (503).
+- **Production configuration:**
+  - the passphrase has at least 20 characters and isn't the development value from
+    `.env.example`;
+  - env mode requires the bundle;
+  - a non-strict key check is refused.
+- **Env mode cannot rotate through the API** (`409 KEY_ROTATION_UNSUPPORTED_IN_ENV_MODE`):
+  generate locally, bundle, update the secret, redeploy.
+- **Leak prevention:**
+  - logger redaction of key fields and the configuration object;
+  - a public-only JWKS (test against `d`, `p`, `q`, `dp`, `dq`, `qi`);
+  - `check:secrets` now scans the index for PEM private keys, base64-encoded PEM and
+    `*.bundle.b64`, as well as by file name;
+  - `*.bundle.b64` added to `.gitignore`.
+- **Cloud KMS or HSM is future work.** The key store is the seam where it would plug in.
+
+### Reason
+
+- The bundle works on a host with an ephemeral filesystem, without a persistent volume, and
+  without ever putting a raw key anywhere. A leaked bundle alone is useless without the
+  separately stored passphrase.
+- A single owner makes the rule "keys never leak" checkable: one module to review, one error
+  type, one place to add a KMS later.
+- Decrypting once removes per-signature file reads and decryption.
+- The start-up check catches a wrong passphrase, a swapped file or a stale bundle at deploy
+  time, not at the first signing in front of a user.
+- Strict-in-production with degraded-in-development keeps local work possible when one key is
+  missing, while a misconfigured deployment can't go live.
+- Options 4 and 5 are the right answer for a real issuer (NFR-01), but not within the sprint,
+  budget or library constraints. Recording them keeps the trade-off visible for the report.
+
+### Consequences
+
+- **Process memory:** the decrypted key is still in process memory while the server runs.
+  An attacker who controls the process can use it. Only a KMS or HSM removes that.
+- **Rotating in env mode** is a redeploy, not an API call. The portal must explain the 409.
+- **New settings:** `ISSUER_KEY_SOURCE`, `ISSUER_KEYS_BUNDLE`, `ISSUER_KEYS_STRICT_STARTUP`.
+  `.env.example` now carries a development-only passphrase value that production refuses.
+- **New CLI command:** `npm run keys:bundle` (`--force` to replace). It checks every key before
+  bundling and prints ids, kids and the path only.
+- **A real `NODE_ENV=production` start-up** needs PostgreSQL, which isn't available on the
+  development machine. Tests and the evidence script therefore prove the production key policy
+  with `ISSUER_KEYS_STRICT_STARTUP=true` on the embedded database. The configuration-level
+  production refusals (passphrase, bundle) run in real production processes, because they fail
+  before the database connects.
+- **Signing errors:** a signing key problem is now always `503 ISSUER_KEY_UNAVAILABLE`. It was
+  previously `500 ISSUER_KEY_UNAVAILABLE` or `503 KEY_PASSPHRASE_NOT_CONFIGURED`.
+  `KEY_PASSPHRASE_NOT_CONFIGURED` remains only for key generation.
+- **Failed loads are remembered** for `KEY_RETRY_BACKOFF_SECONDS` (default 30): signings in that
+  window get the cached error without another decryption, so a broken key can't be used to make
+  the server decrypt on every request. A fixed key is picked up after the window, or at once on
+  `reload()` / rotation.

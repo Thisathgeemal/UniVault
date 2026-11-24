@@ -11,6 +11,8 @@ import { createApp } from './app.js';
 import { ConfigError, loadConfig, type AppConfig } from './config/env.js';
 import { createDatabase } from './db/client.js';
 import { runMigrations } from './db/migrate.js';
+import { keyStoreFromConfig } from './keys/key-store.js';
+import { checkIssuerKeysAtStartup } from './keys/startup-check.js';
 import { createLogger } from './lib/logger.js';
 
 function readConfig(): AppConfig {
@@ -41,7 +43,22 @@ if (config.DB_AUTO_MIGRATE) {
 }
 logger.info(`Database connected (${database.driver})`);
 
-const app = createApp(config, logger, { database });
+// Issuer signing keys: load and check every active key before accepting requests (Decision 014).
+// Strict (always in production): any failure stops the server here, before listening.
+const keyStore = keyStoreFromConfig(database.db, config);
+const keyCheck = await checkIssuerKeysAtStartup(keyStore, {
+  strict: config.ISSUER_KEYS_STRICT_STARTUP,
+  production: config.NODE_ENV === 'production',
+  logger,
+});
+if (!keyCheck.ok) {
+  await database.close();
+  // Let the log line reach stdout before exiting
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  process.exit(1);
+}
+
+const app = createApp(config, logger, { database, keyStore });
 
 const server: Server = app.listen(config.PORT, () => {
   logger.info(

@@ -183,15 +183,14 @@ will call it after checking the pre-authorised code.
 
 **Checks, in order (nothing is signed if any fails):**
 
-| Check                                                                                                                               | Error                                                  |
-| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `holderPublicJwk` is an EC **P-256 public** JWK: `kty: EC`, `crv: P-256`, 32-byte `x` and `y`, **no `d`**, and a point on the curve | 400 `INVALID_HOLDER_KEY`                               |
-| The credential exists                                                                                                               | 404 `CREDENTIAL_NOT_FOUND`                             |
-| It is `pending`                                                                                                                     | 409 `CREDENTIAL_NOT_PENDING`                           |
-| Its `expires_at` is in the future                                                                                                   | 409 `CREDENTIAL_EXPIRED`                               |
-| The issuer has an active key                                                                                                        | 409 `ISSUER_KEY_MISSING`                               |
-| `ISSUER_KEY_PASSPHRASE` is configured                                                                                               | 503 `KEY_PASSPHRASE_NOT_CONFIGURED`                    |
-| The private key loads (`loadIssuerPrivateKey`)                                                                                      | 500 `ISSUER_KEY_UNAVAILABLE` (no paths in the message) |
+| Check                                                                                                                                            | Error                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `holderPublicJwk` is an EC **P-256 public** JWK: `kty: EC`, `crv: P-256`, 32-byte `x` and `y`, **no `d`**, and a point on the curve              | 400 `INVALID_HOLDER_KEY`                                                                                |
+| The credential exists                                                                                                                            | 404 `CREDENTIAL_NOT_FOUND`                                                                              |
+| It is `pending`                                                                                                                                  | 409 `CREDENTIAL_NOT_PENDING`                                                                            |
+| Its `expires_at` is in the future                                                                                                                | 409 `CREDENTIAL_EXPIRED`                                                                                |
+| The issuer has an active key                                                                                                                     | 409 `ISSUER_KEY_MISSING`                                                                                |
+| The key store returns the issuer's active key: found, encrypted, decrypted with `ISSUER_KEY_PASSPHRASE`, kid and public key match (Decision 014) | 503 `ISSUER_KEY_UNAVAILABLE` (generic message; the detailed code is logged with issuer id and kid only) |
 
 **Then:**
 

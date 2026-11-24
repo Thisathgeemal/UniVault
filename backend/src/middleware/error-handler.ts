@@ -9,6 +9,7 @@
  */
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { ZodError } from 'zod';
+import { KeyStoreError } from '../keys/key-store.js';
 import { AppError } from '../lib/errors.js';
 
 interface ErrorBody {
@@ -36,7 +37,19 @@ export function createErrorHandler(options: {
     let status = 500;
     let body: ErrorBody = { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' };
 
-    if (err instanceof AppError) {
+    if (err instanceof KeyStoreError) {
+      // Issuer key problems: a generic 503 for the client; the detailed code goes to the log
+      // with the issuer id and kid only (Decision 014)
+      status = 503;
+      body = {
+        code: 'ISSUER_KEY_UNAVAILABLE',
+        message: 'The issuer signing key is not available. Try again later.',
+      };
+      req.log?.error(
+        { keyStore: { code: err.code, issuerId: err.issuerId, kid: err.kid } },
+        'Issuer signing key unavailable',
+      );
+    } else if (err instanceof AppError) {
       status = err.status;
       body = { code: err.code, message: err.message };
       if (err.details !== undefined) body.details = err.details;
@@ -63,7 +76,9 @@ export function createErrorHandler(options: {
 
     // Unexpected errors (5xx) are logged with the full error; client errors as warnings,
     // unless the route lowered its log level (the public status route: debug)
-    if (status >= 500) req.log?.error({ err }, 'Unhandled error');
+    if (err instanceof KeyStoreError) {
+      // already logged above, without the error object
+    } else if (status >= 500) req.log?.error({ err }, 'Unhandled error');
     else if (res.locals.logLevel === 'debug')
       req.log?.debug({ code: body.code, status }, body.message);
     else req.log?.warn({ code: body.code, status }, body.message);

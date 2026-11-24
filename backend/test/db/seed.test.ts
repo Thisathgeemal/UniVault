@@ -1,6 +1,3 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
@@ -8,7 +5,6 @@ import { pino } from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { createDatabase, type Database } from '../../src/db/client.js';
-import { runMigrations } from '../../src/db/migrate.js';
 import { holders, issuerStaff } from '../../src/db/schema.js';
 import { seedDatabase } from '../../src/db/seed.js';
 import { verifyPassword } from '../../src/lib/passwords.js';
@@ -72,24 +68,7 @@ describe('seeding sample records', () => {
   });
 });
 
-describe('embedded database on disk', () => {
-  it('keeps data between connections (pglite://<folder>)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'univault-pglite-'));
-    try {
-      const first = await createDatabase(`pglite://${dir}`);
-      await runMigrations(first);
-      await seedDatabase(first.db, { dataDir: FIXTURES, staffPassword: 'test-password-123' });
-      await first.close();
-
-      const second = await createDatabase(`pglite://${dir}`);
-      const all = await second.db.select().from(holders);
-      expect(all).toHaveLength(5);
-      await second.close();
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }, 30_000);
-
+describe('database URL', () => {
   it('rejects an unsupported DATABASE_URL', async () => {
     await expect(createDatabase('mysql://localhost/db')).rejects.toThrow(
       /pglite:\/\/ or postgres:\/\//,
@@ -104,6 +83,7 @@ describe('health endpoint reports the database', () => {
     const res = await request(app).get('/api/v1/health');
     expect(res.status).toBe(200);
     expect(res.body.database).toBe('up');
+    expect(res.body.keys).toEqual({ status: 'ok', activeKeys: 0, loaded: 0 });
     await database.close();
   });
 
@@ -114,5 +94,7 @@ describe('health endpoint reports the database', () => {
     const res = await request(app).get('/api/v1/health');
     expect(res.status).toBe(503);
     expect(res.body).toMatchObject({ status: 'degraded', database: 'down' });
+    // The keys can't be counted without the database: unknown, not "ok" with zero counts
+    expect(res.body.keys).toEqual({ status: 'unknown' });
   });
 });

@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { JWKS_CACHE_SECONDS } from '../src/routes/issuers.routes.js';
 import { issuerKeys } from '../src/db/schema.js';
 import { createIssuerKeysService } from '../src/services/issuer-keys.service.js';
+import { createKeyStore } from '../src/keys/key-store.js';
 import { authedTestApp, STAFF, type AuthedTestApp } from './auth-helpers.js';
 
 const PASSPHRASE = 'test-key-passphrase-123';
@@ -241,8 +242,12 @@ describe('key rotation', () => {
 describe('keys:init support', () => {
   it('lists issuers that still need a key', async () => {
     const service = createIssuerKeysService(t.database.db, {
-      keysDir,
-      passphrase: PASSPHRASE,
+      keyStore: createKeyStore({
+        db: t.database.db,
+        source: 'file',
+        keysDir,
+        passphrase: PASSPHRASE,
+      }),
       publicBaseUrl: 'http://localhost:4000',
     });
     expect(await service.issuersWithoutActiveKey()).toEqual(['employer-b']);

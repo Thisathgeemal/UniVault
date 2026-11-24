@@ -12,20 +12,23 @@ copy .env.example .env      # Windows (macOS/Linux: cp .env.example .env)
 npm run dev                 # http://localhost:4000/api/v1/health
 ```
 
-| Script                  | Purpose                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------------------ |
-| `npm run dev`           | Start with auto-restart on file changes (tsx)                                                    |
-| `npm run build`         | Compile TypeScript to `dist/`                                                                    |
-| `npm start`             | Run the compiled server (`dist/server.js`)                                                       |
-| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 409 tests, 15 files)                      |
-| `npm run test:coverage` | Tests with a coverage report; fails below 88 / 85 / 93 / 89 % (stmts / branches / funcs / lines) |
-| `npm run typecheck`     | Type-check without emitting files                                                                |
-| `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                                                 |
-| `npm run db:migrate`    | Apply new SQL migrations                                                                         |
-| `npm run db:seed`       | Migrate, then load the synthetic issuers, staff and holders                                      |
-| `npm run db:inspect`    | Show tables, row counts and sample rows                                                          |
-| `npm run db:reset`      | Delete the embedded development database, then migrate and seed again                            |
-| `npm run keys:init`     | Generate a signing key for every issuer without an active one                                    |
+| Script                  | Purpose                                                                                                                                         |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`           | Start with auto-restart on file changes (tsx)                                                                                                   |
+| `npm run build`         | Compile TypeScript to `dist/`                                                                                                                   |
+| `npm start`             | Run the compiled server (`dist/server.js`)                                                                                                      |
+| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 471 tests, 19 files). Two projects: `fast` (parallel), then `heavy` (one file at a time) |
+| `npm run test:fast`     | Only the fast, in-process tests (parallel)                                                                                                      |
+| `npm run test:heavy`    | Only the heavy tests: real processes and on-disk PGlite (one file at a time)                                                                    |
+| `npm run test:coverage` | Tests with a coverage report; fails below 88 / 85 / 93 / 89 % (stmts / branches / funcs / lines)                                                |
+| `npm run typecheck`     | Type-check without emitting files                                                                                                               |
+| `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                                                                                                |
+| `npm run db:migrate`    | Apply new SQL migrations                                                                                                                        |
+| `npm run db:seed`       | Migrate, then load the synthetic issuers, staff and holders                                                                                     |
+| `npm run db:inspect`    | Show tables, row counts and sample rows                                                                                                         |
+| `npm run db:reset`      | Delete the embedded development database, then migrate and seed again                                                                           |
+| `npm run keys:init`     | Generate a signing key for every issuer without an active one                                                                                   |
+| `npm run keys:bundle`   | Write the active encrypted keys to `keys/issuer-keys.bundle.b64` for `ISSUER_KEYS_BUNDLE` (`--force` to replace; prints ids and kids only)      |
 
 `dev`, `build`, `typecheck`, `test`, `test:coverage` and `keys:init` run
 `build:deps` first (npm `pre` scripts), so crypto-core is always up to date.
@@ -71,7 +74,9 @@ src/
   db/client.ts           database connection (embedded PGlite or PostgreSQL server)
   db/migrate.ts          SQL migration runner
   db/seed.ts             loads seed-data/ (issuers, staff, holders)
-  db/cli.ts              db:* and keys:init commands
+  db/cli.ts              db:*, keys:init and keys:bundle commands
+  keys/key-store.ts      the ONLY owner of private keys (file or env bundle, decrypt once)
+  keys/startup-check.ts  start-up key check (strict in production)
 migrations/              versioned SQL migrations (source of truth for the schema)
 seed-data/               synthetic test data (scripts/generate-synthetic-data.mjs)
 test/                    config, HTTP (supertest), database and server-process tests
@@ -168,8 +173,20 @@ They are only logged.
 **Invalid values:** the server refuses to start and lists the problem variable
 names, never their values.
 
-**Production:** `JWT_SECRET`, `ISSUER_KEY_PASSPHRASE` and `DATABASE_URL` are
-required.
+**Production:** `JWT_SECRET`, `ISSUER_KEY_PASSPHRASE` (at least 20 characters, not
+the development value from `.env.example`) and `DATABASE_URL` are required;
+`ISSUER_KEY_SOURCE=env` also needs `ISSUER_KEYS_BUNDLE`.
+
+**Issuer key settings:**
+
+| Variable                     | Default                                | Meaning                                                                     |
+| ---------------------------- | -------------------------------------- | --------------------------------------------------------------------------- |
+| `ISSUER_KEYS_DIR`            | `./keys`                               | Encrypted key files (file mode), git-ignored                                |
+| `ISSUER_KEY_PASSPHRASE`      | development value                      | Decrypts the keys (both modes)                                              |
+| `ISSUER_KEY_SOURCE`          | `file`                                 | `file` or `env`                                                             |
+| `ISSUER_KEYS_BUNDLE`         | –                                      | env mode: base64 bundle from `npm run keys:bundle` (host secret)            |
+| `ISSUER_KEYS_STRICT_STARTUP` | `false` (`true` in production, forced) | Exit at start-up if any active key fails its check                          |
+| `KEY_RETRY_BACKOFF_SECONDS`  | `30`                                   | Seconds a failed key load is remembered before signing retries (0 = always) |
 
 **`.env.example`:** see `backend/.env.example` for every variable.
 
@@ -181,7 +198,8 @@ required.
 - **Request IDs:** every request gets an `X-Request-ID` header, which appears in
   the response, the logs and error bodies.
 - **Logs:** coloured and readable in development, JSON in production.
-- **Redaction:** authorisation headers, cookies, passphrases, private keys and
+- **Redaction:** authorisation headers, cookies, passphrases, private keys (also
+  encrypted PEM and the key bundle), `JWT_SECRET`, the configuration object and
   tokens are redacted from logs.
 
 ## Database
@@ -195,8 +213,11 @@ nothing to install:
 - **Deployment:** set `DATABASE_URL=postgres://…` (e.g. Neon or Supabase).
   Production refuses the embedded database.
 
-The server applies new migrations at start-up (`DB_AUTO_MIGRATE=true`), and
-`/health` reports `"database": "up"`.
+The server applies new migrations at start-up (`DB_AUTO_MIGRATE=true`), then
+checks every active issuer key (`issuer keys loaded: n/n`). `/health` reports
+`"database": "up"` and `"keys": { "status", "activeKeys", "loaded" }` (counts
+only); either problem makes it `503 degraded`. Without a reachable database the
+keys can't be counted and the block is `"keys": { "status": "unknown" }`.
 
 See `docs/database/database-design.md` for the ER diagram and the rules each
 table enforces.
@@ -227,11 +248,18 @@ each issuer, with password `UniVault-Dev-2026!` (or `SEED_STAFF_PASSWORD`).
 
 ```
 npm run keys:init      # one key per issuer (needs ISSUER_KEY_PASSPHRASE in .env)
+npm run keys:bundle    # encrypted active keys -> keys/issuer-keys.bundle.b64 (env mode)
 ```
 
-- **Private keys:** encrypted, stored in `keys/` (git-ignored).
+- **Key store:** `src/keys/key-store.ts` is the **only** code that touches private
+  keys. It decrypts each key once, checks its kid and public key, and caches the
+  `KeyObject`. Any key problem gives `503 ISSUER_KEY_UNAVAILABLE`.
+- **Private keys:** encrypted, stored in `keys/` (git-ignored) or deployed in
+  `ISSUER_KEYS_BUNDLE`. Unencrypted keys are refused.
 - **Public keys:** published at `GET /api/v1/issuers/:issuerId/keys` as a JWK Set.
-- **Rotation:** admins can rotate a key with `POST /api/v1/issuers/:issuerId/keys`.
+- **Rotation:** admins can rotate a key with `POST /api/v1/issuers/:issuerId/keys`
+  (file mode; `409 KEY_ROTATION_UNSUPPORTED_IN_ENV_MODE` in env mode).
+- See `docs/security/issuer-key-management.md`.
 
 The backend uses `@univault/crypto-core` (`file:../crypto-core`). `npm run dev`,
 `npm test` and `npm run build` rebuild it automatically first.

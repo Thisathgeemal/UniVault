@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig } from '../src/config/env.js';
+import { readFileSync } from 'node:fs';
+import { ConfigError, DEV_EXAMPLE_KEY_PASSPHRASE, loadConfig } from '../src/config/env.js';
+
+const PRODUCTION = {
+  NODE_ENV: 'production',
+  JWT_SECRET: 'x'.repeat(32),
+  ISSUER_KEY_PASSPHRASE: 'a-long-production-passphrase',
+  DATABASE_URL: 'postgres://localhost/univault',
+};
 
 describe('environment configuration', () => {
   it('applies safe defaults for local development', () => {
@@ -52,13 +60,10 @@ describe('environment configuration', () => {
   });
 
   it('accepts a complete production configuration', () => {
-    const config = loadConfig({
-      NODE_ENV: 'production',
-      JWT_SECRET: 'x'.repeat(32),
-      ISSUER_KEY_PASSPHRASE: 'a-long-passphrase',
-      DATABASE_URL: 'postgres://localhost/univault',
-    });
+    const config = loadConfig(PRODUCTION);
     expect(config.NODE_ENV).toBe('production');
+    expect(config.ISSUER_KEY_SOURCE).toBe('file');
+    expect(config.ISSUER_KEYS_STRICT_STARTUP).toBe(true); // always strict in production
   });
 
   it('uses the embedded development database by default and auto-migrates', () => {
@@ -118,5 +123,82 @@ describe('environment configuration', () => {
       expect(message).not.toContain('too-short-secret-value');
       expect(message).not.toContain('shortpass');
     }
+  });
+
+  describe('issuer key settings (Decision 014)', () => {
+    it('defaults to file keys and a non-strict start-up outside production', () => {
+      expect(loadConfig({})).toMatchObject({
+        ISSUER_KEY_SOURCE: 'file',
+        ISSUER_KEYS_STRICT_STARTUP: false,
+      });
+      expect(loadConfig({ ISSUER_KEYS_STRICT_STARTUP: 'true' }).ISSUER_KEYS_STRICT_STARTUP).toBe(
+        true,
+      );
+      expect(() => loadConfig({ ISSUER_KEY_SOURCE: 'vault' })).toThrow(/ISSUER_KEY_SOURCE/);
+    });
+
+    it('KEY_RETRY_BACKOFF_SECONDS defaults to 30 and accepts 0 to 3600 whole seconds', () => {
+      expect(loadConfig({}).KEY_RETRY_BACKOFF_SECONDS).toBe(30);
+      expect(loadConfig({ KEY_RETRY_BACKOFF_SECONDS: '0' }).KEY_RETRY_BACKOFF_SECONDS).toBe(0);
+      expect(loadConfig({ KEY_RETRY_BACKOFF_SECONDS: '' }).KEY_RETRY_BACKOFF_SECONDS).toBe(30);
+      for (const bad of ['-1', '3601', '1.5', 'soon']) {
+        expect(() => loadConfig({ KEY_RETRY_BACKOFF_SECONDS: bad })).toThrow(
+          /KEY_RETRY_BACKOFF_SECONDS/,
+        );
+      }
+    });
+
+    it('requires a production passphrase of at least 20 characters', () => {
+      expect(() =>
+        loadConfig({ ...PRODUCTION, ISSUER_KEY_PASSPHRASE: 'nineteen-characters' }),
+      ).toThrow(/ISSUER_KEY_PASSPHRASE: must be at least 20 characters in production/);
+    });
+
+    it('refuses the development passphrase from .env.example in production', () => {
+      expect(() =>
+        loadConfig({ ...PRODUCTION, ISSUER_KEY_PASSPHRASE: DEV_EXAMPLE_KEY_PASSPHRASE }),
+      ).toThrow(/ISSUER_KEY_PASSPHRASE: must not be the development value/);
+      // The development value is still fine outside production
+      expect(loadConfig({ ISSUER_KEY_PASSPHRASE: DEV_EXAMPLE_KEY_PASSPHRASE })).toBeTruthy();
+    });
+
+    it('keeps the refused value in sync with backend/.env.example', () => {
+      const example = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
+      const line = example.split(/\r?\n/).find((l) => l.startsWith('ISSUER_KEY_PASSPHRASE='));
+      expect(line).toBe(`ISSUER_KEY_PASSPHRASE=${DEV_EXAMPLE_KEY_PASSPHRASE}`);
+      // The bundle and source are documented without values
+      expect(example).toMatch(/^ISSUER_KEYS_BUNDLE=$/m);
+      expect(example).toMatch(/^ISSUER_KEY_SOURCE=file$/m);
+    });
+
+    it('requires ISSUER_KEYS_BUNDLE in production env mode', () => {
+      expect(() => loadConfig({ ...PRODUCTION, ISSUER_KEY_SOURCE: 'env' })).toThrow(
+        /ISSUER_KEYS_BUNDLE: is required in production when ISSUER_KEY_SOURCE=env/,
+      );
+      expect(
+        loadConfig({ ...PRODUCTION, ISSUER_KEY_SOURCE: 'env', ISSUER_KEYS_BUNDLE: 'e30=' })
+          .ISSUER_KEY_SOURCE,
+      ).toBe('env');
+    });
+
+    it('refuses a non-strict key check in production', () => {
+      expect(() => loadConfig({ ...PRODUCTION, ISSUER_KEYS_STRICT_STARTUP: 'false' })).toThrow(
+        /ISSUER_KEYS_STRICT_STARTUP: cannot be false in production/,
+      );
+    });
+
+    it('never puts the passphrase or bundle in error messages', () => {
+      try {
+        loadConfig({
+          ...PRODUCTION,
+          ISSUER_KEY_PASSPHRASE: 'short-secret-phrase',
+          ISSUER_KEY_SOURCE: 'env',
+          ISSUER_KEYS_STRICT_STARTUP: 'false',
+        });
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect((err as Error).message).not.toContain('short-secret-phrase');
+      }
+    });
   });
 });

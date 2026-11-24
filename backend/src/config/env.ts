@@ -10,6 +10,14 @@
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
+/**
+ * The development-only passphrase written in backend/.env.example. Production refuses it
+ * (test/config.test.ts keeps the two in sync).
+ */
+export const DEV_EXAMPLE_KEY_PASSPHRASE = 'univault-dev-key-passphrase-change-me';
+/** Minimum ISSUER_KEY_PASSPHRASE length in production (12 elsewhere). */
+export const PRODUCTION_MIN_PASSPHRASE_LENGTH = 20;
+
 const csvList = z
   .string()
   .transform((s) =>
@@ -43,6 +51,18 @@ const envSchema = z
     JWT_SECRET: z.string().min(32, 'must be at least 32 characters').optional(),
     ISSUER_KEYS_DIR: z.string().min(1).default('./keys'),
     ISSUER_KEY_PASSPHRASE: z.string().min(12, 'must be at least 12 characters').optional(),
+    // Where issuer private keys are loaded from (src/keys/key-store.ts, Decision 014):
+    // file = encrypted PEM files in ISSUER_KEYS_DIR; env = ISSUER_KEYS_BUNDLE
+    ISSUER_KEY_SOURCE: z.enum(['file', 'env']).default('file'),
+    // Base64 bundle made by `npm run keys:bundle` (env mode). Encrypted keys only; secret anyway
+    ISSUER_KEYS_BUNDLE: z.string().max(1_000_000).optional(),
+    // Exit at start-up if any active issuer key fails its check. Always true in production
+    ISSUER_KEYS_STRICT_STARTUP: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === 'true')),
+    // Seconds a failed issuer key load is remembered before the next signing retries it (0 = always)
+    KEY_RETRY_BACKOFF_SECONDS: z.coerce.number().int().min(0).max(3600).default(30),
     AI_SERVICE_URL: z.url().default('http://localhost:5001'),
     AI_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(1500),
     CREDENTIAL_OFFER_TTL_SECONDS: z.coerce.number().int().positive().default(600),
@@ -75,6 +95,37 @@ const envSchema = z
           ctx.addIssue({ code: 'custom', path: [key], message: 'is required in production' });
         }
       }
+      if (
+        env.ISSUER_KEY_PASSPHRASE &&
+        env.ISSUER_KEY_PASSPHRASE.length < PRODUCTION_MIN_PASSPHRASE_LENGTH
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ISSUER_KEY_PASSPHRASE'],
+          message: `must be at least ${PRODUCTION_MIN_PASSPHRASE_LENGTH} characters in production`,
+        });
+      }
+      if (env.ISSUER_KEY_PASSPHRASE === DEV_EXAMPLE_KEY_PASSPHRASE) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ISSUER_KEY_PASSPHRASE'],
+          message: 'must not be the development value from .env.example in production',
+        });
+      }
+      if (env.ISSUER_KEY_SOURCE === 'env' && !env.ISSUER_KEYS_BUNDLE) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ISSUER_KEYS_BUNDLE'],
+          message: 'is required in production when ISSUER_KEY_SOURCE=env',
+        });
+      }
+      if (env.ISSUER_KEYS_STRICT_STARTUP === false) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ISSUER_KEYS_STRICT_STARTUP'],
+          message: 'cannot be false in production (the key check is always strict there)',
+        });
+      }
       if (env.DEV_SIMULATE_REDEMPTION) {
         ctx.addIssue({
           code: 'custom',
@@ -93,9 +144,11 @@ const envSchema = z
     }
   });
 
-export type AppConfig = z.infer<typeof envSchema> & {
+export type AppConfig = Omit<z.infer<typeof envSchema>, 'ISSUER_KEYS_STRICT_STARTUP'> & {
   /** Always set after loadConfig(). */
   JWT_SECRET: string;
+  /** Always set after loadConfig(): true in production, else the value given (default false). */
+  ISSUER_KEYS_STRICT_STARTUP: boolean;
   /** True when no JWT_SECRET was configured and a temporary one was generated (dev/test only). */
   JWT_SECRET_IS_EPHEMERAL: boolean;
 };
@@ -128,6 +181,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const ephemeral = !result.data.JWT_SECRET;
   return {
     ...result.data,
+    ISSUER_KEYS_STRICT_STARTUP:
+      result.data.NODE_ENV === 'production' || result.data.ISSUER_KEYS_STRICT_STARTUP === true,
     JWT_SECRET: result.data.JWT_SECRET ?? randomBytes(48).toString('base64url'),
     JWT_SECRET_IS_EPHEMERAL: ephemeral,
   };

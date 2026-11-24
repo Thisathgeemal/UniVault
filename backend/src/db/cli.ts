@@ -5,6 +5,8 @@
  *   npm run db:inspect   show tables, row counts and sample rows
  *   npm run db:reset     DELETE all data and recreate (development only)
  *   npm run keys:init    generate a signing key for every issuer without one
+ *   npm run keys:bundle  write the active encrypted keys as ISSUER_KEYS_BUNDLE to
+ *                        <ISSUER_KEYS_DIR>/issuer-keys.bundle.b64 (add --force to replace it)
  */
 import 'dotenv/config';
 import { rm } from 'node:fs/promises';
@@ -14,6 +16,7 @@ import { loadConfig } from '../config/env.js';
 import { createDatabase, PGLITE_PREFIX, type Database } from './client.js';
 import { runMigrations } from './migrate.js';
 import * as schema from './schema.js';
+import { KEY_BUNDLE_FILE_NAME, keyStoreFromConfig } from '../keys/key-store.js';
 import { createIssuerKeysService } from '../services/issuer-keys.service.js';
 import { DEFAULT_SEED_PASSWORD, seedDatabase } from './seed.js';
 
@@ -126,8 +129,7 @@ async function main(): Promise<void> {
         // Generate a signing key for every issuer that does not have an active one yet
         await migrate(database);
         const service = createIssuerKeysService(database.db, {
-          keysDir: config.ISSUER_KEYS_DIR,
-          passphrase: config.ISSUER_KEY_PASSPHRASE,
+          keyStore: keyStoreFromConfig(database.db, config),
           publicBaseUrl: config.PUBLIC_BASE_URL,
         });
         const missing = await service.issuersWithoutActiveKey();
@@ -140,8 +142,28 @@ async function main(): Promise<void> {
         console.log(`Public keys: ${config.PUBLIC_BASE_URL}/api/v1/issuers/<issuer-id>/keys`);
         break;
       }
+      case 'bundle': {
+        // Reads the ACTIVE encrypted key files (checked like start-up) and writes the bundle for
+        // ISSUER_KEYS_BUNDLE. The bundle itself is never printed: only ids, kids and the path
+        await migrate(database);
+        const fileStore = keyStoreFromConfig(database.db, { ...config, ISSUER_KEY_SOURCE: 'file' });
+        const result = await fileStore.writeBundle(
+          resolve(config.ISSUER_KEYS_DIR, KEY_BUNDLE_FILE_NAME),
+          { force: process.argv.includes('--force') },
+        );
+        for (const key of result.keys)
+          console.log(`  bundled   ${key.issuerId.padEnd(12)} kid ${key.kid}`);
+        console.log(`\nBundle written (mode 0600): ${result.path}`);
+        console.log(
+          'Set its content as the host secret ISSUER_KEYS_BUNDLE, with ISSUER_KEY_SOURCE=env and ISSUER_KEY_PASSPHRASE. Do not commit or paste it anywhere else.',
+        );
+        console.log(
+          'Reminder: delete this local bundle file once ISSUER_KEYS_BUNDLE is set on the host.',
+        );
+        break;
+      }
       default:
-        console.log('Usage: tsx src/db/cli.ts <migrate | seed | inspect | reset | keys>');
+        console.log('Usage: tsx src/db/cli.ts <migrate | seed | inspect | reset | keys | bundle>');
         process.exitCode = 1;
     }
   } finally {

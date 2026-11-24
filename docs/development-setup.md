@@ -51,8 +51,11 @@ For wallet testing on a phone, the phone and the laptop must be on the same Wi-F
    Windows (PowerShell): `Copy-Item backend/.env.example backend/.env`
 
 3. Fill in the values. Every variable is documented by a comment in its template. In particular:
-   - `backend/.env`: generate a random `JWT_SECRET` and set `ISSUER_KEY_PASSPHRASE` (at least
-     12 characters; needed by `npm run keys:init` and for signing credentials). Leave
+   - `backend/.env`: generate a random `JWT_SECRET`. `ISSUER_KEY_PASSPHRASE` comes with a
+     development-only value (needed by `npm run keys:init` and for signing credentials);
+     production refuses that value and needs at least 20 characters. Keep
+     `ISSUER_KEY_SOURCE=file` locally (`env` is for cloud hosts, see
+     `docs/security/issuer-key-management.md`). Leave
      `DATABASE_URL` empty to use the embedded development database (PGlite in
      `backend/.data/`); set a `postgres://` URL only for a real PostgreSQL server.
    - `wallet/.env`: set `EXPO_PUBLIC_API_BASE_URL` to the laptop's **LAN IP**

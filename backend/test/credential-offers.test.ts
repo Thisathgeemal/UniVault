@@ -16,6 +16,7 @@ import {
 } from '../src/services/credential-offers.service.js';
 import { createCredentialsService } from '../src/services/credentials.service.js';
 import { dbError } from './db/helpers.js';
+import { createKeyStore } from '../src/keys/key-store.js';
 import { authedTestApp, STAFF, type AuthedTestApp } from './auth-helpers.js';
 import { captureLogger, testConfig } from './helpers.js';
 
@@ -540,8 +541,12 @@ describe('rejections', () => {
   it('refuses a credential that is no longer pending (409 CREDENTIAL_NOT_PENDING)', async () => {
     const credentialId = await newPendingEmployment();
     const signer = createCredentialsService(t.database.db, loadCredentialSchemas(), {
-      keysDir,
-      passphrase: PASSPHRASE,
+      keyStore: createKeyStore({
+        db: t.database.db,
+        source: 'file',
+        keysDir,
+        passphrase: PASSPHRASE,
+      }),
       publicBaseUrl: BASE_URL,
     });
     await signer.signCredential(credentialId, walletJwk());

@@ -1,8 +1,10 @@
 # Issuer Public Key API
 
 **Sprint:** 1 · **Requirements:** FR-ISS-02, FR-VER-02, NFR-01, NFR-06
-**Code:** `backend/src/routes/issuers.routes.ts`, `backend/src/services/issuer-keys.service.ts`
-**Tests:** `backend/test/issuer-keys.test.ts`
+**Code:** `backend/src/routes/issuers.routes.ts`, `backend/src/services/issuer-keys.service.ts`;
+private keys only through `backend/src/keys/key-store.ts`
+([issuer-key-management.md](../security/issuer-key-management.md), Decision 014)
+**Tests:** `backend/test/issuer-keys.test.ts`, `backend/test/key-store.test.ts`
 
 ## 1. Purpose
 
@@ -94,12 +96,18 @@ format (RFC 7517), so any verifier can fetch them without logging in.
 
 **Errors:**
 
-| Situation                                 | Status                                                   |
-| ----------------------------------------- | -------------------------------------------------------- |
-| No login                                  | 401                                                      |
-| Malformed issuer ID                       | 400 `VALIDATION_ERROR`                                   |
-| An officer, or an admin of another issuer | 403 `FORBIDDEN`                                          |
-| `ISSUER_KEY_PASSPHRASE` not configured    | 503 `KEY_PASSPHRASE_NOT_CONFIGURED` (nothing is written) |
+| Situation                                                     | Status                                                                                                                                                                                  |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No login                                                      | 401                                                                                                                                                                                     |
+| Malformed issuer ID                                           | 400 `VALIDATION_ERROR`                                                                                                                                                                  |
+| An officer, or an admin of another issuer                     | 403 `FORBIDDEN`                                                                                                                                                                         |
+| Keys come from `ISSUER_KEYS_BUNDLE` (`ISSUER_KEY_SOURCE=env`) | 409 `KEY_ROTATION_UNSUPPORTED_IN_ENV_MODE` (nothing is created). Generate the key locally with the CLI, run `npm run keys:bundle`, update `ISSUER_KEYS_BUNDLE` on the host and redeploy |
+| `ISSUER_KEY_PASSPHRASE` not configured                        | 503 `KEY_PASSPHRASE_NOT_CONFIGURED` (nothing is written)                                                                                                                                |
+| The new key cannot be loaded back after publishing            | 503 `ISSUER_KEY_UNAVAILABLE` (detail in the server log only)                                                                                                                            |
+
+The response never contains private key material. The JWKS and every key response contain only
+the public members `kty`, `n`, `e`, `kid`, `alg` and `use`. A test fails if `d`, `p`, `q`,
+`dp`, `dq` or `qi` ever appear, even when a stored JWK is tampered with.
 
 ## 3. How a verifier uses it
 
@@ -114,14 +122,16 @@ with credentials signed by the issuance service.
 
 ## 4. Key generation and storage
 
-| Part        | Where it goes                                                                                                     |
-| ----------- | ----------------------------------------------------------------------------------------------------------------- |
-| Private key | Encrypted (AES-256) with `ISSUER_KEY_PASSPHRASE`, saved as `<kid>.private.pem` in `ISSUER_KEYS_DIR` (git-ignored) |
-| Public key  | `issuer_keys` table (`status = active`) and `<kid>.public.jwk.json`                                               |
+| Part        | Where it goes                                                                                                                                                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Private key | Encrypted (AES-256) with `ISSUER_KEY_PASSPHRASE`, saved as `<kid>.private.pem` in `ISSUER_KEYS_DIR` (git-ignored), or deployed in `ISSUER_KEYS_BUNDLE` (env mode). Read only by the key store, decrypted once and checked at start-up |
+| Public key  | `issuer_keys` table (`status = active`) and `<kid>.public.jwk.json`                                                                                                                                                                   |
 
 **Generating keys for all issuers at once:** run `npm run keys:init` from
 `backend/`. It creates a key for every issuer that doesn't have an active one,
-and is safe to repeat.
+and is safe to repeat. For a host with an ephemeral filesystem, `npm run keys:bundle`
+then writes the encrypted active keys as `keys/issuer-keys.bundle.b64` for
+`ISSUER_KEYS_BUNDLE` (see the key-management doc, section 8).
 
 ## 5. Key rotation
 
@@ -133,7 +143,8 @@ Generating a new key for an issuer that already has one:
 Both steps run in **one database transaction**, so there's never a moment with
 zero or two active keys. Retired keys stay in the key set, so **credentials
 signed before the rotation keep verifying**. New credentials are signed with the
-new key: `signCredential()` always loads the issuer's **active** key, and
+new key: `signCredential()` always uses the issuer's **active** key (the key store
+clears its cached entry and loads the new key right after the rotation), and
 `backend/test/credentials.test.ts` checks that a credential signed after a
 rotation carries the new `kid` and verifies, while an older one still verifies
 with the retired key.

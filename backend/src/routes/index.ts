@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { AuthService } from '../auth/auth-service.js';
 import type { AuthMiddleware } from '../auth/middleware.js';
 import type { Database } from '../db/client.js';
+import type { KeyStore } from '../keys/key-store.js';
 import type { CredentialOffersService } from '../services/credential-offers.service.js';
 import type { CredentialStatusService } from '../services/credential-status.js';
 import type { CredentialsService } from '../services/credentials.service.js';
@@ -22,6 +23,7 @@ export interface ApiRouterDeps {
   version: string;
   environment: string;
   database?: Database;
+  keyStore?: KeyStore;
   authService?: AuthService;
   issuerKeys?: IssuerKeysService;
   holders?: HoldersService;

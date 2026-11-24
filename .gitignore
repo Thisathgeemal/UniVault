@@ -23,6 +23,9 @@
 **/private-keys/
 **/keys/
 
+# Issuer key bundles (npm run keys:bundle): encrypted keys, but still secret
+*.bundle.b64
+
 # ------------------------------------------
 # Node.js dependencies
 # ------------------------------------------

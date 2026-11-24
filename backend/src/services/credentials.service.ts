@@ -28,11 +28,7 @@
  * stored. Expiry instants are whole seconds, so the SD-JWT `exp` equals expires_at exactly.
  */
 import { createPublicKey } from 'node:crypto';
-import {
-  computeEcJwkThumbprint,
-  createSdJwt,
-  loadIssuerPrivateKey,
-} from '@univault/crypto-core/node';
+import { computeEcJwkThumbprint, createSdJwt } from '@univault/crypto-core/node';
 import { and, asc, count, desc, eq, gt, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import type { StaffProfile } from '../auth/auth-service.js';
@@ -48,6 +44,7 @@ import {
   type Holder,
   type NewCredentialStatusEvent,
 } from '../db/schema.js';
+import type { KeyStore } from '../keys/key-store.js';
 import { AppError } from '../lib/errors.js';
 import type { ClaimIssue, CredentialSchemas, CredentialTypeName } from './credential-schemas.js';
 import {
@@ -222,8 +219,8 @@ export interface CredentialsService {
 }
 
 export interface CredentialsServiceOptions {
-  keysDir: string;
-  passphrase: string | undefined;
+  /** The only owner of private keys (src/keys/key-store.ts). */
+  keyStore: KeyStore;
   publicBaseUrl: string;
   now?: () => Date;
 }
@@ -836,26 +833,11 @@ export function createCredentialsService(
         );
       }
 
-      const key = await activeKey(record.issuerId);
-      if (!key) throw issuerKeyMissing();
-      if (!options.passphrase) {
-        throw new AppError(
-          503,
-          'KEY_PASSPHRASE_NOT_CONFIGURED',
-          'ISSUER_KEY_PASSPHRASE must be set before credentials can be signed',
-        );
-      }
-      let privateKey;
-      try {
-        privateKey = await loadIssuerPrivateKey(options.keysDir, key.kid, options.passphrase);
-      } catch {
-        // Do not pass on the underlying message: it can contain file system paths
-        throw new AppError(
-          500,
-          'ISSUER_KEY_UNAVAILABLE',
-          'The issuer signing key could not be loaded',
-        );
-      }
+      if (!(await activeKey(record.issuerId))) throw issuerKeyMissing();
+      // The key store decrypts each key once and checks it (Decision 014). Any key problem is a
+      // KeyStoreError, answered as 503 ISSUER_KEY_UNAVAILABLE by the error handler
+      const key = await options.keyStore.getSigningKey(record.issuerId);
+      const privateKey = key.privateKey;
 
       // Subject claims: the snapshot, with age_over_18 recalculated on the issuance date
       const subject = withDerivedClaims(record.credentialType, record.claimsSnapshot, signedAt);

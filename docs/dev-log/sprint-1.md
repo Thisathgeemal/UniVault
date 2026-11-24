@@ -154,6 +154,85 @@
 - **Next / Blockers:** As above / none.
 - **Evidence:** `backend/test/credential-status.test.ts` (visibility, log template, 429 log).
 
+### Tue 24 Nov (Sprint 1 carry-over: secure issuer key loading)
+
+- **Done:** Central issuer key store (NFR-01, FR-ISS-02, NFR-08, Decision 014, draft).
+  - `src/keys/key-store.ts` is the only code that touches private keys. It decrypts each key
+    once, checks it (thumbprint = kid, public key = stored JWK) and caches the `KeyObject`.
+    Signing, rotation, start-up, `/health` and the CLI go through it.
+  - Two sources: encrypted files (`ISSUER_KEY_SOURCE=file`) or an encrypted env bundle
+    (`ISSUER_KEY_SOURCE=env`, `ISSUER_KEYS_BUNDLE`, written by the new `npm run keys:bundle`).
+    Unencrypted keys are refused. Rotation in env mode → `409
+KEY_ROTATION_UNSUPPORTED_IN_ENV_MODE`.
+  - `KeyStoreError` (`KEY_NOT_FOUND`, `KEY_DECRYPT_FAILED`, `KEY_UNENCRYPTED`,
+    `KEY_KID_MISMATCH`, `KEY_PUBLIC_MISMATCH`, `KEY_SOURCE_INVALID`) → `503
+ISSUER_KEY_UNAVAILABLE` with a generic message; the code goes to the log with issuer id
+    and kid.
+  - Start-up check before listening: strict (exit 1) in production or with
+    `ISSUER_KEYS_STRICT_STARTUP=true`, otherwise it starts degraded. There is a file-permission
+    warning outside production (skipped on Windows). Production refuses a passphrase under 20
+    characters, the development value now in `.env.example`, and env mode without a bundle.
+  - `/health` has a keys block (`status`, `activeKeys`, `loaded`) and turns 503 `degraded` when
+    a key failed.
+  - Leak prevention: more redaction paths (key fields, `config`); public-only JWKS test;
+    `check:secrets` now scans staged content for PEM private keys, base64-encoded PEM and
+    `*.bundle.b64`; `*.bundle.b64` added to `.gitignore`.
+  - Evidence script `scripts/evidence/s1-keys.ps1`: run end to end on PowerShell 5.1 in its own
+    throwaway folder, all eight sections and the final leak check as expected.
+  - Backend tests: 409 → 465 (15 → 18 files), all passing; coverage 89.69% statements, 86.56%
+    branches, 93.11% functions, 90.41% lines.
+- **Next:** Supervisor review of Decision 014; set the host secrets for the demo deployment
+  (key-management doc, section 8).
+- **Blockers:** No PostgreSQL server on the development machine, so a real `NODE_ENV=production`
+  start-up can't be run locally. The production key policy is proven with
+  `ISSUER_KEYS_STRICT_STARTUP=true` instead (Issue 12).
+- **Evidence:** `backend/test/key-store.test.ts`, `backend/test/key-startup.test.ts`,
+  `backend/test/check-secrets.test.ts`; screenshots of the eight sections of
+  `scripts/evidence/s1-keys.ps1` (to be taken: `evidence/s1-2026-11-24-keys-<section>.png`).
+
+### Tue 24 Nov (follow-up: key retry backoff, health unknown, production checklist)
+
+- **Done:** Follow-up to the key store (Decision 014).
+  - **Retry backoff:** a failed key load is remembered for `KEY_RETRY_BACKOFF_SECONDS` (new,
+    default 30, 0–3600). Signings in that window get the cached `KeyStoreError` (503
+    `ISSUER_KEY_UNAVAILABLE`) without another decryption; the first one after it retries.
+    `reload()` and rotation clear the failure at once.
+  - **Health:** with the database down or not configured, the keys block is
+    `{ "status": "unknown" }` instead of `ok` with zero counts.
+  - **`keys:bundle`** ends with a reminder to delete the local bundle once
+    `ISSUER_KEYS_BUNDLE` is set on the host.
+  - **Docs:** production key checklist and the "to verify at deployment" items (strict start-up
+    on real PostgreSQL, the permission warning on real Linux) in
+    `docs/security/issuer-key-management.md` §8.
+  - Backend tests: 465 → 471 (18 files), all passing; coverage 89.67% statements, 86.62%
+    branches, 93.11% functions, 90.39% lines.
+- **Next:** Run the production checklist when the demo host is set up.
+- **Blockers:** None new (Issue 12 still applies).
+- **Evidence:** `backend/test/key-store.test.ts` ("retry backoff" block, injected clock),
+  `backend/test/db/seed.test.ts` and `backend/test/app.test.ts` (health `unknown`),
+  `backend/test/key-startup.test.ts` (bundle reminder).
+
+### Tue 24 Nov (follow-up: test timeouts under parallel load)
+
+- **Done:** Made the backend suite reliable on Windows (Issue 15).
+  - Diagnosed first: no bug in the strict start-up path. Run alone three times, the
+    wrong-passphrase test took 3.1–3.6 s and exited 1 every time. In the full parallel suite it
+    took 9.6 s, and on a slower machine it timed out.
+  - Two Vitest projects in one run: **fast** (parallel) and **heavy** (`server.test.ts`,
+    `key-startup.test.ts`, `check-secrets.test.ts` and the new `db/seed-disk.test.ts`). Heavy
+    runs after fast, one file at a time. New scripts `npm run test:fast` and
+    `npm run test:heavy`.
+  - Every spawned process is killed in `afterEach`, and the test waits for its exit, even after
+    a failure or timeout. Sync git and scan calls have a process `timeout`. The on-disk database
+    is closed in `afterEach`. Each heavy test has a named timeout; the global timeouts are
+    unchanged.
+  - `npm run test:coverage` three times in a row: 471/471 each time (86.7–89.1 s), coverage
+    89.67 / 86.62 / 93.11 / 90.39. Heavy tests now run at their alone speed (3.1–3.8 s).
+- **Next:** Watch the suite time; if the fast project grows, consider splitting it further.
+- **Blockers:** None.
+- **Evidence:** `backend/vitest.config.ts`; three consecutive `test:coverage` runs (see
+  Issue 15).
+
 ## Testing evidence
 
 Record the tests that show the sprint goal is met, with links to output in `evidence/`.
@@ -316,3 +395,78 @@ Record the tests that show the sprint goal is met, with links to output in `evid
   Rows created earlier may still carry milliseconds (development data only).
 - **Lesson:** When the same instant is stored in two places with different precision, fix the
   precision at the source.
+
+### Issue 12: A production start-up could not be tested on this machine (24 Nov 2026)
+
+- **Task:** Secure issuer key loading
+- **Symptom:** The production key checks (exit on a wrong passphrase or a kid mismatch) run after
+  the database connects. `loadConfig()` refuses the embedded database in production, and the
+  laptop has no PostgreSQL server or Docker.
+- **Resolution:** The key check's strictness is a setting, `ISSUER_KEYS_STRICT_STARTUP`. It is
+  always true in production, and production refuses `false`. Tests and the evidence script run
+  the real server with the strict policy on the embedded database. The configuration-level
+  production refusals (weak or development passphrase, env mode without a bundle) still run as
+  real `NODE_ENV=production` processes, because they fail before the database connects.
+- **Lesson:** Make security policies explicit settings that production forces on. They can
+  then be demonstrated without production infrastructure.
+
+### Issue 13: Key problems gave three different responses (24 Nov 2026)
+
+- **Task:** Secure issuer key loading
+- **Symptom:** Signing read and decrypted the key file on every call. A wrong passphrase gave
+  `500 ISSUER_KEY_UNAVAILABLE`, a missing passphrase `503 KEY_PASSPHRASE_NOT_CONFIGURED`, and a
+  swapped key file would have signed with a key that doesn't match the published `kid`.
+- **Resolution:** All key loading moved into the key store. It decrypts once, checks kid and
+  public key, and every key problem is `503 ISSUER_KEY_UNAVAILABLE`, with the detail only in the
+  log.
+- **Lesson:** Give each secret one owner, so that checks, caching and error handling exist once.
+
+### Issue 14: Evidence script failed on a user folder with a space (24 Nov 2026)
+
+- **Task:** Key evidence script
+- **Symptom:** `node` reported a syntax error in `C:\Users\MSI`. Exit codes of servers started
+  in the background were empty.
+- **Cause:** Windows PowerShell 5.1's `Start-Process` neither quotes arguments that contain
+  spaces nor reports `ExitCode` unless the process handle was read while the process ran.
+- **Resolution:** Arguments with spaces are quoted (`ConvertTo-ArgList`), the handle is read
+  right after `Start-Process`, and the checks require a real non-zero exit code.
+- **Lesson:** Test scripts on paths with spaces. In PowerShell, `$null -ne 0` is true, so check
+  for `$null` explicitly.
+
+### Issue 15: Timeouts under parallel load on Windows (24 Nov 2026)
+
+- **Task:** Backend test reliability
+- **Symptom:** On the developer's machine the full suite had 2 timeouts (469/471):
+  - `key-startup.test.ts` "exits non-zero before listening when the passphrase is wrong" at
+    90 s (its kid-mismatch sibling passed in 17 s);
+  - `db/seed.test.ts` "keeps data between connections" at 30 s, after 73 s.
+
+  `server.test.ts` took 69 s in the same run.
+
+- **Diagnosis:** Each file run alone, three times: the wrong-passphrase test took 3.1–3.6 s
+  and exited 1 every time, and the on-disk test 2.6–2.8 s. The strict start-up path doesn't
+  hang: the backoff cache uses no timers, and the database is closed before `process.exit(1)`.
+  In the full suite on this machine (16 logical CPUs) the same tests took:
+  - wrong passphrase: 9.6 s;
+  - on-disk PGlite: 16.9 s;
+  - a server start: 34.5 s.
+- **Cause:** CPU and disk contention, not a bug. The heavy tests spawn Node processes that
+  compile TypeScript with tsx at start-up, or write PGlite to disk. They ran at the same time as
+  about 14 other files, each starting its own in-memory PGlite. A slower machine pushed them
+  past their timeouts. A timed-out `await proc.exited` also left its process running, which
+  slowed later tests further.
+- **Resolution:**
+  - Two Vitest projects: heavy tests run after the fast ones, one file at a time
+    (`sequence.groupOrder`, `fileParallelism: false`). The on-disk test moved to
+    `db/seed-disk.test.ts`.
+  - Every child process is killed in `afterEach`.
+  - Sync calls have a process timeout.
+  - Each heavy test has a named timeout.
+
+  Three consecutive `test:coverage` runs passed at 471/471, with the heavy tests at their
+  alone speed. The suite takes about 87–89 s instead of 67–77 s, because the heavy files no
+  longer overlap with the rest.
+
+- **Lesson:** Time a slow test alone before treating it as a bug. Keep tests that start real
+  processes or use the disk apart from the parallel in-process ones, and always clean up
+  processes in a hook, not only on the success path.

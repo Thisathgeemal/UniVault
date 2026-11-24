@@ -20,12 +20,17 @@
     "test": "vitest run",
     "pretest:coverage": "npm run build:deps",
     "test:coverage": "vitest run --coverage",
+    "pretest:fast": "npm run build:deps",
+    "test:fast": "vitest run --project fast",
+    "pretest:heavy": "npm run build:deps",
+    "test:heavy": "vitest run --project heavy",
     "db:migrate": "tsx src/db/cli.ts migrate",
     "db:seed": "tsx src/db/cli.ts seed",
     "db:inspect": "tsx src/db/cli.ts inspect",
     "db:reset": "tsx src/db/cli.ts reset",
     "prekeys:init": "npm run build:deps",
-    "keys:init": "tsx src/db/cli.ts keys"
+    "keys:init": "tsx src/db/cli.ts keys",
+    "keys:bundle": "tsx src/db/cli.ts bundle"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.17",

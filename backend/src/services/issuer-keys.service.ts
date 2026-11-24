@@ -1,24 +1,19 @@
 /**
  * Issuer signing keys: generation, rotation and public-key publication.
  *
- * - Private keys are created with @univault/crypto-core, encrypted with
- *   ISSUER_KEY_PASSPHRASE and written to ISSUER_KEYS_DIR (git-ignored).
- *   They never enter the database or an API response.
+ * - Private keys are created and stored by the key store (src/keys/key-store.ts, the only
+ *   code that touches them): encrypted with ISSUER_KEY_PASSPHRASE in ISSUER_KEYS_DIR
+ *   (git-ignored). In env mode (ISSUER_KEYS_BUNDLE) keys cannot be generated here: 409.
+ *   Private keys never enter the database or an API response.
  * - Public keys go into the issuer_keys table and are published as a
  *   JSON Web Key Set (JWKS) at GET /api/v1/issuers/:issuerId/keys.
  * - Rotation retires the current key instead of deleting it: credentials
  *   signed with the old key must keep verifying until they expire.
  */
-import { rm } from 'node:fs/promises';
-import {
-  generateIssuerKeys,
-  issuerKeyFileNames,
-  saveIssuerKeyPair,
-  type IssuerPublicJwk,
-} from '@univault/crypto-core/node';
+import type { IssuerPublicJwk } from '@univault/crypto-core/node';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
-import { join } from 'node:path';
 import type { Db } from '../db/client.js';
+import type { KeyStore } from '../keys/key-store.js';
 import { issuerKeys, issuers } from '../db/schema.js';
 import { AppError } from '../lib/errors.js';
 
@@ -66,8 +61,11 @@ export function toPublicJwk(stored: Record<string, unknown>): IssuerPublicJwk {
 
 export function createIssuerKeysService(
   db: Db,
-  options: { keysDir: string; passphrase: string | undefined; publicBaseUrl: string },
+  options: { keyStore: KeyStore; publicBaseUrl: string },
 ): IssuerKeysService {
+  const isPublished = async (kid: string) =>
+    (await db.select({ kid: issuerKeys.kid }).from(issuerKeys).where(eq(issuerKeys.kid, kid)))
+      .length > 0;
   const issuerExists = async (issuerId: string) =>
     (await db.select({ id: issuers.id }).from(issuers).where(eq(issuers.id, issuerId))).length > 0;
 
@@ -105,17 +103,10 @@ export function createIssuerKeysService(
 
     async generateKey(issuerId) {
       if (!(await issuerExists(issuerId))) throw issuerNotFound(issuerId);
-      if (!options.passphrase) {
-        throw new AppError(
-          503,
-          'KEY_PASSPHRASE_NOT_CONFIGURED',
-          'ISSUER_KEY_PASSPHRASE must be set in backend/.env before issuer keys can be generated',
-        );
-      }
 
-      // 1. Create the key pair and store the encrypted private key on disk
-      const keyPair = await generateIssuerKeys({ passphrase: options.passphrase });
-      await saveIssuerKeyPair(options.keysDir, keyPair);
+      // 1. The key store creates the key pair and stores the encrypted private key
+      //    (409 in env mode, 503 without a passphrase)
+      const keyPair = await options.keyStore.createKeyPair();
 
       // 2. Retire the current key and publish the new one – in one transaction,
       //    so there is never a moment with zero or two active keys
@@ -135,6 +126,8 @@ export function createIssuerKeysService(
           });
           return retired[0]?.kid ?? null;
         });
+        // 3. Clear the issuer's cached key and load (and check) the new one
+        await options.keyStore.reload(issuerId);
         return {
           issuerId,
           kid: keyPair.kid,
@@ -144,11 +137,7 @@ export function createIssuerKeysService(
         };
       } catch (err) {
         // Do not leave an unpublished private key on disk
-        const names = issuerKeyFileNames(keyPair.kid);
-        await Promise.all([
-          rm(join(options.keysDir, names.privateKey), { force: true }),
-          rm(join(options.keysDir, names.publicJwk), { force: true }),
-        ]);
+        if (!(await isPublished(keyPair.kid))) await keyPair.discard();
         throw err;
       }
     },

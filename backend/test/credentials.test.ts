@@ -16,6 +16,7 @@ import {
   createCredentialsService,
   type CredentialsService,
 } from '../src/services/credentials.service.js';
+import { createKeyStore } from '../src/keys/key-store.js';
 import { authedTestApp, STAFF, type AuthedTestApp } from './auth-helpers.js';
 import { captureLogger, testConfig } from './helpers.js';
 
@@ -159,8 +160,12 @@ beforeAll(async () => {
 
   // The same signing service the Sprint 2 redemption endpoint will use, on the same database
   signer = createCredentialsService(t.database.db, loadCredentialSchemas(), {
-    keysDir,
-    passphrase: PASSPHRASE,
+    keyStore: createKeyStore({
+      db: t.database.db,
+      source: 'file',
+      keysDir,
+      passphrase: PASSPHRASE,
+    }),
     publicBaseUrl: BASE_URL,
   });
 
@@ -466,8 +471,12 @@ describe('signCredential – refusals before signing', () => {
 
   it('refuses a pending credential whose expiry has passed (409 CREDENTIAL_EXPIRED)', async () => {
     const later = createCredentialsService(t.database.db, loadCredentialSchemas(), {
-      keysDir,
-      passphrase: PASSPHRASE,
+      keyStore: createKeyStore({
+        db: t.database.db,
+        source: 'file',
+        keysDir,
+        passphrase: PASSPHRASE,
+      }),
       publicBaseUrl: BASE_URL,
       now: () => new Date(Date.now() + 400 * DAY_MS), // past the 1-year expiry
     });
@@ -477,26 +486,35 @@ describe('signCredential – refusals before signing', () => {
     });
   });
 
-  it('returns 503 when no key passphrase is configured', async () => {
+  it('refuses with KEY_DECRYPT_FAILED when no key passphrase is configured', async () => {
     const noPass = createCredentialsService(t.database.db, loadCredentialSchemas(), {
-      keysDir,
-      passphrase: undefined,
+      keyStore: createKeyStore({
+        db: t.database.db,
+        source: 'file',
+        keysDir,
+        passphrase: undefined,
+      }),
       publicBaseUrl: BASE_URL,
     });
+    // KeyStoreError: the API answers 503 ISSUER_KEY_UNAVAILABLE (test/key-store.test.ts)
     await expect(noPass.signCredential(pendingId, walletKey().publicJwk)).rejects.toMatchObject({
-      status: 503,
-      code: 'KEY_PASSPHRASE_NOT_CONFIGURED',
+      name: 'KeyStoreError',
+      code: 'KEY_DECRYPT_FAILED',
     });
   });
 
-  it('returns 500 ISSUER_KEY_UNAVAILABLE (no file paths) when the key cannot be decrypted', async () => {
+  it('refuses with KEY_DECRYPT_FAILED (no file paths) when the key cannot be decrypted', async () => {
     const wrongPass = createCredentialsService(t.database.db, loadCredentialSchemas(), {
-      keysDir,
-      passphrase: 'a-different-passphrase',
+      keyStore: createKeyStore({
+        db: t.database.db,
+        source: 'file',
+        keysDir,
+        passphrase: 'a-different-passphrase',
+      }),
       publicBaseUrl: BASE_URL,
     });
     const error = await wrongPass.signCredential(pendingId, walletKey().publicJwk).catch((e) => e);
-    expect(error).toMatchObject({ status: 500, code: 'ISSUER_KEY_UNAVAILABLE' });
+    expect(error).toMatchObject({ name: 'KeyStoreError', code: 'KEY_DECRYPT_FAILED' });
     expect(String(error.message)).not.toContain(keysDir);
   });
 

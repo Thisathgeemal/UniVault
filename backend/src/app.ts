@@ -17,6 +17,7 @@ import { createAuthMiddleware } from './auth/middleware.js';
 import { createTokenService } from './auth/tokens.js';
 import type { AppConfig } from './config/env.js';
 import type { Database } from './db/client.js';
+import { keyStoreFromConfig, type KeyStore } from './keys/key-store.js';
 import { AppError } from './lib/errors.js';
 import { createErrorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { apiRouter } from './routes/index.js';
@@ -36,6 +37,11 @@ export interface AppDependencies {
   database?: Database;
   /** Clock for credential expiry and status (tests set the time); defaults to the real time. */
   now?: () => Date;
+  /**
+   * The issuer key store (the only owner of private keys). server.ts passes the one it checked
+   * at start-up; tests may inject one. Default: built from the configuration.
+   */
+  keyStore?: KeyStore;
 }
 
 /** Paths of the public status route, which has its own CORS policy. */
@@ -133,25 +139,27 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
       })
     : undefined;
   const auth = createAuthMiddleware({ tokens, ...(authService ? { authService } : {}) });
-  const issuerKeys = deps.database
-    ? createIssuerKeysService(deps.database.db, {
-        keysDir: config.ISSUER_KEYS_DIR,
-        passphrase: config.ISSUER_KEY_PASSPHRASE,
-        publicBaseUrl: config.PUBLIC_BASE_URL,
-      })
-    : undefined;
+  const keyStore =
+    deps.keyStore ?? (deps.database ? keyStoreFromConfig(deps.database.db, config) : undefined);
+  const issuerKeys =
+    deps.database && keyStore
+      ? createIssuerKeysService(deps.database.db, {
+          keyStore,
+          publicBaseUrl: config.PUBLIC_BASE_URL,
+        })
+      : undefined;
   // Credential schemas are loaded at start-up: a missing or broken schema stops the server early
   const schemas = loadCredentialSchemas(config.CREDENTIAL_SCHEMAS_DIR);
   const holders = deps.database ? createHoldersService(deps.database.db, schemas) : undefined;
   const now = deps.now ?? (() => new Date());
-  const credentials = deps.database
-    ? createCredentialsService(deps.database.db, schemas, {
-        keysDir: config.ISSUER_KEYS_DIR,
-        passphrase: config.ISSUER_KEY_PASSPHRASE,
-        publicBaseUrl: config.PUBLIC_BASE_URL,
-        now,
-      })
-    : undefined;
+  const credentials =
+    deps.database && keyStore
+      ? createCredentialsService(deps.database.db, schemas, {
+          keyStore,
+          publicBaseUrl: config.PUBLIC_BASE_URL,
+          now,
+        })
+      : undefined;
   const credentialStatus = deps.database
     ? createCredentialStatusService(deps.database.db, { now })
     : undefined;
@@ -187,6 +195,7 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
         windowMinutes: config.LOGIN_RATE_LIMIT_WINDOW_MINUTES,
       },
       ...(deps.database ? { database: deps.database } : {}),
+      ...(keyStore ? { keyStore } : {}),
       ...(authService ? { authService } : {}),
       ...(issuerKeys ? { issuerKeys } : {}),
       ...(holders ? { holders } : {}),
