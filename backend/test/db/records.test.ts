@@ -9,6 +9,7 @@ import type { Database } from '../../src/db/client.js';
 import {
   credentialOffers,
   credentialRecords,
+  credentialStatusEvents,
   holders,
   issuerKeys,
   issuerStaff,
@@ -302,11 +303,11 @@ describe('credential records', () => {
         validCredential({
           status: 'revoked',
           revokedAt: new Date(),
-          revocationReason: 'Employee resigned',
+          revocationReason: 'employment_ended',
         }),
       )
       .returning();
-    expect(cred).toMatchObject({ status: 'revoked', revocationReason: 'Employee resigned' });
+    expect(cred).toMatchObject({ status: 'revoked', revocationReason: 'employment_ended' });
     const bad = validCredential({ status: 'revoked' });
     expect(await dbError(database.db.insert(credentialRecords).values(bad))).toMatch(
       /check constraint/,
@@ -323,8 +324,8 @@ describe('credential records', () => {
       .update(credentialRecords)
       .set({
         status: 'superseded',
-        revokedAt: new Date(),
-        revocationReason: 'Designation changed',
+        supersededAt: new Date(),
+        supersededByStaffId: staffId,
         statusUpdatedAt: new Date(),
       })
       .where(eq(credentialRecords.id, original!.id));
@@ -453,5 +454,149 @@ describe('credential offers', () => {
       redeemedAt: new Date(),
     });
     expect(await dbError(bad)).toMatch(/check constraint/);
+  });
+});
+
+describe('revocation, supersede and status history (migration 0005)', () => {
+  const insert = (overrides: Partial<typeof credentialRecords.$inferInsert>) =>
+    database.db.insert(credentialRecords).values(validCredential(overrides));
+  const pending = (overrides: Partial<typeof credentialRecords.$inferInsert> = {}) =>
+    insert({
+      status: 'pending',
+      issuerKid: null,
+      holderKeyThumbprint: null,
+      issuedAt: null,
+      ...overrides,
+    });
+
+  it('stores a revoked credential with time, reason and staff member', async () => {
+    const [row] = await insert({
+      status: 'revoked',
+      revokedAt: new Date(),
+      revocationReason: 'employment_ended',
+      revokedByStaffId: staffId,
+    }).returning();
+    expect(row).toMatchObject({ status: 'revoked', revokedByStaffId: staffId });
+  });
+
+  it('stores a credential revoked while pending, which was never signed', async () => {
+    const [row] = await pending({
+      status: 'revoked',
+      revokedAt: new Date(),
+      revocationReason: 'issued_in_error',
+    }).returning();
+    expect(row).toMatchObject({ status: 'revoked', issuedAt: null, issuerKid: null });
+  });
+
+  it.each([
+    ['revoked without a reason', { status: 'revoked', revokedAt: new Date() }],
+    ['revoked without a time', { status: 'revoked', revocationReason: 'other' }],
+    ['valid with a revocation time', { revokedAt: new Date() }],
+    ['valid with a revocation reason', { revocationReason: 'other' }],
+    ['valid with a revoking staff member', { revokedByStaffId: 'STAFF' }],
+    [
+      'revoked that is also marked superseded',
+      {
+        status: 'revoked',
+        revokedAt: new Date(),
+        revocationReason: 'other',
+        supersededAt: new Date(),
+      },
+    ],
+    ['superseded without a supersede time', { status: 'superseded' }],
+    [
+      'superseded with a revocation time (the old 0001 rule)',
+      { status: 'superseded', supersededAt: new Date(), revokedAt: new Date() },
+    ],
+    ['valid with a supersede time', { supersededAt: new Date() }],
+    ['valid with a superseding staff member', { supersededByStaffId: 'STAFF' }],
+    ['pending with signing data', { status: 'pending' }],
+    ['valid with only part of the signing data', { holderKeyThumbprint: null }],
+    [
+      'superseded without signing data',
+      {
+        status: 'superseded',
+        supersededAt: new Date(),
+        issuedAt: null,
+        issuerKid: null,
+        holderKeyThumbprint: null,
+      },
+    ],
+  ] as const)('refuses a credential %s', async (_label, overrides) => {
+    const values = Object.fromEntries(
+      Object.entries(overrides).map(([k, v]) => [k, v === 'STAFF' ? staffId : v]),
+    ) as Partial<typeof credentialRecords.$inferInsert>;
+    expect(await dbError(insert(values))).toMatch(/check constraint/);
+  });
+
+  it('refuses a second replacement of the same credential (UNIQUE replaces_credential_id)', async () => {
+    const [original] = await insert({ status: 'superseded', supersededAt: new Date() }).returning();
+    await pending({ replacesCredentialId: original!.id });
+    expect(await dbError(pending({ replacesCredentialId: original!.id }))).toMatch(
+      /duplicate key|unique/,
+    );
+  });
+
+  describe('credential_status_events', () => {
+    let credentialId: string;
+    beforeAll(async () => {
+      const [row] = await pending().returning();
+      credentialId = row!.id;
+    });
+    const event = (overrides: Partial<typeof credentialStatusEvents.$inferInsert> = {}) => ({
+      credentialId,
+      issuerId: 'employer-a',
+      fromStatus: 'pending' as const,
+      toStatus: 'revoked' as const,
+      reason: 'issued_in_error',
+      staffId,
+      ...overrides,
+    });
+
+    it('stores creation (null -> pending) and later changes', async () => {
+      await database.db
+        .insert(credentialStatusEvents)
+        .values([event({ fromStatus: null, toStatus: 'pending', reason: null }), event()]);
+      const rows = await database.db
+        .select()
+        .from(credentialStatusEvents)
+        .where(eq(credentialStatusEvents.credentialId, credentialId));
+      expect(rows.map((r) => [r.fromStatus, r.toStatus])).toEqual([
+        [null, 'pending'],
+        ['pending', 'revoked'],
+      ]);
+    });
+
+    it('is append-only: rows cannot be updated or deleted', async () => {
+      const update = database.db
+        .update(credentialStatusEvents)
+        .set({ reason: 'changed' })
+        .where(eq(credentialStatusEvents.credentialId, credentialId));
+      expect(await dbError(update)).toMatch(/append-only/);
+      const remove = database.db
+        .delete(credentialStatusEvents)
+        .where(eq(credentialStatusEvents.credentialId, credentialId));
+      expect(await dbError(remove)).toMatch(/append-only/);
+    });
+
+    it('refuses an event whose issuer is not the issuer of the credential', async () => {
+      const bad = database.db.insert(credentialStatusEvents).values(event({ issuerId: 'bank-a' }));
+      expect(await dbError(bad)).toMatch(/foreign key/);
+    });
+
+    it.each([
+      ['a change to the same status', { fromStatus: 'valid', toStatus: 'valid' }],
+      ['a missing from_status for anything but creation', { fromStatus: null, toStatus: 'valid' }],
+      ['a from_status on creation', { fromStatus: 'valid', toStatus: 'pending' }],
+      ['a note longer than 500 characters', { note: 'x'.repeat(501) }],
+    ] as const)('refuses %s', async (_label, overrides) => {
+      const bad = database.db.insert(credentialStatusEvents).values(event(overrides));
+      expect(await dbError(bad)).toMatch(/check constraint/);
+    });
+
+    it('keeps the audit trail: a staff member with events cannot be deleted', async () => {
+      const remove = database.db.delete(issuerStaff).where(eq(issuerStaff.id, staffId));
+      expect(await dbError(remove)).toMatch(/foreign key/);
+    });
   });
 });

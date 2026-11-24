@@ -119,6 +119,16 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
         publicBaseUrl: config.PUBLIC_BASE_URL,
       })
     : undefined;
+  // DEV ONLY (remove in Sprint 2 with wallet redemption): one warning when the app is built,
+  // so an enabled simulated-redemption route is never silent
+  const devSimulateRedemption =
+    config.NODE_ENV !== 'production' && config.DEV_SIMULATE_REDEMPTION && credentials !== undefined;
+  if (devSimulateRedemption) {
+    logger.warn(
+      { route: `${API_PREFIX}/dev/credentials/:credentialId/simulate-redemption` },
+      'DEV_SIMULATE_REDEMPTION=true – development-only simulated redemption route is enabled (remove in Sprint 2)',
+    );
+  }
   app.use(
     API_PREFIX,
     apiRouter({
@@ -135,6 +145,7 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
       ...(holders ? { holders } : {}),
       ...(credentials ? { credentials } : {}),
       ...(credentialOffers ? { credentialOffers } : {}),
+      devSimulateRedemption,
     }),
   );
 

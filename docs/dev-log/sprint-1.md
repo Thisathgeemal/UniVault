@@ -52,6 +52,55 @@
 - **Blockers:**
 - **Evidence:**
 
+### Tue 24 Nov (Sprint 1 carry-over: revoke and reissue)
+
+- **Done:** Credential revocation and reissuance (FR-ISS-03, Decision 012, draft).
+  `POST /credentials/:id/revoke` (admin; pending or valid → revoked; open offers invalidated),
+  `POST /credentials/:id/reissue` (officer/admin; valid → superseded plus a new pending
+  replacement built from the holder's current record through the issuance code) and
+  `GET /credentials/:id/events` (status history). Migration `0005` adds the revoke/supersede
+  columns, the append-only `credential_status_events` table with a backfill, and new CHECK rules.
+  `signCredential` now writes the `pending → valid` event, and `findOfferByCode` reports offers
+  of non-pending credentials as `invalidated`. Development-only simulated redemption route
+  (`DEV_SIMULATE_REDEMPTION=true`) and the evidence script `scripts/evidence/s1-revocation.ps1`.
+  Backend tests: 287 → 364 (12 → 14 files), all passing (crypto-core unchanged at 158).
+- **Next:** Supervisor review of Decision 012; Sprint 2 wallet redemption (then remove the
+  simulate route); status endpoint reading `revoked` / `superseded`.
+- **Blockers:** None.
+- **Evidence:** `backend/test/credential-revocation.test.ts`, `backend/test/dev-routes.test.ts`;
+  screenshots of the seven sections of `scripts/evidence/s1-revocation.ps1` (to be taken:
+  `evidence/s1-2026-11-24-revocation-<section>.png`).
+
+### Tue 24 Nov (follow-up polish: revoke and reissue)
+
+- **Done:**
+  - A stored holder record that no longer passes its credential schema now gives the same
+    `422 HOLDER_DATA_INVALID` from issuance and reissue (one code path). `400 VALIDATION_ERROR`
+    is kept for invalid request bodies only.
+  - Migration `0006_reason_value_checks.sql`: CHECK constraints limit `revocation_reason` and
+    `credential_status_events.reason` to the API enum values, added `NOT VALID` so older
+    free-text rows survive (PGlite supports `NOT VALID`; checked first).
+  - Backend coverage thresholds in `vitest.config.ts` (statements 88, branches 85,
+    functions 93, lines 89), just below the current figures.
+  - Removed an unused `eslint-disable` comment in `error-handler.ts`; root lint now has no
+    warnings.
+  - Decision 012 sprint label set to "S2 (Sprint 1 carry-over)"; `validUntil` documented as
+    00:00 UTC on that date.
+  - The server logs one warning at start-up when `DEV_SIMULATE_REDEMPTION=true`.
+  - Backend tests: 364 → 371 (14 files), all passing; coverage 88.61% statements, 85.45%
+    branches, 93.04% functions, 89.18% lines.
+- **Temporary (remove in Sprint 2):** the development-only simulated redemption route
+  (`POST /api/v1/dev/credentials/:id/simulate-redemption`, `src/routes/dev.routes.ts`,
+  `DEV_SIMULATE_REDEMPTION`, `test/dev-routes.test.ts`) exists only for manual testing and the
+  evidence script. Remove it, its config variable and its tests when wallet redemption
+  (`POST /credential-offers/credential`) ships, and switch the evidence script to the real
+  redemption flow.
+- **Next:** As above.
+- **Blockers:** None.
+- **Evidence:** `backend/test/db/schema.test.ts` ("migration 0006"), `backend/test/credentials.test.ts`
+  and `backend/test/credential-revocation.test.ts` (422 `HOLDER_DATA_INVALID`),
+  `backend/test/dev-routes.test.ts` (start-up warning).
+
 ## Testing evidence
 
 Record the tests that show the sprint goal is met, with links to output in `evidence/`.
@@ -143,3 +192,49 @@ Record the tests that show the sprint goal is met, with links to output in `evid
 - **Cause:** Not fully confirmed. The same command passed from PowerShell, so the code was not at fault. The likely cause is that Git Bash reports the working directory as `/d/FYP/...` while Vitest resolves files as `D:/FYP/...`, so Vitest's test context did not match the files it loaded.
 - **Resolution:** Ran all tests from PowerShell (158 crypto-core and 247 backend tests passed). Documented the rule in `CLAUDE.md` and `backend/README.md`.
 - **Lesson:** On Windows, run Vitest from PowerShell or cmd. When every test file fails the same way, suspect the environment before the code.
+
+### Issue 7: Revoking a pending credential failed with 500 (24 Nov 2026)
+
+- **Task:** Credential revocation and reissue
+- **Symptom:** The first run of `test/credential-revocation.test.ts` had 4 failures: revoking a
+  `pending` credential returned `500`, and the tests that depended on it (offer invalidation,
+  issuing again after revocation, the `created -> revoked` history) failed with it.
+- **Cause:** Migration 0001 assumed every credential past `pending` had been signed (CHECK
+  `credential_records_check1`: any other status needs `issued_at`, `issuer_kid` and
+  `holder_key_thumbprint`). A credential revoked before redemption was never signed, so the
+  database rejected the update. A second 0001 rule (`check3`) also required `revoked_at` on
+  superseded rows, which conflicted with the new `superseded_at` column.
+- **Resolution:** Migration 0005 (not yet applied anywhere outside tests) drops both 0001 rules
+  and replaces them with `credential_records_signing_fields` (signing data all set or all NULL;
+  `valid`/`superseded` signed, `pending` never, `revoked` either way) and separate revocation and
+  supersede rules. Database tests now cover a revoked-while-pending row and the rejected cases.
+- **Lesson:** CHECK constraints written before a feature exists encode assumptions about it.
+  Review them when the feature arrives, and test the unusual path (revoke before redemption),
+  not only the main one.
+
+### Issue 8: A valid credential could not be created for the evidence script (24 Nov 2026)
+
+- **Task:** Revocation evidence script
+- **Symptom:** Sections "REVOKE VALID" and "REISSUE LINK" need a `valid` credential, but
+  credentials only become valid at wallet redemption, which returns `501` until Sprint 2.
+- **Cause:** Signing deliberately has one path, `signCredential()`, called only by redemption. A
+  second process cannot sign directly either: the dev server holds the embedded PGlite database,
+  and opening it from another process risks corrupting it.
+- **Resolution:** A development-only route `POST /api/v1/dev/credentials/:id/simulate-redemption`
+  (admin, own issuer) calls `signCredential()` with a throwaway P-256 key and returns metadata
+  only. It is mounted only when `DEV_SIMULATE_REDEMPTION=true`, and the config refuses that
+  setting in production. To be removed once redemption exists.
+- **Lesson:** When a feature depends on a later sprint, plan a safe, clearly marked stand-in
+  rather than a back door into the database.
+
+### Issue 9: Evidence script needed PowerShell 7, which is not installed (24 Nov 2026)
+
+- **Task:** Revocation evidence script
+- **Symptom:** `-SkipHttpErrorCheck` and `-StatusCodeVariable` (needed to show `403`/`409`
+  responses) exist only in PowerShell 7; the development laptop has Windows PowerShell 5.1 only.
+- **Resolution:** The script uses those parameters on PowerShell 7 and, on 5.1, reads the status
+  and error body from the exception instead. It was run end to end on 5.1 against a throwaway
+  database (all seven sections as expected). The file is ASCII-only, because 5.1 misreads UTF-8
+  without a BOM.
+- **Lesson:** Check which PowerShell version is installed before relying on newer cmdlet
+  parameters.

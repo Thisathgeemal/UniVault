@@ -9,6 +9,7 @@ import type { IssuerKeysService } from '../services/issuer-keys.service.js';
 import { authRouter } from './auth.routes.js';
 import { credentialOffersRouter } from './credential-offers.routes.js';
 import { credentialsRouter } from './credentials.routes.js';
+import { devRouter } from './dev.routes.js';
 import { healthRouter } from './health.routes.js';
 import { holdersRouter } from './holders.routes.js';
 import { issuersRouter } from './issuers.routes.js';
@@ -27,6 +28,8 @@ export interface ApiRouterDeps {
   credentialOffers?: CredentialOffersService;
   auth: AuthMiddleware;
   loginRateLimit: { max: number; windowMinutes: number };
+  /** Mount the development-only /dev routes (never true in production; see loadConfig). */
+  devSimulateRedemption?: boolean;
 }
 
 /** All API routes, mounted under /api/v1 by app.ts. */
@@ -49,6 +52,9 @@ export function apiRouter(deps: ApiRouterDeps): Router {
   router.use('/holders', holdersRouter(deps.auth, deps.holders));
   router.use('/credentials', credentialsRouter(deps.auth, deps.credentials));
   router.use('/credential-offers', credentialOffersRouter(deps.auth, deps.credentialOffers));
+  if (deps.devSimulateRedemption && deps.credentials) {
+    router.use('/dev', devRouter(deps.auth, deps.credentials));
+  }
   router.use('/status', statusRouter());
   router.use('/verifications', verificationsRouter());
   return router;

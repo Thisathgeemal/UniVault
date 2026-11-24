@@ -306,14 +306,16 @@ describe('AC5 – issuer role restrictions are enforced', () => {
       .send({ holderId: UUID, credentialType: 'EmploymentCredential' });
     expect(issue.status).toBe(404); // allowed for officers: reached the holder lookup
     expect(issue.body.error.code).toBe('HOLDER_NOT_FOUND');
-    expect(
-      (await request(t.app).post(`/api/v1/credentials/${UUID}/reissue`).set(bearer(officer)))
-        .status,
-    ).toBe(501);
+    const reissue = await request(t.app)
+      .post(`/api/v1/credentials/${UUID}/reissue`)
+      .set(bearer(officer))
+      .send({ reason: 'details_changed' });
+    expect(reissue.status).toBe(404); // allowed for officers: reached the credential lookup
+    expect(reissue.body.error.code).toBe('CREDENTIAL_NOT_FOUND');
   });
 
   it('officers cannot revoke credentials (403); admins can', async () => {
-    const body = { reason: 'Employee resigned' };
+    const body = { reason: 'employment_ended' };
     const asOfficer = await request(t.app)
       .post(`/api/v1/credentials/${UUID}/revoke`)
       .set(bearer(officer))
@@ -330,7 +332,7 @@ describe('AC5 – issuer role restrictions are enforced', () => {
           .set(bearer(admin))
           .send(body)
       ).status,
-    ).toBe(501);
+    ).toBe(404); // allowed for admins: reached the credential lookup
   });
 
   it('only admins can list staff, and only their own issuer’s staff', async () => {

@@ -12,19 +12,20 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 
 ## Decision index
 
-| #                                                                                                | Decision                                                                           | Date            | Sprint | Status         | Related requirements                                          |
-| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | --------------- | ------ | -------------- | ------------------------------------------------------------- |
-| [001](#decision-001-typescript-for-all-javascript-components)                                    | TypeScript for all JavaScript components                                           | Mon 16 Nov 2026 | S1     | Accepted       | None (development tooling)                                    |
-| [002](#decision-002-root-level-eslint-9-and-prettier-ruff-for-ai-service)                        | Root-level ESLint 9 and Prettier; Ruff for ai-service                              | Mon 16 Nov 2026 | S1     | Accepted       | None (development tooling)                                    |
-| [003](#decision-003-sd-jwt-vc-flat-claim-layout-instead-of-json-ld)                              | SD-JWT VC flat claim layout (W3C VC model); subject claims selectively disclosable | Tue 17 Nov 2026 | S1     | Accepted       | FR-ISS-01, FR-ISS-02, FR-VER-01, FR-VER-03, FR-BAK-01, NFR-01 |
-| [004](#decision-004-data-minimisation-in-credential-schemas)                                     | Data minimisation in the credential schemas                                        | Tue 17 Nov 2026 | S1     | Accepted       | FR-ISS-01, FR-VER-03, NFR-08                                  |
-| [005](#decision-005-derived-age_over_18-claim-and-under-18-handling)                             | Derived `age_over_18` claim and under-18 handling                                  | Tue 17 Nov 2026 | S1     | Accepted       | FR-ISS-01, FR-ISS-03, FR-VER-03, NFR-08                       |
-| [006](#decision-006-sd-jwt-library-selection-sd-jwtcore)                                         | SD-JWT library: `@sd-jwt/core` pinned to 0.25.0                                    | Thu 19 Nov 2026 | S1     | Accepted       | FR-ISS-02, FR-VER-02, FR-WAL-06, NFR-01                       |
-| [007](#decision-007-es256-for-holder-key-binding)                                                | ES256 for holder key binding; issuer signatures stay RS256                         | Thu 19 Nov 2026 | S1     | Proposed       | NFR-01, FR-WAL-06, FR-VER-02                                  |
-| [008](#decision-008-postgresql-with-embedded-pglite-for-development-and-hand-written-migrations) | PostgreSQL, with embedded PGlite for development and hand-written migrations       | Fri 20 Nov 2026 | S1     | Draft – review | FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08 |
-| [009](#decision-009-issuer-staff-authentication-jwt-database-re-check-and-lockout)               | Issuer staff authentication (JWT, database re-check and lockout)                   | Fri 20 Nov 2026 | S1     | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
-| [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)             | Credential signing deferred to wallet redemption (holder binding)                  | Fri 20 Nov 2026 | S1     | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
-| [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                 | OpenID4VCI pre-authorised code offer format                                        | Fri 20 Nov 2026 | S1     | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
+| #                                                                                                 | Decision                                                                           | Date            | Sprint                   | Status         | Related requirements                                          |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | --------------- | ------------------------ | -------------- | ------------------------------------------------------------- |
+| [001](#decision-001-typescript-for-all-javascript-components)                                     | TypeScript for all JavaScript components                                           | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
+| [002](#decision-002-root-level-eslint-9-and-prettier-ruff-for-ai-service)                         | Root-level ESLint 9 and Prettier; Ruff for ai-service                              | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
+| [003](#decision-003-sd-jwt-vc-flat-claim-layout-instead-of-json-ld)                               | SD-JWT VC flat claim layout (W3C VC model); subject claims selectively disclosable | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-02, FR-VER-01, FR-VER-03, FR-BAK-01, NFR-01 |
+| [004](#decision-004-data-minimisation-in-credential-schemas)                                      | Data minimisation in the credential schemas                                        | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-VER-03, NFR-08                                  |
+| [005](#decision-005-derived-age_over_18-claim-and-under-18-handling)                              | Derived `age_over_18` claim and under-18 handling                                  | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-03, FR-VER-03, NFR-08                       |
+| [006](#decision-006-sd-jwt-library-selection-sd-jwtcore)                                          | SD-JWT library: `@sd-jwt/core` pinned to 0.25.0                                    | Thu 19 Nov 2026 | S1                       | Accepted       | FR-ISS-02, FR-VER-02, FR-WAL-06, NFR-01                       |
+| [007](#decision-007-es256-for-holder-key-binding)                                                 | ES256 for holder key binding; issuer signatures stay RS256                         | Thu 19 Nov 2026 | S1                       | Proposed       | NFR-01, FR-WAL-06, FR-VER-02                                  |
+| [008](#decision-008-postgresql-with-embedded-pglite-for-development-and-hand-written-migrations)  | PostgreSQL, with embedded PGlite for development and hand-written migrations       | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08 |
+| [009](#decision-009-issuer-staff-authentication-jwt-database-re-check-and-lockout)                | Issuer staff authentication (JWT, database re-check and lockout)                   | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
+| [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)              | Credential signing deferred to wallet redemption (holder binding)                  | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
+| [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                  | OpenID4VCI pre-authorised code offer format                                        | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
+| [012](#decision-012-reissue-supersedes-immediately-status-changes-recorded-as-append-only-events) | Reissue supersedes immediately; status changes recorded as append-only events      | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-03, FR-BAK-01, NFR-06, NFR-08                          |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -386,9 +387,9 @@ Use a derived boolean claim `age_over_18` in the KYC credential (required).
   `age_over_18` is `false`, the 18th birthday.
 - The claim states eligibility at issuance time; because of the expiry cap, a valid credential's
   `false` value is always still true.
-- The revoke and reissue endpoints (`POST /api/v1/credentials/:credentialId/revoke` and
-  `/reissue`) still return `501`; until they are built, reissuing an under-18 holder's
-  credential at 18 is a manual step.
+- At 18 the credential is replaced through `POST /api/v1/credentials/:credentialId/reissue`
+  (Decision 012), which recalculates `age_over_18` and the expiry from the holder's current
+  record. Reissue is triggered by staff; nothing reissues automatically on the birthday.
 
 ## Decision 006: SD-JWT library selection (@sd-jwt/core)
 
@@ -800,8 +801,10 @@ Use option 3:
   must call `signCredential` after checking the pre-authorised code; no other code path signs
   credentials.
 - A pending credential that is never redeemed blocks a new credential of the same type for that
-  holder until it expires. The revoke task must therefore accept `pending` credentials as well
-  as `valid` ones.
+  holder until it expires, unless an admin revokes it: `POST /credentials/:id/revoke` accepts
+  `pending` as well as `valid` credentials (Decision 012).
+- A credential revoked or superseded before redemption can never be signed: `signCredential`
+  updates only `WHERE status = 'pending'`, and revoke/reissue invalidate the open offers.
 - `kyc_verification_date` is taken from the date the pending record was created, not from the
   signing date.
 
@@ -891,3 +894,109 @@ by value). `credential_configuration_ids` holds `EmploymentCredential` or `KYCCr
   transaction code (`tx_code`) are not implemented; they can be added if needed.
 - `PUBLIC_BASE_URL` must be reachable by the phone (the laptop's LAN IP during testing), because
   `credential_issuer` is built from it.
+- Revoking or reissuing a credential invalidates its open offers in the same transaction
+  (Decision 012), so a QR code for a withdrawn credential can no longer be redeemed.
+
+## Decision 012: Reissue supersedes immediately; status changes recorded as append-only events
+
+- **Date:** Tue 24 Nov 2026
+- **Sprint:** S2 (Sprint 1 carry-over)
+- **Status:** Draft – review
+- **Requirements:** FR-ISS-03, FR-BAK-01, NFR-06, NFR-08
+- **Related:** [credentials-api.md](../api/credentials-api.md) (sections 2 and 6),
+  [credential-offers-api.md](../api/credential-offers-api.md) (section 4),
+  [database-design.md](../database/database-design.md) (sections 3, 4 and 8), migrations
+  `backend/migrations/0005_revocation_and_status_events.sql` and
+  `0006_reason_value_checks.sql`
+- **Evidence:** [`backend/test/credential-revocation.test.ts`](../../backend/test/credential-revocation.test.ts)
+  (revoke, reissue, events, signing safety, concurrency),
+  [`backend/test/db/records.test.ts`](../../backend/test/db/records.test.ts) and
+  [`backend/test/db/schema.test.ts`](../../backend/test/db/schema.test.ts) (CHECK, UNIQUE and
+  append-only rules; migration backfill); evidence script `scripts/evidence/s1-revocation.ps1`
+  (sections 1–7)
+
+### Context
+
+FR-ISS-03 requires that a credential is never edited in place: a change of data, a lost wallet
+or a renewal means the old credential is withdrawn and a new one issued. Credentials are signed
+only when the wallet redeems an offer (Decision 010), so a replacement starts as `pending` and
+becomes `valid` later, possibly never if the holder does not scan the new QR code.
+
+Two questions had to be answered: **when** the old credential stops being valid, and **how** the
+issuer can later show who changed a credential's status, when and why (audit, PDPA
+accountability), given that the credential row only holds its current state.
+
+### Options considered
+
+**When the old credential is superseded:**
+
+1. **Supersede at reissue:** in one transaction, the old credential becomes `superseded` and the
+   pending replacement is created. The holder has no valid credential of that type until they
+   redeem the new offer.
+2. **Supersede at redemption of the replacement:** the old credential stays `valid` until the
+   wallet redeems the new one; only then is it superseded. The holder is never without a
+   credential, but two credentials of the same type are briefly "active" together, and the old
+   data (e.g. a former designation, or a key on a lost phone) stays presentable until the
+   holder acts.
+
+**How status changes are recorded:**
+
+1. **Columns on the credential row only** (`revoked_at`, `superseded_at`, …): shows the last
+   change, not the history.
+2. **An append-only `credential_status_events` table**, written in the same transaction as
+   each change.
+
+### Decision
+
+- **Reissue supersedes immediately** (option 1). `POST /credentials/:id/reissue` locks the old
+  credential and the holder, builds the replacement from the holder's current record through
+  the issuance code, sets the old credential to `superseded`, inserts the new one as `pending`
+  with `replaces_credential_id`, and invalidates the old credential's open offers. Only `valid`
+  credentials can be reissued; a pending one is revoked and issued again.
+- **Revoke** (`POST /credentials/:id/revoke`, admin only) accepts `pending` and `valid`
+  credentials, with a reason from a fixed list and an optional note (required for `other`).
+- **Every status change is an event** in `credential_status_events`: creation, signing at
+  redemption (no staff member), revocation and supersede (reason, note, staff). The table is
+  append-only (a trigger refuses UPDATE and DELETE), its issuer must match the credential's
+  (composite foreign key), and `GET /credentials/:id/events` returns it oldest first.
+- The credential row keeps its current state for fast reads: `revoked_at`,
+  `revoked_by_staff_id`, `revocation_reason`, `superseded_at`, `superseded_by_staff_id`, with
+  CHECK constraints tying each group to its status.
+
+### Reason
+
+- Reissue happens because the old credential is wrong or unsafe (changed data, lost or
+  compromised wallet). Leaving it valid until the holder redeems the replacement would keep
+  wrong data or a stolen key presentable for an unknown time; superseding at once removes that
+  window.
+- It keeps the rule "at most one pending or valid credential per holder and type" exact, with no
+  special case for a credential that is about to be replaced.
+- Doing everything in one transaction means there is never a moment with two active credentials,
+  or a superseded credential without a replacement.
+- An append-only history answers "who withdrew this credential, when and why" for the audit
+  trail and the report, without trusting a mutable row; writing it in the same transaction as
+  the change means the history can never disagree with the current status.
+
+### Consequences
+
+- Between reissue and redemption the holder has **no valid credential** of that type. Staff
+  should create the new offer straight away; the issuer portal should show this.
+- Migration 0005 replaced two 0001 rules: a pending credential can now be revoked without having
+  been signed, and a superseded credential records `superseded_at` instead of `revoked_at`.
+  Existing rows were migrated and a history was backfilled.
+- Staff members who appear in the history cannot be deleted (`ON DELETE RESTRICT`); they are
+  deactivated instead.
+- Notes may contain personal data: they are stored only in the history, returned only to the
+  credential's issuer, never logged, and limited to 500 characters.
+- The future status endpoint (FR-BAK-01) reads `revoked` and `superseded` from the credential
+  row; wallets and verifiers treat both as "not valid".
+- Reason values are limited to the API enums in the database too (migration 0006, CHECK
+  constraints added `NOT VALID`, so free-text reasons stored before 0005/0006 are kept). Adding
+  a reason means a new migration as well as a code change.
+- A holder record that no longer passes its schema is reported the same way by issuance and
+  reissue (`422 HOLDER_DATA_INVALID`), because both use one code path.
+- **Temporary:** until Sprint 2 builds redemption, a development-only route
+  (`POST /api/v1/dev/credentials/:id/simulate-redemption`, `DEV_SIMULATE_REDEMPTION=true`,
+  refused in production, one warning logged at start-up when enabled) is the only way to make
+  a credential `valid` for manual testing. It is removed in Sprint 2 when wallet redemption
+  ships.

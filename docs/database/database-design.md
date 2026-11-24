@@ -1,6 +1,6 @@
 # UniVault Database Design (v1)
 
-**Sprint:** 1 · **Database:** PostgreSQL · **Migrations:** `backend/migrations/0001`–`0004` (section 8)
+**Sprint:** 1 · **Database:** PostgreSQL · **Migrations:** `backend/migrations/0001`–`0006` (section 8)
 **Requirements supported:** FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08
 
 ## 1. Technology decision
@@ -25,9 +25,12 @@ erDiagram
     ISSUER_KEYS |o--o{ CREDENTIAL_RECORDS : "signed"
     CREDENTIAL_RECORDS |o--o| CREDENTIAL_RECORDS : "replaces (reissue)"
     CREDENTIAL_RECORDS ||--o{ CREDENTIAL_OFFERS : "offered via"
+    CREDENTIAL_RECORDS ||--|{ CREDENTIAL_STATUS_EVENTS : "history"
+    ISSUERS ||--o{ CREDENTIAL_STATUS_EVENTS : "scopes"
     ISSUER_STAFF |o--o{ HOLDERS : "created"
-    ISSUER_STAFF |o--o{ CREDENTIAL_RECORDS : "created"
+    ISSUER_STAFF |o--o{ CREDENTIAL_RECORDS : "created / revoked / superseded"
     ISSUER_STAFF |o--o{ CREDENTIAL_OFFERS : "created"
+    ISSUER_STAFF |o--o{ CREDENTIAL_STATUS_EVENTS : "changed status"
 
     ISSUERS {
         text id PK "e.g. employer-a"
@@ -75,8 +78,12 @@ erDiagram
         text holder_key_thumbprint "wallet key (cnf)"
         timestamptz issued_at
         timestamptz expires_at
-        timestamptz revoked_at
-        uuid replaces_credential_id FK "unique"
+        timestamptz revoked_at "set iff revoked"
+        text revocation_reason "set iff revoked"
+        uuid revoked_by_staff_id FK "0005"
+        timestamptz superseded_at "0005, set iff superseded"
+        uuid superseded_by_staff_id FK "0005"
+        uuid replaces_credential_id FK "unique, not itself"
         uuid created_by_staff_id FK
     }
     CREDENTIAL_OFFERS {
@@ -87,50 +94,102 @@ erDiagram
         timestamptz redeemed_at
         text redeemed_wallet_thumbprint
         integer failed_attempts "reserved: Sprint 2 brute-force limit"
-        timestamptz invalidated_at "0004, replaced by a newer offer"
+        timestamptz invalidated_at "0004 newer offer; revoke or reissue"
         uuid created_by_staff_id FK
+    }
+    CREDENTIAL_STATUS_EVENTS {
+        uuid id PK "0005, append-only"
+        uuid credential_id FK "with issuer_id"
+        text issuer_id FK
+        credential_status from_status "NULL only for creation"
+        credential_status to_status
+        text reason
+        text note "max 500, never logged"
+        uuid staff_id FK "NULL = wallet-driven"
+        timestamptz created_at
     }
 ```
 
 ## 3. Tables
 
-| Table                | Purpose                                                     | Key rules enforced by the database                                                                                                                                                                                                                                              |
-| -------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `issuers`            | Employers and banks                                         | ID format `^[a-z0-9-]{3,40}$`; type is an enum                                                                                                                                                                                                                                  |
-| `issuer_keys`        | RS256 **public** keys (private keys stay encrypted on disk) | `kid` is a 43-character thumbprint and must equal the JWK's `kid`; **only one active key per issuer** (partial unique index); a retired key must record `retired_at`                                                                                                            |
-| `issuer_staff`       | Issuer portal users                                         | Email unique regardless of case; only scrypt hashes accepted (no plain-text passwords); `failed_login_attempts` counts consecutive failures (never negative) and `locked_until` holds a temporary lockout (migration 0002)                                                      |
-| `holders`            | An issuer's employee or customer record                     | `external_ref` unique per issuer; the same person at two issuers is two rows; `claims` must be a JSON object; `created_by_staff_id` records which staff member created the record (migration 0003, set to NULL if that staff member is deleted)                                 |
-| `credential_records` | One row per credential (`id` = `jti`)                       | See section 4                                                                                                                                                                                                                                                                   |
-| `credential_offers`  | Pre-authorised offers behind the QR code                    | Only a SHA-256 hash of the code is stored, unique; it cannot be created already expired; redemption time and wallet key are recorded together; `invalidated_at` is set when a newer offer replaces it, and an offer can never be both redeemed and invalidated (migration 0004) |
-| `schema_migrations`  | Applied migrations and checksums                            | Created by the migration runner                                                                                                                                                                                                                                                 |
+| Table                      | Purpose                                                                       | Key rules enforced by the database                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `issuers`                  | Employers and banks                                                           | ID format `^[a-z0-9-]{3,40}$`; type is an enum                                                                                                                                                                                                                                                                                                                                                                            |
+| `issuer_keys`              | RS256 **public** keys (private keys stay encrypted on disk)                   | `kid` is a 43-character thumbprint and must equal the JWK's `kid`; **only one active key per issuer** (partial unique index); a retired key must record `retired_at`                                                                                                                                                                                                                                                      |
+| `issuer_staff`             | Issuer portal users                                                           | Email unique regardless of case; only scrypt hashes accepted (no plain-text passwords); `failed_login_attempts` counts consecutive failures (never negative) and `locked_until` holds a temporary lockout (migration 0002)                                                                                                                                                                                                |
+| `holders`                  | An issuer's employee or customer record                                       | `external_ref` unique per issuer; the same person at two issuers is two rows; `claims` must be a JSON object; `created_by_staff_id` records which staff member created the record (migration 0003, set to NULL if that staff member is deleted)                                                                                                                                                                           |
+| `credential_records`       | One row per credential (`id` = `jti`)                                         | See section 4                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `credential_offers`        | Pre-authorised offers behind the QR code                                      | Only a SHA-256 hash of the code is stored, unique; it cannot be created already expired; redemption time and wallet key are recorded together; `invalidated_at` is set when a newer offer replaces it or the credential is revoked or reissued, and an offer can never be both redeemed and invalidated (migration 0004)                                                                                                  |
+| `credential_status_events` | Append-only status history of every credential (migration 0005, Decision 012) | A trigger refuses UPDATE and DELETE; composite FK `(credential_id, issuer_id)` → `credential_records (id, issuer_id)`, so an event's issuer is always its credential's issuer; `from_status` is NULL exactly for creation (`→ pending`) and differs from `to_status`; `note` ≤ 500 characters; `staff_id` is `ON DELETE RESTRICT` (a staff member with history cannot be deleted); index on `(credential_id, created_at)` |
+| `schema_migrations`        | Applied migrations and checksums                                              | Created by the migration runner                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## 4. Credential lifecycle and status
 
-| Status       | Meaning                                        | Required fields (CHECK constraints)                                          |
-| ------------ | ---------------------------------------------- | ---------------------------------------------------------------------------- |
-| `pending`    | Created by staff, offered, not yet in a wallet | none extra                                                                   |
-| `valid`      | Signed and delivered to the wallet             | `issued_at`, `issuer_kid`, `holder_key_thumbprint`; `expires_at > issued_at` |
-| `revoked`    | Withdrawn by the issuer (e.g. resignation)     | `revoked_at` (plus optional `revocation_reason`)                             |
-| `superseded` | Replaced by a reissued credential              | `revoked_at`; a newer record points to it                                    |
+```mermaid
+stateDiagram-v2
+    [*] --> pending: issue (POST /credentials) or reissue (new replacement)
+    pending --> valid: signCredential() at wallet redemption
+    pending --> revoked: revoke (admin)
+    valid --> revoked: revoke (admin)
+    valid --> superseded: reissue (officer/admin)
+    revoked --> [*]
+    superseded --> [*]
+```
 
-**Reissue (FR-ISS-03).** When a holder's data changes:
+| Status       | Meaning                                        | Required fields (CHECK constraints, migration 0005)                                                                                                            |
+| ------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pending`    | Created by staff, offered, not yet in a wallet | No signing data, no revocation or supersede data                                                                                                               |
+| `valid`      | Signed and delivered to the wallet             | `issued_at`, `issuer_kid`, `holder_key_thumbprint` (all three); `expires_at > issued_at`                                                                       |
+| `revoked`    | Withdrawn by the issuer                        | `revoked_at` and `revocation_reason`; `revoked_by_staff_id` (NULL only if that staff member was deleted). Signing data only if it was revoked after redemption |
+| `superseded` | Replaced by a reissued credential              | Signing data, `superseded_at` and `superseded_by_staff_id`; exactly one newer record points to it                                                              |
 
-1. The old record becomes `superseded`.
-2. A new record is created with `replaces_credential_id` = the old ID.
+Revocation columns are NULL for every other status, and `superseded_at` /
+`superseded_by_staff_id` are NULL unless `superseded`
+(`credential_records_revocation_fields`, `credential_records_supersede_fields`,
+`credential_records_signing_fields`). Migration 0005 replaced two 0001 rules:
+"anything past pending was signed" (a pending credential can now be revoked
+unsigned) and "revoked or superseded ⇒ `revoked_at`".
 
-This column is **unique**, so a credential can be replaced only once, and it can
-never point to itself. The full history can be followed in both directions.
+**Reason values (migration 0006).** `credential_records.revocation_reason` must be
+one of the API's revocation reasons (`details_changed`, `employment_ended`,
+`relationship_ended`, `wallet_lost_or_compromised`, `issued_in_error`, `other`),
+and `credential_status_events.reason` one of the revocation or reissue reasons
+(adds `validity_extension`), or NULL (`credential_records_revocation_reason_value`,
+`credential_status_events_reason_value`). Both CHECKs were added `NOT VALID`:
+rows stored earlier with free-text reasons are not checked and survive, while
+every new row is. PostgreSQL would also check an UPDATE of an old row, but
+revoked and superseded rows are final and events are append-only, so old rows
+are never updated. A new reason needs a new migration (drop and re-add the
+CHECK, again `NOT VALID`).
+
+**Reissue (FR-ISS-03, Decision 012).** In one transaction:
+
+1. The old record becomes `superseded` immediately.
+2. A new `pending` record is created from the holder's current record, with
+   `replaces_credential_id` = the old ID.
+3. The old record's open offers are invalidated, and both changes are written to
+   `credential_status_events`.
+
+`replaces_credential_id` is **unique**, so a credential can be replaced only
+once, and it can never point to itself. The full history can be followed in both
+directions (API: `replacesCredentialId` / `replacedByCredentialId`).
 
 **One active credential per holder and type.** A holder can have at most one
-`pending` or `valid` credential of each type. This is enforced by the issuance
-API, not by a database constraint: it locks the holder row
-(`SELECT … FOR UPDATE`) while it checks, so two simultaneous requests can't
-both succeed. A partial unique index was not added yet, because the reissue
-design (next task) may need a new record next to the one it replaces; this can
-be revisited then.
+`pending` or `valid` credential of each type. This is enforced by the API, not by
+a database constraint: issuance and reissue lock the holder row
+(`SELECT … FOR UPDATE`) while they check, so two simultaneous requests can't both
+succeed. Reissue supersedes the old record before the check, so a partial unique
+index on `(holder_id, credential_type)` for pending and valid rows would also
+work and could be added later as a backstop.
 
-**Status checks (FR-BAK-01).** `status`, `status_updated_at` and `revoked_at`
-are what the wallet and verifiers read through the status endpoint.
+**Status history.** Every change is an event row: creation (`NULL → pending`,
+staff), signing (`pending → valid`, no staff: wallet-driven), revocation and
+supersede (with reason, optional note and staff). Migration 0005 backfilled
+creation, signing and the last change for credentials that already existed.
+
+**Status checks (FR-BAK-01).** `status`, `status_updated_at`, `revoked_at` and
+`superseded_at` are what the wallet and verifiers will read through the status
+endpoint.
 
 ## 5. Privacy and security decisions (PDPA, NFR-08)
 
@@ -143,6 +202,11 @@ are what the wallet and verifiers read through the status endpoint.
 - **Staff passwords are hashed with scrypt** (salted, memory-hard).
 - **Deletes are restricted.** An issuer with holders, or a holder with
   credentials, cannot be deleted by accident.
+- **Notes are personal data.** Revocation and reissue notes live only in
+  `credential_status_events.note` (≤ 500 characters), are returned only to the
+  credential's own issuer, and are never logged.
+- **The audit trail cannot be rewritten.** `credential_status_events` is
+  append-only (trigger), and a staff member who appears in it cannot be deleted.
 
 ## 6. Sample data
 
@@ -174,12 +238,14 @@ start-up when `DB_AUTO_MIGRATE=true`). Each one runs once, inside a transaction,
 and is recorded with its checksum in `schema_migrations`. An applied file must
 never be edited; changes go in a new file.
 
-| File                              | Changes                                                                                                                                                                            |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0001_initial_schema.sql`         | Enum types, the `set_updated_at` trigger function, and the six tables with their keys, CHECK constraints and indexes                                                               |
-| `0002_staff_login_protection.sql` | `issuer_staff.failed_login_attempts` (integer, default 0, CHECK `>= 0`) and `issuer_staff.locked_until` (timestamptz) for the login lockout                                        |
-| `0003_holder_audit.sql`           | `holders.created_by_staff_id` (uuid, references `issuer_staff`, `ON DELETE SET NULL`): which staff member created each holder record (audit)                                       |
-| `0004_offer_invalidation.sql`     | `credential_offers.invalidated_at` (timestamptz, NULL = not invalidated) and CHECK `invalidated_at IS NULL OR redeemed_at IS NULL`: a new offer invalidates the earlier usable one |
+| File                                    | Changes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001_initial_schema.sql`               | Enum types, the `set_updated_at` trigger function, and the six tables with their keys, CHECK constraints and indexes                                                                                                                                                                                                                                                                                                                                                                               |
+| `0002_staff_login_protection.sql`       | `issuer_staff.failed_login_attempts` (integer, default 0, CHECK `>= 0`) and `issuer_staff.locked_until` (timestamptz) for the login lockout                                                                                                                                                                                                                                                                                                                                                        |
+| `0003_holder_audit.sql`                 | `holders.created_by_staff_id` (uuid, references `issuer_staff`, `ON DELETE SET NULL`): which staff member created each holder record (audit)                                                                                                                                                                                                                                                                                                                                                       |
+| `0004_offer_invalidation.sql`           | `credential_offers.invalidated_at` (timestamptz, NULL = not invalidated) and CHECK `invalidated_at IS NULL OR redeemed_at IS NULL`: a new offer invalidates the earlier usable one                                                                                                                                                                                                                                                                                                                 |
+| `0005_revocation_and_status_events.sql` | `credential_records.revoked_by_staff_id`, `superseded_at`, `superseded_by_staff_id` (reusing 0001's `revoked_at`, `revocation_reason`, `replaces_credential_id`); drops 0001's `credential_records_check1` and `_check3` and adds the signing / revocation / supersede CHECKs; UNIQUE `(id, issuer_id)`; table `credential_status_events` with its append-only trigger and index; backfills events for existing credentials and moves the old superseded time from `revoked_at` to `superseded_at` |
+| `0006_reason_value_checks.sql`          | CHECK `credential_records_revocation_reason_value` and `credential_status_events_reason_value`: reasons limited to the API enum values (or NULL). Added `NOT VALID`, so existing rows (free-text reasons from before 0005) are not checked                                                                                                                                                                                                                                                         |
 
 `backend/src/db/schema.ts` (Drizzle) must match; `backend/test/db/schema.test.ts`
 checks the two agree.

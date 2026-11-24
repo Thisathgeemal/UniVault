@@ -1,5 +1,5 @@
 /**
- * Credential issuance (FR-ISS-01, FR-ISS-02).
+ * Credential issuance (FR-ISS-01, FR-ISS-02), revocation and reissue (FR-ISS-03).
  *
  * Issuance happens in two steps, because a credential must be bound to the
  * holder's wallet key (`cnf`), which is only known when the wallet redeems the
@@ -14,6 +14,14 @@
  *                          is returned to the caller only: never stored, never logged.
  *
  * A credential is never signed without a holder public key, and never twice.
+ *
+ * Afterwards (Decision 012):
+ *   revoke()   – an admin withdraws a pending or valid credential; its open offers are
+ *                invalidated in the same transaction.
+ *   reissue()  – a valid credential is superseded at once by a new PENDING credential built
+ *                from the holder's CURRENT record, through the same code as create().
+ * Every status change is written to credential_status_events (append-only) in the same
+ * transaction as the change itself; events() returns that history.
  */
 import { createPublicKey } from 'node:crypto';
 import {
@@ -21,16 +29,51 @@ import {
   createSdJwt,
   loadIssuerPrivateKey,
 } from '@univault/crypto-core/node';
-import { and, count, desc, eq, gt, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import type { StaffProfile } from '../auth/auth-service.js';
 import type { Db } from '../db/client.js';
-import { credentialRecords, holders, issuerKeys, issuers } from '../db/schema.js';
+import {
+  credentialOffers,
+  credentialRecords,
+  credentialStatusEvents,
+  holders,
+  issuerKeys,
+  issuers,
+  issuerStaff,
+  type Holder,
+  type NewCredentialStatusEvent,
+} from '../db/schema.js';
 import { AppError } from '../lib/errors.js';
 import type { ClaimIssue, CredentialSchemas, CredentialTypeName } from './credential-schemas.js';
 import { ageOn, holderNotFound, ISSUER_RECORD_TYPES } from './holders.service.js';
 
 export type CredentialStatus = 'pending' | 'valid' | 'revoked' | 'superseded';
+
+/** Why an admin revoked a credential (stored in revocation_reason and the status history). */
+export const REVOCATION_REASONS = [
+  'details_changed',
+  'employment_ended',
+  'relationship_ended',
+  'wallet_lost_or_compromised',
+  'issued_in_error',
+  'other',
+] as const;
+export type RevocationReason = (typeof REVOCATION_REASONS)[number];
+
+/** Why a credential was reissued (stored in the status history of the superseded credential). */
+export const REISSUE_REASONS = [
+  'details_changed',
+  'wallet_lost_or_compromised',
+  'validity_extension',
+  'other',
+] as const;
+export type ReissueReason = (typeof REISSUE_REASONS)[number];
+
+export interface StaffRef {
+  id: string;
+  displayName: string;
+}
 
 /** Credential metadata shown in the issuer portal. No claims, signature or key material. */
 export interface CredentialMetadata {
@@ -47,13 +90,61 @@ export interface CredentialMetadata {
   expiresAt: string;
   statusUpdatedAt: string;
   revokedAt: string | null;
-  createdBy: { id: string; displayName: string } | null;
+  revocationReason: string | null;
+  revokedBy: StaffRef | null;
+  supersededAt: string | null;
+  supersededBy: StaffRef | null;
+  /** The credential this one was reissued from. */
+  replacesCredentialId: string | null;
+  /** The credential that replaced this one (set once it is superseded). */
+  replacedByCredentialId: string | null;
+  createdBy: StaffRef | null;
   createdAt: string;
 }
 
 export interface CreateCredentialInput {
   holderId: string;
   credentialType?: CredentialTypeName | undefined;
+}
+
+export interface RevokeCredentialInput {
+  reason: RevocationReason;
+  /** Free text; required when reason is 'other'. Stored in the history only, never logged. */
+  note?: string | undefined;
+}
+
+export interface ReissueCredentialInput {
+  reason: ReissueReason;
+  /** Free text; required when reason is 'other'. Stored in the history only, never logged. */
+  note?: string | undefined;
+  /** YYYY-MM-DD: an earlier expiry than the issuance rules give (00:00 UTC on that date). */
+  validUntil?: string | undefined;
+}
+
+export interface RevokeResult {
+  credential: CredentialMetadata;
+  /** Offers invalidated by the revocation (for logging; not part of the response). */
+  invalidatedOfferIds: string[];
+}
+
+export interface ReissueResult {
+  /** The new pending replacement. */
+  credential: CredentialMetadata;
+  replaces: { id: string; status: 'superseded' };
+  /** The old credential's offers invalidated by the reissue (for logging). */
+  invalidatedOfferIds: string[];
+}
+
+/** One status change in a credential's history. */
+export interface CredentialStatusEventView {
+  id: string;
+  fromStatus: CredentialStatus | null;
+  toStatus: CredentialStatus;
+  reason: string | null;
+  note: string | null;
+  /** Null for wallet-driven events (signing at redemption) and backfilled events. */
+  staff: StaffRef | null;
+  createdAt: string;
 }
 
 export interface ListCredentialsQuery {
@@ -84,6 +175,23 @@ export interface CredentialsService {
     query: ListCredentialsQuery,
   ): Promise<{ credentials: CredentialMetadata[]; total: number; limit: number; offset: number }>;
   get(staff: StaffProfile, credentialId: string): Promise<CredentialMetadata>;
+  /** Pending or valid → revoked (the route allows admins only). */
+  revoke(
+    staff: StaffProfile,
+    credentialId: string,
+    input: RevokeCredentialInput,
+  ): Promise<RevokeResult>;
+  /** Valid → superseded, plus a new pending replacement from the holder's current record. */
+  reissue(
+    staff: StaffProfile,
+    credentialId: string,
+    input: ReissueCredentialInput,
+  ): Promise<ReissueResult>;
+  /** The credential's status history, oldest first. */
+  events(
+    staff: StaffProfile,
+    credentialId: string,
+  ): Promise<{ credentialId: string; events: CredentialStatusEventView[] }>;
   /** Signs a pending credential, bound to the holder's wallet key. Sprint 2 redemption calls this. */
   signCredential(credentialId: string, holderPublicJwk: unknown): Promise<SignedCredential>;
 }
@@ -228,6 +336,12 @@ export function parseHolderPublicJwk(input: unknown): HolderPublicJwk {
 /** Statuses that block creating another credential of the same type for a holder. */
 const ACTIVE_STATUSES: CredentialStatus[] = ['pending', 'valid'];
 
+/** Query executor: the database or a transaction handle (inside a transaction always pass `tx`). */
+type Executor = Pick<Db, 'select' | 'insert' | 'update'>;
+
+/** Tie-break for events written at the same instant: creation, then signing, then the rest. */
+const EVENT_ORDER = sql`case ${credentialStatusEvents.toStatus} when 'pending' then 0 when 'valid' then 1 else 2 end`;
+
 export function createCredentialsService(
   db: Db,
   schemas: CredentialSchemas,
@@ -237,13 +351,7 @@ export function createCredentialsService(
   const baseUrl = options.publicBaseUrl.replace(/\/+$/, '');
 
   const loadMetadata = async (where: SQL | undefined): Promise<CredentialMetadata | null> => {
-    const row = await db.query.credentialRecords.findFirst({
-      where,
-      with: {
-        holder: { columns: { id: true, externalRef: true, fullName: true } },
-        createdBy: { columns: { id: true, displayName: true } },
-      },
-    });
+    const row = await db.query.credentialRecords.findFirst({ where, with: METADATA_RELATIONS });
     return row ? toMetadata(row) : null;
   };
 
@@ -263,6 +371,191 @@ export function createCredentialsService(
       'This issuer has no active signing key yet. An administrator must create one first (run npm run keys:init).',
     );
 
+  const recordEvent = (executor: Executor, event: NewCredentialStatusEvent) =>
+    executor.insert(credentialStatusEvents).values(event);
+
+  /** Locks the holder row (issuer-scoped), so issuance for one holder is serialised. */
+  const lockHolder = async (tx: Executor, staff: StaffProfile, holderId: string) => {
+    const [holder] = await tx
+      .select()
+      .from(holders)
+      .where(and(eq(holders.id, holderId), eq(holders.issuerId, staff.issuer.id)))
+      .for('update');
+    if (!holder) throw holderNotFound();
+    return holder;
+  };
+
+  /** Locks a credential row (issuer-scoped). Another issuer's credential is "not found". */
+  const lockCredential = async (tx: Executor, staff: StaffProfile, credentialId: string) => {
+    const [credential] = await tx
+      .select()
+      .from(credentialRecords)
+      .where(
+        and(
+          eq(credentialRecords.id, credentialId),
+          eq(credentialRecords.issuerId, staff.issuer.id),
+        ),
+      )
+      .for('update');
+    if (!credential) throw credentialNotFound();
+    return credential;
+  };
+
+  /**
+   * The issuance rules shared by create() and reissue(): the holder's CURRENT record is
+   * validated again, age_over_18 is recalculated, and the expiry gets the same caps
+   * (schema default, ID document expiry, 18th birthday, and an optional earlier validUntil).
+   * A holder record that fails validation is a 422 HOLDER_DATA_INVALID for both paths
+   * (the request itself was valid; the stored data is not). 400 VALIDATION_ERROR is kept
+   * for invalid request bodies.
+   */
+  const prepareClaims = (
+    type: CredentialTypeName,
+    holder: Holder,
+    issuedOn: Date,
+    rules: { validUntil?: string | undefined } = {},
+  ) => {
+    const schema = schemas.metadata(type);
+    // The holder record may have been stored under an older schema: validate it again
+    const claims = withDerivedClaims(type, holder.claims, issuedOn);
+    const issues: ClaimIssue[] = schemas
+      .validate(type, claims)
+      .map((i) => ({ path: `claims.${i.path}`, message: i.message }));
+    const documentExpiry =
+      typeof claims.id_document_expiry === 'string'
+        ? startOfDateUtc(claims.id_document_expiry)
+        : null;
+    if (documentExpiry && documentExpiry <= issuedOn) {
+      issues.push({ path: 'claims.id_document_expiry', message: 'the ID document has expired' });
+    }
+    if (issues.length > 0) {
+      throw new AppError(
+        422,
+        'HOLDER_DATA_INVALID',
+        `The holder record no longer matches the ${type} schema. Update the holder record first.`,
+        issues,
+      );
+    }
+
+    let expiresAt = computeExpiry(issuedOn, schema.defaultValidity, claims);
+    if (rules.validUntil !== undefined) {
+      const requested = startOfDateUtc(rules.validUntil);
+      if (!requested || requested <= issuedOn || requested > expiresAt) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'Invalid validUntil', [
+          {
+            path: 'validUntil',
+            message: `must be a date after today and no later than ${isoDate(expiresAt)}`,
+          },
+        ]);
+      }
+      expiresAt = requested;
+    }
+    return { schema, claims, expiresAt };
+  };
+
+  /** Rejects a second pending or valid credential of the same type for one holder. */
+  const assertNoActiveCredential = async (
+    tx: Executor,
+    holderId: string,
+    type: CredentialTypeName,
+  ) => {
+    const [existing] = await tx
+      .select({ id: credentialRecords.id })
+      .from(credentialRecords)
+      .where(
+        and(
+          eq(credentialRecords.holderId, holderId),
+          eq(credentialRecords.credentialType, type),
+          inArray(credentialRecords.status, ACTIVE_STATUSES),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      throw new AppError(
+        409,
+        'ACTIVE_CREDENTIAL_EXISTS',
+        `This holder already has a pending or valid ${type}. Use reissue to change it.`,
+        { credentialId: existing.id },
+      );
+    }
+  };
+
+  /** Inserts a pending credential and its creation event (null → pending). */
+  const insertPending = async (
+    tx: Executor,
+    staff: StaffProfile,
+    holder: Holder,
+    type: CredentialTypeName,
+    prepared: ReturnType<typeof prepareClaims>,
+    issuedOn: Date,
+    replacesCredentialId: string | null = null,
+  ) => {
+    const [row] = await tx
+      .insert(credentialRecords)
+      .values({
+        issuerId: staff.issuer.id,
+        holderId: holder.id,
+        credentialType: type,
+        vct: prepared.schema.vct,
+        schemaVersion: prepared.schema.schemaVersion,
+        status: 'pending',
+        claimsSnapshot: prepared.claims,
+        expiresAt: prepared.expiresAt,
+        replacesCredentialId,
+        createdByStaffId: staff.id,
+        createdAt: issuedOn,
+        statusUpdatedAt: issuedOn,
+      })
+      .returning({ id: credentialRecords.id });
+    await recordEvent(tx, {
+      credentialId: row!.id,
+      issuerId: staff.issuer.id,
+      fromStatus: null,
+      toStatus: 'pending',
+      staffId: staff.id,
+      createdAt: issuedOn,
+    });
+    return row!.id;
+  };
+
+  /** Invalidates every offer of a credential that is neither redeemed nor already invalidated. */
+  const invalidateOpenOffers = async (tx: Executor, credentialId: string, at: Date) =>
+    (
+      await tx
+        .update(credentialOffers)
+        .set({ invalidatedAt: at })
+        .where(
+          and(
+            eq(credentialOffers.credentialId, credentialId),
+            isNull(credentialOffers.redeemedAt),
+            isNull(credentialOffers.invalidatedAt),
+          ),
+        )
+        .returning({ id: credentialOffers.id })
+    ).map((o) => o.id);
+
+  /** 409 for a credential that is already revoked or superseded (both are final). */
+  const assertNotFinal = async (
+    tx: Executor,
+    credential: { id: string; status: CredentialStatus },
+  ) => {
+    if (credential.status === 'revoked') {
+      throw new AppError(409, 'CREDENTIAL_ALREADY_REVOKED', 'This credential is already revoked');
+    }
+    if (credential.status === 'superseded') {
+      const [replacement] = await tx
+        .select({ id: credentialRecords.id })
+        .from(credentialRecords)
+        .where(eq(credentialRecords.replacesCredentialId, credential.id));
+      throw new AppError(
+        409,
+        'CREDENTIAL_SUPERSEDED',
+        'This credential has already been replaced by a reissued credential',
+        { replacedBy: replacement?.id ?? null },
+      );
+    }
+  };
+
   return {
     async create(staff, input) {
       const expectedType = ISSUER_RECORD_TYPES[staff.issuer.type].credentialType;
@@ -274,82 +567,15 @@ export function createCredentialsService(
           },
         ]);
       }
-      const schema = schemas.metadata(expectedType);
       const issuedOn = now();
 
       const id = await db.transaction(async (tx) => {
-        // Lock the holder row: concurrent requests for the same holder are serialised, so the
-        // "one active credential" check below cannot be raced
-        const [holder] = await tx
-          .select()
-          .from(holders)
-          .where(and(eq(holders.id, input.holderId), eq(holders.issuerId, staff.issuer.id)))
-          .for('update');
-        if (!holder) throw holderNotFound();
-
-        // The holder record may have been stored under an older schema: validate it again
-        const claims = withDerivedClaims(expectedType, holder.claims, issuedOn);
-        const issues: ClaimIssue[] = schemas
-          .validate(expectedType, claims)
-          .map((i) => ({ path: `claims.${i.path}`, message: i.message }));
-        const documentExpiry =
-          typeof claims.id_document_expiry === 'string'
-            ? startOfDateUtc(claims.id_document_expiry)
-            : null;
-        if (documentExpiry && documentExpiry <= issuedOn) {
-          issues.push({
-            path: 'claims.id_document_expiry',
-            message: 'the ID document has expired',
-          });
-        }
-        if (issues.length > 0) {
-          throw new AppError(
-            400,
-            'VALIDATION_ERROR',
-            `The holder record no longer matches the ${expectedType} schema. Update the holder record first.`,
-            issues,
-          );
-        }
-
-        const [existing] = await tx
-          .select({ id: credentialRecords.id })
-          .from(credentialRecords)
-          .where(
-            and(
-              eq(credentialRecords.holderId, holder.id),
-              eq(credentialRecords.credentialType, expectedType),
-              inArray(credentialRecords.status, ACTIVE_STATUSES),
-            ),
-          )
-          .limit(1);
-        if (existing) {
-          throw new AppError(
-            409,
-            'ACTIVE_CREDENTIAL_EXISTS',
-            `This holder already has a pending or valid ${expectedType}. Use reissue to change it.`,
-            { credentialId: existing.id },
-          );
-        }
-
+        // Holder row locked: the "one active credential" check below cannot be raced
+        const holder = await lockHolder(tx, staff, input.holderId);
+        const prepared = prepareClaims(expectedType, holder, issuedOn);
+        await assertNoActiveCredential(tx, holder.id, expectedType);
         if (!(await activeKey(staff.issuer.id, tx))) throw issuerKeyMissing();
-
-        const [row] = await tx
-          .insert(credentialRecords)
-          .values({
-            issuerId: staff.issuer.id,
-            holderId: holder.id,
-            credentialType: expectedType,
-            vct: schema.vct,
-            schemaVersion: schema.schemaVersion,
-            status: 'pending',
-            claimsSnapshot: claims,
-            expiresAt: computeExpiry(issuedOn, schema.defaultValidity, claims),
-            createdByStaffId: staff.id,
-            createdAt: issuedOn,
-            statusUpdatedAt: issuedOn,
-          })
-          .returning({ id: credentialRecords.id });
-        return row!.id;
+        return insertPending(tx, staff, holder, expectedType, prepared, issuedOn);
       });
 
       return (await loadMetadata(eq(credentialRecords.id, id)))!;
@@ -364,10 +590,7 @@ export function createCredentialsService(
       const [rows, totals] = await Promise.all([
         db.query.credentialRecords.findMany({
           where,
-          with: {
-            holder: { columns: { id: true, externalRef: true, fullName: true } },
-            createdBy: { columns: { id: true, displayName: true } },
-          },
+          with: METADATA_RELATIONS,
           orderBy: [desc(credentialRecords.createdAt), desc(credentialRecords.id)],
           limit: query.limit,
           offset: query.offset,
@@ -391,6 +614,153 @@ export function createCredentialsService(
       );
       if (!found) throw credentialNotFound();
       return found;
+    },
+
+    async revoke(staff, credentialId, input) {
+      const at = now();
+      const result = await db.transaction(async (tx) => {
+        const credential = await lockCredential(tx, staff, credentialId);
+        await assertNotFinal(tx, credential);
+
+        // Pending can be revoked too: otherwise an unredeemed credential blocks new issuance
+        await tx
+          .update(credentialRecords)
+          .set({
+            status: 'revoked',
+            revokedAt: at,
+            revokedByStaffId: staff.id,
+            revocationReason: input.reason,
+            statusUpdatedAt: at,
+          })
+          .where(
+            and(
+              eq(credentialRecords.id, credential.id),
+              inArray(credentialRecords.status, ACTIVE_STATUSES),
+            ),
+          );
+        const invalidatedOfferIds = await invalidateOpenOffers(tx, credential.id, at);
+        await recordEvent(tx, {
+          credentialId: credential.id,
+          issuerId: credential.issuerId,
+          fromStatus: credential.status,
+          toStatus: 'revoked',
+          reason: input.reason,
+          note: input.note ?? null,
+          staffId: staff.id,
+          createdAt: at,
+        });
+        return { id: credential.id, invalidatedOfferIds };
+      });
+
+      return {
+        credential: (await loadMetadata(eq(credentialRecords.id, result.id)))!,
+        invalidatedOfferIds: result.invalidatedOfferIds,
+      };
+    },
+
+    async reissue(staff, credentialId, input) {
+      const issuedOn = now();
+      const result = await db.transaction(async (tx) => {
+        // Old credential first, then the holder: a second reissue of the same credential
+        // waits on this lock, then sees 'superseded' and gets 409
+        const old = await lockCredential(tx, staff, credentialId);
+        if (old.status === 'pending') {
+          throw new AppError(
+            409,
+            'CREDENTIAL_NOT_REISSUABLE',
+            'A pending credential has not been delivered yet, so it cannot be reissued. Revoke it and issue a new one.',
+          );
+        }
+        await assertNotFinal(tx, old);
+
+        const holder = await lockHolder(tx, staff, old.holderId);
+        const prepared = prepareClaims(old.credentialType, holder, issuedOn, {
+          validUntil: input.validUntil,
+        });
+        if (!(await activeKey(staff.issuer.id, tx))) throw issuerKeyMissing();
+
+        // Supersede first, so the "one active credential" check no longer counts the old one
+        await tx
+          .update(credentialRecords)
+          .set({
+            status: 'superseded',
+            supersededAt: issuedOn,
+            supersededByStaffId: staff.id,
+            statusUpdatedAt: issuedOn,
+          })
+          .where(and(eq(credentialRecords.id, old.id), eq(credentialRecords.status, 'valid')));
+        await assertNoActiveCredential(tx, holder.id, old.credentialType);
+
+        const newId = await insertPending(
+          tx,
+          staff,
+          holder,
+          old.credentialType,
+          prepared,
+          issuedOn,
+          old.id,
+        );
+        const invalidatedOfferIds = await invalidateOpenOffers(tx, old.id, issuedOn);
+        await recordEvent(tx, {
+          credentialId: old.id,
+          issuerId: old.issuerId,
+          fromStatus: 'valid',
+          toStatus: 'superseded',
+          reason: input.reason,
+          note: input.note ?? null,
+          staffId: staff.id,
+          createdAt: issuedOn,
+        });
+        return { newId, oldId: old.id, invalidatedOfferIds };
+      });
+
+      return {
+        credential: (await loadMetadata(eq(credentialRecords.id, result.newId)))!,
+        replaces: { id: result.oldId, status: 'superseded' },
+        invalidatedOfferIds: result.invalidatedOfferIds,
+      };
+    },
+
+    async events(staff, credentialId) {
+      const [credential] = await db
+        .select({ id: credentialRecords.id })
+        .from(credentialRecords)
+        .where(
+          and(
+            eq(credentialRecords.id, credentialId),
+            eq(credentialRecords.issuerId, staff.issuer.id),
+          ),
+        );
+      if (!credential) throw credentialNotFound();
+
+      const rows = await db
+        .select({
+          id: credentialStatusEvents.id,
+          fromStatus: credentialStatusEvents.fromStatus,
+          toStatus: credentialStatusEvents.toStatus,
+          reason: credentialStatusEvents.reason,
+          note: credentialStatusEvents.note,
+          staffId: issuerStaff.id,
+          staffName: issuerStaff.displayName,
+          createdAt: credentialStatusEvents.createdAt,
+        })
+        .from(credentialStatusEvents)
+        .leftJoin(issuerStaff, eq(issuerStaff.id, credentialStatusEvents.staffId))
+        .where(eq(credentialStatusEvents.credentialId, credential.id))
+        .orderBy(asc(credentialStatusEvents.createdAt), asc(EVENT_ORDER));
+
+      return {
+        credentialId: credential.id,
+        events: rows.map((r) => ({
+          id: r.id,
+          fromStatus: r.fromStatus,
+          toStatus: r.toStatus,
+          reason: r.reason,
+          note: r.note,
+          staff: r.staffId && r.staffName ? { id: r.staffId, displayName: r.staffName } : null,
+          createdAt: r.createdAt.toISOString(),
+        })),
+      };
     },
 
     async signCredential(credentialId, holderPublicJwk) {
@@ -475,30 +845,44 @@ export function createCredentialsService(
         privateKey,
       });
 
-      // "status = 'pending'" makes signing single-use even if two redemptions race
-      const updated = await db
-        .update(credentialRecords)
-        .set({
-          status: 'valid',
-          issuedAt: signedAt,
-          issuerKid: key.kid,
-          holderKeyThumbprint: computeEcJwkThumbprint(holderKey),
-          statusUpdatedAt: signedAt,
-        })
-        .where(
-          and(
-            eq(credentialRecords.id, record.id),
-            eq(credentialRecords.status, 'pending'),
-            gt(credentialRecords.expiresAt, signedAt),
-          ),
-        )
-        .returning({ id: credentialRecords.id });
-      if (updated.length === 0) {
+      // "status = 'pending'" makes signing single-use even if two redemptions race, and means
+      // a credential revoked or superseded meanwhile can never become valid
+      const signed = await db.transaction(async (tx) => {
+        const updated = await tx
+          .update(credentialRecords)
+          .set({
+            status: 'valid',
+            issuedAt: signedAt,
+            issuerKid: key.kid,
+            holderKeyThumbprint: computeEcJwkThumbprint(holderKey),
+            statusUpdatedAt: signedAt,
+          })
+          .where(
+            and(
+              eq(credentialRecords.id, record.id),
+              eq(credentialRecords.status, 'pending'),
+              gt(credentialRecords.expiresAt, signedAt),
+            ),
+          )
+          .returning({ id: credentialRecords.id });
+        if (updated.length === 0) return false;
+        // Wallet-driven event: no staff member
+        await recordEvent(tx, {
+          credentialId: record.id,
+          issuerId: record.issuerId,
+          fromStatus: 'pending',
+          toStatus: 'valid',
+          staffId: null,
+          createdAt: signedAt,
+        });
+        return true;
+      });
+      if (!signed) {
         // The SD-JWT just created is discarded: it is never returned
         throw new AppError(
           409,
           'CREDENTIAL_NOT_PENDING',
-          'This credential has already been signed',
+          'This credential is no longer pending (it was signed, revoked or superseded meanwhile)',
         );
       }
 
@@ -507,9 +891,22 @@ export function createCredentialsService(
   };
 }
 
+/** Related rows loaded with every credential's metadata. */
+const STAFF_COLUMNS = { columns: { id: true, displayName: true } } as const;
+const METADATA_RELATIONS = {
+  holder: { columns: { id: true, externalRef: true, fullName: true } },
+  createdBy: STAFF_COLUMNS,
+  revokedBy: STAFF_COLUMNS,
+  supersededBy: STAFF_COLUMNS,
+  replacedBy: { columns: { id: true } },
+} as const;
+
 type RecordWithRelations = typeof credentialRecords.$inferSelect & {
   holder: { id: string; externalRef: string; fullName: string };
-  createdBy: { id: string; displayName: string } | null;
+  createdBy: StaffRef | null;
+  revokedBy: StaffRef | null;
+  supersededBy: StaffRef | null;
+  replacedBy: { id: string }[];
 };
 
 function toMetadata(row: RecordWithRelations): CredentialMetadata {
@@ -526,6 +923,12 @@ function toMetadata(row: RecordWithRelations): CredentialMetadata {
     expiresAt: row.expiresAt.toISOString(),
     statusUpdatedAt: row.statusUpdatedAt.toISOString(),
     revokedAt: row.revokedAt?.toISOString() ?? null,
+    revocationReason: row.revocationReason,
+    revokedBy: row.revokedBy ?? null,
+    supersededAt: row.supersededAt?.toISOString() ?? null,
+    supersededBy: row.supersededBy ?? null,
+    replacesCredentialId: row.replacesCredentialId,
+    replacedByCredentialId: row.replacedBy[0]?.id ?? null,
     createdBy: row.createdBy ?? null,
     createdAt: row.createdAt.toISOString(),
   };

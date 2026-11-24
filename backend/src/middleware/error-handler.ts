@@ -32,7 +32,6 @@ export function createErrorHandler(options: {
   exposeInternalErrors: boolean;
 }): ErrorRequestHandler {
   // Express recognises error handlers by their four parameters, so `_next` must stay
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return (err: unknown, req, res, _next) => {
     let status = 500;
     let body: ErrorBody = { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' };

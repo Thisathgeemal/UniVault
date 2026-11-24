@@ -56,6 +56,12 @@ const envSchema = z
     LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
     LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(20),
     LOGIN_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).default(15),
+    // DEVELOPMENT ONLY: mount POST /api/v1/dev/credentials/:id/simulate-redemption, which signs a
+    // pending credential with a throwaway wallet key until Sprint 2 wallet redemption exists
+    DEV_SIMULATE_REDEMPTION: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
   })
   .superRefine((env, ctx) => {
     // Secrets that are optional while developing become mandatory in production
@@ -64,6 +70,13 @@ const envSchema = z
         if (!env[key]) {
           ctx.addIssue({ code: 'custom', path: [key], message: 'is required in production' });
         }
+      }
+      if (env.DEV_SIMULATE_REDEMPTION) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['DEV_SIMULATE_REDEMPTION'],
+          message: 'must not be enabled in production',
+        });
       }
       // The embedded database is for development only
       if (!/^postgres(ql)?:\/\//.test(env.DATABASE_URL)) {

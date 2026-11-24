@@ -2,7 +2,7 @@
 
 **Sprint:** 1 · **Requirements:** FR-ISS-01, NFR-01, NFR-06, NFR-08
 **Code:** `backend/src/routes/credential-offers.routes.ts`, `backend/src/services/credential-offers.service.ts`
-· **Migration:** `0004_offer_invalidation.sql`
+· **Migrations:** `0004_offer_invalidation.sql`; offers are also invalidated by revoke and reissue (`0005`, Decision 012)
 **Tests:** `backend/test/credential-offers.test.ts`
 
 ## 1. Purpose
@@ -131,16 +131,25 @@ It **never** contains the code or its hash. Another issuer's offer returns `404`
 
 The status is worked out when the offer is read; it isn't stored.
 
-| Status        | When                                                       | Precedence |
-| ------------- | ---------------------------------------------------------- | ---------- |
-| `redeemed`    | `redeemed_at` is set (the wallet collected the credential) | 1 (wins)   |
-| `invalidated` | `invalidated_at` is set (a newer offer replaced this one)  | 2          |
-| `expired`     | `expires_at` has passed                                    | 3          |
-| `active`      | none of the above: the code can still be redeemed          | –          |
+| Status        | When                                                                                                        | Precedence |
+| ------------- | ----------------------------------------------------------------------------------------------------------- | ---------- |
+| `redeemed`    | `redeemed_at` is set (the wallet collected the credential)                                                  | 1 (wins)   |
+| `invalidated` | `invalidated_at` is set: a newer offer replaced this one, or the credential was **revoked** or **reissued** | 2          |
+| `expired`     | `expires_at` has passed                                                                                     | 3          |
+| `active`      | none of the above: the code can still be redeemed                                                           | –          |
 
 `redeemed` wins over `expired`: an offer collected before it expired stays
 `redeemed` afterwards. The database refuses an offer that is both redeemed and
 invalidated (CHECK constraint in `0004_offer_invalidation.sql`).
+
+**Invalidated by revoke and reissue.** `POST /credentials/:id/revoke` and
+`POST /credentials/:id/reissue` set `invalidated_at` on **every** offer of the
+affected credential that is not redeemed and not already invalidated (expired
+ones included), in the same transaction as the status change. Polling
+`GET /credential-offers/:offerId` then shows `status: "invalidated"` with
+`credentialStatus: "revoked"` or `"superseded"`. A reissue never creates an
+offer for the replacement: the portal calls `POST /credential-offers` for the
+new pending credential. See [credentials-api.md](credentials-api.md) section 6.
 
 ## 5. Why OpenID4VCI
 
@@ -160,7 +169,7 @@ credential offer format, pre-authorised code flow:
   (`EmploymentCredential` or `KYCCredential`).
 
 The issuer metadata endpoint and the token/credential exchange that complete
-OpenID4VCI are Sprint 2 work. See Decision 011 (draft).
+OpenID4VCI are Sprint 2 work. See Decision 011 (Draft – review).
 
 ## 6. Security
 
@@ -194,9 +203,12 @@ OpenID4VCI are Sprint 2 work. See Decision 011 (draft).
 
 - `findOfferByCode(code)` in `credential-offers.service.ts` hashes the code and
   looks the offer up by hash. It returns `null` for a malformed or unknown code,
-  and otherwise the offer's ID, credential, issuer, derived status, expiry and
-  `failedAttempts`, but never the hash. Redemption must accept only
-  `status === 'active'`.
+  and otherwise the offer's ID, credential, issuer, `credentialStatus`, derived
+  status, expiry and `failedAttempts`, but never the hash. Redemption must
+  accept only `status === 'active'`. As a second line of defence, an offer whose
+  credential is no longer `pending` (revoked, superseded or already valid) is
+  reported as `invalidated` even if `invalidated_at` was never set, and
+  `signCredential` itself only updates `WHERE status = 'pending'`.
 - Redemption then calls `signCredential(credentialId, walletPublicJwk)`
   (`credentials.service.ts`) and records `redeemed_at` and
   `redeemed_wallet_thumbprint`.

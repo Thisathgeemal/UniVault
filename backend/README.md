@@ -12,20 +12,20 @@ copy .env.example .env      # Windows (macOS/Linux: cp .env.example .env)
 npm run dev                 # http://localhost:4000/api/v1/health
 ```
 
-| Script                  | Purpose                                                                     |
-| ----------------------- | --------------------------------------------------------------------------- |
-| `npm run dev`           | Start with auto-restart on file changes (tsx)                               |
-| `npm run build`         | Compile TypeScript to `dist/`                                               |
-| `npm start`             | Run the compiled server (`dist/server.js`)                                  |
-| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 287 tests, 12 files) |
-| `npm run test:coverage` | Tests with a coverage report                                                |
-| `npm run typecheck`     | Type-check without emitting files                                           |
-| `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                            |
-| `npm run db:migrate`    | Apply new SQL migrations                                                    |
-| `npm run db:seed`       | Migrate, then load the synthetic issuers, staff and holders                 |
-| `npm run db:inspect`    | Show tables, row counts and sample rows                                     |
-| `npm run db:reset`      | Delete the embedded development database, then migrate and seed again       |
-| `npm run keys:init`     | Generate a signing key for every issuer without an active one               |
+| Script                  | Purpose                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `npm run dev`           | Start with auto-restart on file changes (tsx)                                                    |
+| `npm run build`         | Compile TypeScript to `dist/`                                                                    |
+| `npm start`             | Run the compiled server (`dist/server.js`)                                                       |
+| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 371 tests, 14 files)                      |
+| `npm run test:coverage` | Tests with a coverage report; fails below 88 / 85 / 93 / 89 % (stmts / branches / funcs / lines) |
+| `npm run typecheck`     | Type-check without emitting files                                                                |
+| `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                                                 |
+| `npm run db:migrate`    | Apply new SQL migrations                                                                         |
+| `npm run db:seed`       | Migrate, then load the synthetic issuers, staff and holders                                      |
+| `npm run db:inspect`    | Show tables, row counts and sample rows                                                          |
+| `npm run db:reset`      | Delete the embedded development database, then migrate and seed again                            |
+| `npm run keys:init`     | Generate a signing key for every issuer without an active one                                    |
 
 `dev`, `build`, `typecheck`, `test`, `test:coverage` and `keys:init` run
 `build:deps` first (npm `pre` scripts), so crypto-core is always up to date.
@@ -55,13 +55,15 @@ src/
   routes/staff.routes.ts              staff list (admin)
   routes/issuers.routes.ts            issuers, JWKS, key generation
   routes/holders.routes.ts            holder records
-  routes/credentials.routes.ts        credential issuance (pending), list, get; revoke/reissue planned
+  routes/credentials.routes.ts        credential issuance (pending), list, get, revoke, reissue, events
+  routes/dev.routes.ts                DEV ONLY: simulated redemption (DEV_SIMULATE_REDEMPTION=true)
   routes/credential-offers.routes.ts  QR offers and status; wallet redemption planned (Sprint 2)
   routes/status.routes.ts             credential status (planned)
   routes/verifications.routes.ts      verification sessions (planned)
   services/issuer-keys.service.ts  key generation, rotation, JWKS publication
   services/holders.service.ts      holder records (schema-validated, issuer-scoped)
-  services/credentials.service.ts  pending credentials, expiry rules, signCredential (SD-JWT)
+  services/credentials.service.ts  pending credentials, expiry rules, signCredential (SD-JWT),
+                                   revoke, reissue (supersede), status history
   services/credential-offers.service.ts  pre-authorised offers (hash only), status, findOfferByCode
   services/credential-schemas.ts   loads docs/schemas and validates claims
   db/schema.ts           Drizzle table definitions and relations
@@ -79,36 +81,40 @@ JSON body (size-limited) → `/api/v1` routes → 404 → error handler.
 
 ## API routes (`/api/v1`)
 
-| Method | Path                                         | Access           | Status                               |
-| ------ | -------------------------------------------- | ---------------- | ------------------------------------ |
-| GET    | `/health`                                    | Public           | ✅ Implemented                       |
-| POST   | `/auth/login`                                | Public           | ✅ Implemented (rate-limited)        |
-| GET    | `/auth/me`                                   | Login            | ✅ Implemented                       |
-| POST   | `/auth/logout`                               | Login            | ✅ Implemented                       |
-| GET    | `/staff`                                     | Admin            | ✅ Implemented                       |
-| GET    | `/issuers`                                   | Public           | ✅ Implemented                       |
-| GET    | `/issuers/:issuerId/keys`                    | Public           | ✅ Implemented                       |
-| POST   | `/issuers/:issuerId/keys`                    | Admin (own)      | ✅ Implemented                       |
-| GET    | `/holders`, `/holders/:holderId`             | Login            | ✅ Implemented                       |
-| POST   | `/holders`                                   | Login            | ✅ Implemented                       |
-| POST   | `/credentials`                               | Officer or admin | ✅ Implemented (creates **pending**) |
-| GET    | `/credentials`, `/credentials/:credentialId` | Login            | ✅ Implemented                       |
-| POST   | `/credentials/:credentialId/revoke`          | Admin            | 501 – Sprint 1                       |
-| POST   | `/credentials/:credentialId/reissue`         | Login            | 501 – Sprint 1                       |
-| POST   | `/credential-offers`                         | Officer or admin | ✅ Implemented (one-time QR offer)   |
-| GET    | `/credential-offers/:offerId`                | Login            | ✅ Implemented (status polling)      |
-| POST   | `/credential-offers/token`                   | Public (code)    | 501 – Sprint 2 (wallet)              |
-| POST   | `/credential-offers/credential`              | Public (code)    | 501 – Sprint 2 (wallet)              |
-| GET    | `/status/:credentialId`                      | Public           | 501 – Sprint 1                       |
-| POST   | `/verifications`                             | Public           | 501 – Sprint 3                       |
-| GET    | `/verifications/:verificationId/request`     | Public           | 501 – Sprint 3                       |
-| POST   | `/verifications/:verificationId/response`    | Public           | 501 – Sprint 3                       |
-| GET    | `/verifications/:verificationId/result`      | Public           | 501 – Sprint 3                       |
+| Method | Path                                                 | Access           | Status                                                       |
+| ------ | ---------------------------------------------------- | ---------------- | ------------------------------------------------------------ |
+| GET    | `/health`                                            | Public           | ✅ Implemented                                               |
+| POST   | `/auth/login`                                        | Public           | ✅ Implemented (rate-limited)                                |
+| GET    | `/auth/me`                                           | Login            | ✅ Implemented                                               |
+| POST   | `/auth/logout`                                       | Login            | ✅ Implemented                                               |
+| GET    | `/staff`                                             | Admin            | ✅ Implemented                                               |
+| GET    | `/issuers`                                           | Public           | ✅ Implemented                                               |
+| GET    | `/issuers/:issuerId/keys`                            | Public           | ✅ Implemented                                               |
+| POST   | `/issuers/:issuerId/keys`                            | Admin (own)      | ✅ Implemented                                               |
+| GET    | `/holders`, `/holders/:holderId`                     | Login            | ✅ Implemented                                               |
+| POST   | `/holders`                                           | Login            | ✅ Implemented                                               |
+| POST   | `/credentials`                                       | Officer or admin | ✅ Implemented (creates **pending**)                         |
+| GET    | `/credentials`, `/credentials/:credentialId`         | Login            | ✅ Implemented                                               |
+| POST   | `/credentials/:credentialId/revoke`                  | Admin            | ✅ Implemented (pending or valid)                            |
+| POST   | `/credentials/:credentialId/reissue`                 | Officer or admin | ✅ Implemented (supersedes, new pending)                     |
+| GET    | `/credentials/:credentialId/events`                  | Officer or admin | ✅ Implemented (status history)                              |
+| POST   | `/credential-offers`                                 | Officer or admin | ✅ Implemented (one-time QR offer)                           |
+| GET    | `/credential-offers/:offerId`                        | Login            | ✅ Implemented (status polling)                              |
+| POST   | `/credential-offers/token`                           | Public (code)    | 501 – Sprint 2 (wallet)                                      |
+| POST   | `/credential-offers/credential`                      | Public (code)    | 501 – Sprint 2 (wallet)                                      |
+| GET    | `/status/:credentialId`                              | Public           | 501 – Sprint 1                                               |
+| POST   | `/verifications`                                     | Public           | 501 – Sprint 3                                               |
+| GET    | `/verifications/:verificationId/request`             | Public           | 501 – Sprint 3                                               |
+| POST   | `/verifications/:verificationId/response`            | Public           | 501 – Sprint 3                                               |
+| GET    | `/verifications/:verificationId/result`              | Public           | 501 – Sprint 3                                               |
+| POST   | `/dev/credentials/:credentialId/simulate-redemption` | Admin (own)      | **Dev only**, mounted only if `DEV_SIMULATE_REDEMPTION=true` |
 
 Credentials are **signed when the wallet redeems its offer** (Sprint 2), by
 `signCredential()` in `services/credentials.service.ts`; `POST /credentials`
 only creates the pending record. `POST /credential-offers` turns it into a one-time
-QR offer. See `docs/api/credentials-api.md` and `docs/api/credential-offers-api.md`.
+QR offer. Revoke and reissue invalidate a credential's open offers, and every status
+change is recorded in `credential_status_events` (Decision 012). See
+`docs/api/credentials-api.md` and `docs/api/credential-offers-api.md`.
 
 Planned routes already validate their input. Each returns `501 NOT_IMPLEMENTED`
 with the sprint it is planned for, until its handler is written.

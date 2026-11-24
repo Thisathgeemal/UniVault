@@ -86,7 +86,12 @@ export interface OfferForRedemption {
   offerId: string;
   credentialId: string;
   issuerId: string;
+  /**
+   * 'active' only if the offer is usable AND its credential is still pending. Revoking or
+   * reissuing invalidates open offers; this check is the second line of defence.
+   */
   status: OfferStatus;
+  credentialStatus: CredentialStatus;
   expiresAt: Date;
   redeemedAt: Date | null;
   invalidatedAt: Date | null;
@@ -277,6 +282,7 @@ export function createCredentialOffersService(
           offerId: credentialOffers.id,
           credentialId: credentialOffers.credentialId,
           issuerId: credentialRecords.issuerId,
+          credentialStatus: credentialRecords.status,
           expiresAt: credentialOffers.expiresAt,
           redeemedAt: credentialOffers.redeemedAt,
           invalidatedAt: credentialOffers.invalidatedAt,
@@ -285,7 +291,13 @@ export function createCredentialOffersService(
         .from(credentialOffers)
         .innerJoin(credentialRecords, eq(credentialRecords.id, credentialOffers.credentialId))
         .where(eq(credentialOffers.preAuthorizedCodeHash, hashPreAuthorizedCode(code)));
-      return row ? { ...row, status: offerStatus(row, now()) } : null;
+      if (!row) return null;
+      const status = offerStatus(row, now());
+      // An offer for a credential that is no longer pending can never be redeemed
+      return {
+        ...row,
+        status: status === 'active' && row.credentialStatus !== 'pending' ? 'invalidated' : status,
+      };
     },
   };
 }

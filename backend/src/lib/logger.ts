@@ -18,6 +18,10 @@ export const REDACT_PATHS = [
   '*.secret',
   '*.token',
   '*.pre_authorized_code',
+  // Free-text revocation/reissue notes can contain personal data (PDPA)
+  'note',
+  '*.note',
+  'req.body.note',
 ];
 
 export function createLogger(

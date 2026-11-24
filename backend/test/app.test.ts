@@ -41,6 +41,7 @@ describe('server and routing', () => {
     ['POST', '/api/v1/credentials'],
     ['POST', `/api/v1/credentials/${UUID}/revoke`],
     ['POST', `/api/v1/credentials/${UUID}/reissue`],
+    ['GET', `/api/v1/credentials/${UUID}/events`],
     ['POST', '/api/v1/credential-offers'],
     ['POST', '/api/v1/issuers/employer-a/keys'],
     ['GET', '/api/v1/staff'],

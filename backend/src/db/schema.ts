@@ -1,7 +1,7 @@
 /**
  * Drizzle ORM table definitions – typed access to the tables created by
- * migrations/0001_initial_schema.sql. The SQL migration is the source of truth
- * for structure and constraints; test/db/schema.test.ts checks the two match.
+ * migrations/0001–0006. The SQL migrations are the source of truth for
+ * structure and constraints; test/db/schema.test.ts checks the two match.
  */
 import { relations } from 'drizzle-orm';
 import {
@@ -103,8 +103,13 @@ export const credentialRecords = pgTable('credential_records', {
   issuedAt: timestamp('issued_at', { withTimezone: true }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   statusUpdatedAt: timestamp('status_updated_at', { withTimezone: true }).notNull().defaultNow(),
+  /** Set iff status = 'revoked' (with revocationReason). */
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   revocationReason: text('revocation_reason'),
+  revokedByStaffId: uuid('revoked_by_staff_id').references(() => issuerStaff.id),
+  /** Set iff status = 'superseded' (migration 0005). */
+  supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  supersededByStaffId: uuid('superseded_by_staff_id').references(() => issuerStaff.id),
   replacesCredentialId: uuid('replaces_credential_id')
     .unique()
     .references((): AnyPgColumn => credentialRecords.id),
@@ -125,6 +130,26 @@ export const credentialOffers = pgTable('credential_offers', {
   /** Set when a newer offer for the same credential replaced this one (migration 0004). */
   invalidatedAt: timestamp('invalidated_at', { withTimezone: true }),
   createdByStaffId: uuid('created_by_staff_id').references(() => issuerStaff.id),
+  ...timestamps,
+});
+
+/**
+ * Append-only status history of each credential (migration 0005, Decision 012).
+ * fromStatus is null only for creation; staffId is null for wallet-driven events.
+ */
+export const credentialStatusEvents = pgTable('credential_status_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  credentialId: uuid('credential_id')
+    .notNull()
+    .references(() => credentialRecords.id),
+  issuerId: text('issuer_id')
+    .notNull()
+    .references(() => issuers.id),
+  fromStatus: credentialStatus('from_status'),
+  toStatus: credentialStatus('to_status').notNull(),
+  reason: text('reason'),
+  note: text('note'),
+  staffId: uuid('staff_id').references(() => issuerStaff.id),
   ...timestamps,
 });
 
@@ -158,6 +183,17 @@ export const credentialRecordsRelations = relations(credentialRecords, ({ one, m
   createdBy: one(issuerStaff, {
     fields: [credentialRecords.createdByStaffId],
     references: [issuerStaff.id],
+    relationName: 'credentialCreatedBy',
+  }),
+  revokedBy: one(issuerStaff, {
+    fields: [credentialRecords.revokedByStaffId],
+    references: [issuerStaff.id],
+    relationName: 'credentialRevokedBy',
+  }),
+  supersededBy: one(issuerStaff, {
+    fields: [credentialRecords.supersededByStaffId],
+    references: [issuerStaff.id],
+    relationName: 'credentialSupersededBy',
   }),
   signingKey: one(issuerKeys, {
     fields: [credentialRecords.issuerKid],
@@ -170,6 +206,19 @@ export const credentialRecordsRelations = relations(credentialRecords, ({ one, m
   }),
   replacedBy: many(credentialRecords, { relationName: 'reissue' }),
   offers: many(credentialOffers),
+  statusEvents: many(credentialStatusEvents),
+}));
+
+export const credentialStatusEventsRelations = relations(credentialStatusEvents, ({ one }) => ({
+  credential: one(credentialRecords, {
+    fields: [credentialStatusEvents.credentialId],
+    references: [credentialRecords.id],
+  }),
+  issuer: one(issuers, { fields: [credentialStatusEvents.issuerId], references: [issuers.id] }),
+  staff: one(issuerStaff, {
+    fields: [credentialStatusEvents.staffId],
+    references: [issuerStaff.id],
+  }),
 }));
 
 export const credentialOffersRelations = relations(credentialOffers, ({ one }) => ({
@@ -192,3 +241,5 @@ export type NewHolder = typeof holders.$inferInsert;
 export type CredentialRecord = typeof credentialRecords.$inferSelect;
 export type NewCredentialRecord = typeof credentialRecords.$inferInsert;
 export type CredentialOffer = typeof credentialOffers.$inferSelect;
+export type CredentialStatusEvent = typeof credentialStatusEvents.$inferSelect;
+export type NewCredentialStatusEvent = typeof credentialStatusEvents.$inferInsert;

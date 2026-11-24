@@ -43,6 +43,7 @@ public keys, credential status) or one-time pre-authorised codes.
 | Log in, view own profile            | ✅      | ✅    |
 | View and create holder records      | ✅      | ✅    |
 | View credentials (list, details)    | ✅      | ✅    |
+| View credential status history      | ✅      | ✅    |
 | Issue credentials, create QR offers | ✅      | ✅    |
 | Reissue credentials                 | ✅      | ✅    |
 | **Revoke** credentials              | ❌      | ✅    |

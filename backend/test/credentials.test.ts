@@ -528,14 +528,15 @@ describe('expiry rules', () => {
     expectExpiryBetween(res.body.expiresAt, before, new Date(), 'P2Y');
   });
 
-  it('refuses a passport that has already expired (400)', async () => {
+  it('refuses a passport that has already expired (422 HOLDER_DATA_INVALID)', async () => {
     const holderId = await newCustomer('CUS-PASS-003', {
       id_document_type: 'passport',
       id_document_number: 'N1111111',
       id_document_expiry: isoDate(new Date(Date.now() - 10 * DAY_MS)),
     });
     const res = await createCredential(tokens.bankOfficer, { holderId });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('HOLDER_DATA_INVALID');
     expect(res.body.error.details).toContainEqual({
       path: 'claims.id_document_expiry',
       message: 'the ID document has expired',
@@ -637,7 +638,7 @@ describe('POST /credentials – rejections', () => {
     ]);
   });
 
-  it('rejects holder claims that no longer pass the credential schema (400)', async () => {
+  it('rejects holder claims that no longer pass the credential schema (422)', async () => {
     const holderId = await newEmployee('STC-80005');
     // Simulate a record stored under an older schema: designation missing, unknown field added
     const { designation: _removed, ...claims } = EMPLOYEE_CLAIMS;
@@ -647,8 +648,8 @@ describe('POST /credentials – rejections', () => {
       .where(eq(holders.id, holderId));
 
     const res = await createCredential(tokens.employerOfficer, { holderId });
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('HOLDER_DATA_INVALID');
     expect(res.body.error.details).toEqual(
       expect.arrayContaining([
         { path: 'claims.designation', message: 'is required' },
