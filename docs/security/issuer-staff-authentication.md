@@ -29,12 +29,12 @@ public keys, credential status) or one-time pre-authorised codes.
 
 ### Public vs protected
 
-| Area                                                                                      | Access                                                                 |
-| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `/health`, `GET /issuers`, `GET /issuers/:id/keys`, `GET /status/:id`                     | Public: needed by verifiers and wallets                                |
-| `/credential-offers/token`, `/credential-offers/credential`                               | Public: the wallet proves itself with the one-time pre-authorised code |
-| `/verifications/*`                                                                        | Public for now: **verifier authentication is planned for Sprint 3**    |
-| `/holders`, `/credentials`, `POST /credential-offers`, `/staff`, `POST /issuers/:id/keys` | **Login required**                                                     |
+| Area                                                                                                                    | Access                                                                 |
+| ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `/health`, `GET /issuers`, `GET /issuers/:id/keys`, `GET /status/:id`                                                   | Public: needed by verifiers and wallets                                |
+| `/credential-offers/token`, `/credential-offers/credential`                                                             | Public: the wallet proves itself with the one-time pre-authorised code |
+| `/verifications/*`                                                                                                      | Public for now: **verifier authentication is planned for Sprint 3**    |
+| `/holders`, `/credentials`, `POST /credential-offers`, `GET /credential-offers/:id`, `/staff`, `POST /issuers/:id/keys` | **Login required**                                                     |
 
 ### Role matrix
 

@@ -1,6 +1,6 @@
 # UniVault Database Design (v1)
 
-**Sprint:** 1 · **Database:** PostgreSQL · **Migrations:** `backend/migrations/0001`–`0003` (section 8)
+**Sprint:** 1 · **Database:** PostgreSQL · **Migrations:** `backend/migrations/0001`–`0004` (section 8)
 **Requirements supported:** FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08
 
 ## 1. Technology decision
@@ -86,21 +86,23 @@ erDiagram
         timestamptz expires_at
         timestamptz redeemed_at
         text redeemed_wallet_thumbprint
-        integer failed_attempts
+        integer failed_attempts "reserved: Sprint 2 brute-force limit"
+        timestamptz invalidated_at "0004, replaced by a newer offer"
+        uuid created_by_staff_id FK
     }
 ```
 
 ## 3. Tables
 
-| Table                | Purpose                                                     | Key rules enforced by the database                                                                                                                                                                                                              |
-| -------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `issuers`            | Employers and banks                                         | ID format `^[a-z0-9-]{3,40}$`; type is an enum                                                                                                                                                                                                  |
-| `issuer_keys`        | RS256 **public** keys (private keys stay encrypted on disk) | `kid` is a 43-character thumbprint and must equal the JWK's `kid`; **only one active key per issuer** (partial unique index); a retired key must record `retired_at`                                                                            |
-| `issuer_staff`       | Issuer portal users                                         | Email unique regardless of case; only scrypt hashes accepted (no plain-text passwords); `failed_login_attempts` counts consecutive failures (never negative) and `locked_until` holds a temporary lockout (migration 0002)                      |
-| `holders`            | An issuer's employee or customer record                     | `external_ref` unique per issuer; the same person at two issuers is two rows; `claims` must be a JSON object; `created_by_staff_id` records which staff member created the record (migration 0003, set to NULL if that staff member is deleted) |
-| `credential_records` | One row per credential (`id` = `jti`)                       | See section 4                                                                                                                                                                                                                                   |
-| `credential_offers`  | Pre-authorised offers behind the QR code                    | Only a SHA-256 hash of the code is stored, unique; it cannot be created already expired; redemption time and wallet key are recorded together                                                                                                   |
-| `schema_migrations`  | Applied migrations and checksums                            | Created by the migration runner                                                                                                                                                                                                                 |
+| Table                | Purpose                                                     | Key rules enforced by the database                                                                                                                                                                                                                                              |
+| -------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `issuers`            | Employers and banks                                         | ID format `^[a-z0-9-]{3,40}$`; type is an enum                                                                                                                                                                                                                                  |
+| `issuer_keys`        | RS256 **public** keys (private keys stay encrypted on disk) | `kid` is a 43-character thumbprint and must equal the JWK's `kid`; **only one active key per issuer** (partial unique index); a retired key must record `retired_at`                                                                                                            |
+| `issuer_staff`       | Issuer portal users                                         | Email unique regardless of case; only scrypt hashes accepted (no plain-text passwords); `failed_login_attempts` counts consecutive failures (never negative) and `locked_until` holds a temporary lockout (migration 0002)                                                      |
+| `holders`            | An issuer's employee or customer record                     | `external_ref` unique per issuer; the same person at two issuers is two rows; `claims` must be a JSON object; `created_by_staff_id` records which staff member created the record (migration 0003, set to NULL if that staff member is deleted)                                 |
+| `credential_records` | One row per credential (`id` = `jti`)                       | See section 4                                                                                                                                                                                                                                                                   |
+| `credential_offers`  | Pre-authorised offers behind the QR code                    | Only a SHA-256 hash of the code is stored, unique; it cannot be created already expired; redemption time and wallet key are recorded together; `invalidated_at` is set when a newer offer replaces it, and an offer can never be both redeemed and invalidated (migration 0004) |
+| `schema_migrations`  | Applied migrations and checksums                            | Created by the migration runner                                                                                                                                                                                                                                                 |
 
 ## 4. Credential lifecycle and status
 
@@ -152,8 +154,9 @@ are what the wallet and verifiers read through the status endpoint.
 
 Credential records and offers are not seeded. Credential records are created
 by the issuance API (`POST /api/v1/credentials`, as `pending`) and signed with
-the issuer's real key when the wallet redeems its offer (Sprint 2). Offers come
-with the credential offer task.
+the issuer's real key when the wallet redeems its offer (Sprint 2). Offers are
+created by `POST /api/v1/credential-offers` (only the SHA-256 hash of the
+code is stored).
 
 ## 7. Commands (from `backend/`)
 
@@ -171,11 +174,12 @@ start-up when `DB_AUTO_MIGRATE=true`). Each one runs once, inside a transaction,
 and is recorded with its checksum in `schema_migrations`. An applied file must
 never be edited; changes go in a new file.
 
-| File                              | Changes                                                                                                                                      |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0001_initial_schema.sql`         | Enum types, the `set_updated_at` trigger function, and the six tables with their keys, CHECK constraints and indexes                         |
-| `0002_staff_login_protection.sql` | `issuer_staff.failed_login_attempts` (integer, default 0, CHECK `>= 0`) and `issuer_staff.locked_until` (timestamptz) for the login lockout  |
-| `0003_holder_audit.sql`           | `holders.created_by_staff_id` (uuid, references `issuer_staff`, `ON DELETE SET NULL`): which staff member created each holder record (audit) |
+| File                              | Changes                                                                                                                                                                            |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001_initial_schema.sql`         | Enum types, the `set_updated_at` trigger function, and the six tables with their keys, CHECK constraints and indexes                                                               |
+| `0002_staff_login_protection.sql` | `issuer_staff.failed_login_attempts` (integer, default 0, CHECK `>= 0`) and `issuer_staff.locked_until` (timestamptz) for the login lockout                                        |
+| `0003_holder_audit.sql`           | `holders.created_by_staff_id` (uuid, references `issuer_staff`, `ON DELETE SET NULL`): which staff member created each holder record (audit)                                       |
+| `0004_offer_invalidation.sql`     | `credential_offers.invalidated_at` (timestamptz, NULL = not invalidated) and CHECK `invalidated_at IS NULL OR redeemed_at IS NULL`: a new offer invalidates the earlier usable one |
 
 `backend/src/db/schema.ts` (Drizzle) must match; `backend/test/db/schema.test.ts`
 checks the two agree.

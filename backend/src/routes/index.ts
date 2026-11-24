@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { AuthService } from '../auth/auth-service.js';
 import type { AuthMiddleware } from '../auth/middleware.js';
 import type { Database } from '../db/client.js';
+import type { CredentialOffersService } from '../services/credential-offers.service.js';
 import type { CredentialsService } from '../services/credentials.service.js';
 import type { HoldersService } from '../services/holders.service.js';
 import type { IssuerKeysService } from '../services/issuer-keys.service.js';
@@ -23,6 +24,7 @@ export interface ApiRouterDeps {
   issuerKeys?: IssuerKeysService;
   holders?: HoldersService;
   credentials?: CredentialsService;
+  credentialOffers?: CredentialOffersService;
   auth: AuthMiddleware;
   loginRateLimit: { max: number; windowMinutes: number };
 }
@@ -46,7 +48,7 @@ export function apiRouter(deps: ApiRouterDeps): Router {
   router.use('/issuers', issuersRouter(deps.auth, deps.issuerKeys));
   router.use('/holders', holdersRouter(deps.auth, deps.holders));
   router.use('/credentials', credentialsRouter(deps.auth, deps.credentials));
-  router.use('/credential-offers', credentialOffersRouter(deps.auth));
+  router.use('/credential-offers', credentialOffersRouter(deps.auth, deps.credentialOffers));
   router.use('/status', statusRouter());
   router.use('/verifications', verificationsRouter());
   return router;

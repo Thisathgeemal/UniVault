@@ -25,6 +25,7 @@ describe('migrations', () => {
       '0001_initial_schema.sql',
       '0002_staff_login_protection.sql',
       '0003_holder_audit.sql',
+      '0004_offer_invalidation.sql',
     ]);
     const tables = await rows<{ table_name: string }>(
       database,
@@ -49,6 +50,7 @@ describe('migrations', () => {
         '0001_initial_schema.sql',
         '0002_staff_login_protection.sql',
         '0003_holder_audit.sql',
+        '0004_offer_invalidation.sql',
       ],
     });
   });

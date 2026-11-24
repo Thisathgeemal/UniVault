@@ -122,6 +122,8 @@ export const credentialOffers = pgTable('credential_offers', {
   redeemedAt: timestamp('redeemed_at', { withTimezone: true }),
   redeemedWalletThumbprint: text('redeemed_wallet_thumbprint'),
   failedAttempts: integer('failed_attempts').notNull().default(0),
+  /** Set when a newer offer for the same credential replaced this one (migration 0004). */
+  invalidatedAt: timestamp('invalidated_at', { withTimezone: true }),
   createdByStaffId: uuid('created_by_staff_id').references(() => issuerStaff.id),
   ...timestamps,
 });
@@ -174,6 +176,10 @@ export const credentialOffersRelations = relations(credentialOffers, ({ one }) =
   credential: one(credentialRecords, {
     fields: [credentialOffers.credentialId],
     references: [credentialRecords.id],
+  }),
+  createdBy: one(issuerStaff, {
+    fields: [credentialOffers.createdByStaffId],
+    references: [issuerStaff.id],
   }),
 }));
 

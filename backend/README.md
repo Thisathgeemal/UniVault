@@ -17,7 +17,7 @@ npm run dev                 # http://localhost:4000/api/v1/health
 | `npm run dev`           | Start with auto-restart on file changes (tsx)                               |
 | `npm run build`         | Compile TypeScript to `dist/`                                               |
 | `npm start`             | Run the compiled server (`dist/server.js`)                                  |
-| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 247 tests, 11 files) |
+| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 287 tests, 12 files) |
 | `npm run test:coverage` | Tests with a coverage report                                                |
 | `npm run typecheck`     | Type-check without emitting files                                           |
 | `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                            |
@@ -56,12 +56,13 @@ src/
   routes/issuers.routes.ts            issuers, JWKS, key generation
   routes/holders.routes.ts            holder records
   routes/credentials.routes.ts        credential issuance (pending), list, get; revoke/reissue planned
-  routes/credential-offers.routes.ts  QR offers and wallet redemption (planned)
+  routes/credential-offers.routes.ts  QR offers and status; wallet redemption planned (Sprint 2)
   routes/status.routes.ts             credential status (planned)
   routes/verifications.routes.ts      verification sessions (planned)
   services/issuer-keys.service.ts  key generation, rotation, JWKS publication
   services/holders.service.ts      holder records (schema-validated, issuer-scoped)
   services/credentials.service.ts  pending credentials, expiry rules, signCredential (SD-JWT)
+  services/credential-offers.service.ts  pre-authorised offers (hash only), status, findOfferByCode
   services/credential-schemas.ts   loads docs/schemas and validates claims
   db/schema.ts           Drizzle table definitions and relations
   db/client.ts           database connection (embedded PGlite or PostgreSQL server)
@@ -94,7 +95,8 @@ JSON body (size-limited) → `/api/v1` routes → 404 → error handler.
 | GET    | `/credentials`, `/credentials/:credentialId` | Login            | ✅ Implemented                       |
 | POST   | `/credentials/:credentialId/revoke`          | Admin            | 501 – Sprint 1                       |
 | POST   | `/credentials/:credentialId/reissue`         | Login            | 501 – Sprint 1                       |
-| POST   | `/credential-offers`                         | Login            | 501 – Sprint 1                       |
+| POST   | `/credential-offers`                         | Officer or admin | ✅ Implemented (one-time QR offer)   |
+| GET    | `/credential-offers/:offerId`                | Login            | ✅ Implemented (status polling)      |
 | POST   | `/credential-offers/token`                   | Public (code)    | 501 – Sprint 2 (wallet)              |
 | POST   | `/credential-offers/credential`              | Public (code)    | 501 – Sprint 2 (wallet)              |
 | GET    | `/status/:credentialId`                      | Public           | 501 – Sprint 1                       |
@@ -105,7 +107,8 @@ JSON body (size-limited) → `/api/v1` routes → 404 → error handler.
 
 Credentials are **signed when the wallet redeems its offer** (Sprint 2), by
 `signCredential()` in `services/credentials.service.ts`; `POST /credentials`
-only creates the pending record. See `docs/api/credentials-api.md`.
+only creates the pending record. `POST /credential-offers` turns it into a one-time
+QR offer. See `docs/api/credentials-api.md` and `docs/api/credential-offers-api.md`.
 
 Planned routes already validate their input. Each returns `501 NOT_IMPLEMENTED`
 with the sprint it is planned for, until its handler is written.

@@ -229,9 +229,9 @@ Signing errors are listed in section 4.
 
 ## 8. Not in scope yet
 
-- **Credential offers and redemption** (Sprint 2): `POST /credential-offers`
-  creates the QR offer; `/credential-offers/token` and `/credential` redeem it
-  and call `signCredential`.
+- **Redemption** (Sprint 2): `/credential-offers/token` and `/credential` redeem
+  the offer and call `signCredential`. Offer creation (`POST /credential-offers`)
+  is done: see [credential-offers-api.md](credential-offers-api.md).
 - **Revoke and reissue** (next task): `POST /credentials/:id/revoke` and `/reissue`.
 - **Status endpoint:** `GET /status/:credentialId`, the `status_uri` in every credential.
 - **Expiring stale pending credentials:** a pending credential that is never

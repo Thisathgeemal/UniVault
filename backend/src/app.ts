@@ -21,6 +21,7 @@ import { AppError } from './lib/errors.js';
 import { createErrorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { apiRouter } from './routes/index.js';
 import { loadCredentialSchemas } from './services/credential-schemas.js';
+import { createCredentialOffersService } from './services/credential-offers.service.js';
 import { createCredentialsService } from './services/credentials.service.js';
 import { createHoldersService } from './services/holders.service.js';
 import { createIssuerKeysService } from './services/issuer-keys.service.js';
@@ -112,6 +113,12 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
         publicBaseUrl: config.PUBLIC_BASE_URL,
       })
     : undefined;
+  const credentialOffers = deps.database
+    ? createCredentialOffersService(deps.database.db, {
+        ttlSeconds: config.CREDENTIAL_OFFER_TTL_SECONDS,
+        publicBaseUrl: config.PUBLIC_BASE_URL,
+      })
+    : undefined;
   app.use(
     API_PREFIX,
     apiRouter({
@@ -127,6 +134,7 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
       ...(issuerKeys ? { issuerKeys } : {}),
       ...(holders ? { holders } : {}),
       ...(credentials ? { credentials } : {}),
+      ...(credentialOffers ? { credentialOffers } : {}),
     }),
   );
 
