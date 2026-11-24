@@ -1,6 +1,6 @@
 # UniVault Database Design (v1)
 
-**Sprint:** 1 · **Database:** PostgreSQL · **Migrations:** `backend/migrations/0001`–`0006` (section 8)
+**Sprint:** 1 · **Database:** PostgreSQL · **Migrations:** `backend/migrations/0001`–`0007` (section 8)
 **Requirements supported:** FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08
 
 ## 1. Technology decision
@@ -136,6 +136,14 @@ stateDiagram-v2
     superseded --> [*]
 ```
 
+**`expired` is computed, not stored.** The diagram shows the stored statuses only (the
+`credential_status` enum). A `valid` credential whose `expires_at` has passed
+(`now >= expires_at`) is reported as `expired` by `effectiveStatus()` in
+`backend/src/services/credential-status.ts`, which the public status endpoint and the
+portal's `effectiveStatus` field both use (precedence revoked > superseded > expired >
+valid). Nothing ever writes `expired` to the database, so no job is needed to keep it
+up to date. `expires_at` is stored in whole seconds, so it equals the SD-JWT `exp`.
+
 | Status       | Meaning                                        | Required fields (CHECK constraints, migration 0005)                                                                                                            |
 | ------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pending`    | Created by staff, offered, not yet in a wallet | No signing data, no revocation or supersede data                                                                                                               |
@@ -187,9 +195,17 @@ staff), signing (`pending → valid`, no staff: wallet-driven), revocation and
 supersede (with reason, optional note and staff). Migration 0005 backfilled
 creation, signing and the last change for credentials that already existed.
 
-**Status checks (FR-BAK-01).** `status`, `status_updated_at`, `revoked_at` and
-`superseded_at` are what the wallet and verifiers will read through the status
-endpoint.
+**Status checks (FR-BAK-01, Decision 013).** `GET /api/v1/status/:credentialId` reads only
+`status` and `expires_at` (one primary-key lookup) and returns the computed status, the
+expiry and the check time ([status-api.md](../api/status-api.md)). Lookups are not stored
+in the database. Credentials that were never signed (`issued_at IS NULL`: pending, or
+revoked while pending) get the same 404 as unknown IDs.
+
+**Development-only simulated expiry (migration 0007, temporary).** The dev route
+`simulate-expiry` moves a valid credential's `expires_at` into the past and records a
+`valid → valid` event with reason `dev_simulated_expiry`.
+`credential_status_events_changes_status` now allows a same-status event for that reason
+only, and the reason CHECK lists it (still `NOT VALID`).
 
 ## 5. Privacy and security decisions (PDPA, NFR-08)
 
@@ -246,6 +262,7 @@ never be edited; changes go in a new file.
 | `0004_offer_invalidation.sql`           | `credential_offers.invalidated_at` (timestamptz, NULL = not invalidated) and CHECK `invalidated_at IS NULL OR redeemed_at IS NULL`: a new offer invalidates the earlier usable one                                                                                                                                                                                                                                                                                                                 |
 | `0005_revocation_and_status_events.sql` | `credential_records.revoked_by_staff_id`, `superseded_at`, `superseded_by_staff_id` (reusing 0001's `revoked_at`, `revocation_reason`, `replaces_credential_id`); drops 0001's `credential_records_check1` and `_check3` and adds the signing / revocation / supersede CHECKs; UNIQUE `(id, issuer_id)`; table `credential_status_events` with its append-only trigger and index; backfills events for existing credentials and moves the old superseded time from `revoked_at` to `superseded_at` |
 | `0006_reason_value_checks.sql`          | CHECK `credential_records_revocation_reason_value` and `credential_status_events_reason_value`: reasons limited to the API enum values (or NULL). Added `NOT VALID`, so existing rows (free-text reasons from before 0005) are not checked                                                                                                                                                                                                                                                         |
+| `0007_dev_simulated_expiry_event.sql`   | Re-adds `credential_status_events_reason_value` with `dev_simulated_expiry` (`NOT VALID`); replaces `credential_status_events_changes_status` so a `valid → valid` event is allowed only with that reason (validated). For the temporary dev route `simulate-expiry`; kept when the route is removed                                                                                                                                                                                               |
 
 `backend/src/db/schema.ts` (Drizzle) must match; `backend/test/db/schema.test.ts`
 checks the two agree.

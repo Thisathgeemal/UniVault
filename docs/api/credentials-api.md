@@ -126,9 +126,10 @@ The issuer always comes from the login token. An `issuerId` in the body is ignor
   "vct": "urn:univault:vct:EmploymentCredential:1",
   "schemaVersion": "1.0",
   "status": "pending",
+  "effectiveStatus": "pending",
   "issuerKid": null,
   "issuedAt": null,
-  "expiresAt": "2027-11-20T08:41:12.345Z",
+  "expiresAt": "2027-11-20T08:41:12.000Z",
   "statusUpdatedAt": "2026-11-20T08:41:12.345Z",
   "revokedAt": null,
   "revocationReason": null,
@@ -142,6 +143,12 @@ The issuer always comes from the login token. An `issuerId` in the body is ignor
 }
 ```
 
+`status` is the **stored** status. `effectiveStatus` is the status at the time of
+the request, from the same `effectiveStatus()` function as the public status endpoint
+([status-api.md](status-api.md) section 4): the stored status, or `expired` for a `valid`
+credential whose `expiresAt` has passed (inclusive). Nothing writes `expired` to the
+database. `expiresAt` is always a whole second, so it equals the SD-JWT `exp` exactly.
+
 `replacesCredentialId` is the credential this one was reissued from;
 `replacedByCredentialId` is set once this one has been superseded. `revokedBy`
 and `supersededBy` are `{ id, displayName }` of the staff member.
@@ -152,12 +159,13 @@ material. The holder-key thumbprint is not returned either.
 
 ### GET `/api/v1/credentials`
 
-| Query      | Default | Meaning                                       |
-| ---------- | ------- | --------------------------------------------- |
-| `status`   | –       | `pending`, `valid`, `revoked` or `superseded` |
-| `holderId` | –       | Only this holder's credentials (UUID)         |
-| `limit`    | 20      | 1–100                                         |
-| `offset`   | 0       | Number of records to skip                     |
+| Query             | Default | Meaning                                                                                                                                             |
+| ----------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`          | –       | Stored status: `pending`, `valid`, `revoked` or `superseded`                                                                                        |
+| `effectiveStatus` | –       | Computed status: the four above or `expired`. `expired` = stored `valid` with `expires_at <= now`; `valid` = stored `valid` with `expires_at > now` |
+| `holderId`        | –       | Only this holder's credentials (UUID)                                                                                                               |
+| `limit`           | 20      | 1–100                                                                                                                                               |
+| `offset`          | 0       | Number of records to skip                                                                                                                           |
 
 **Response:** `{ "credentials": [ …metadata as above… ], "total": 7, "limit": 20, "offset": 0 }`,
 newest first. Only the logged-in issuer's credentials are listed. A `holderId`
@@ -211,19 +219,19 @@ same value.
 
 ### Envelope claims (always visible)
 
-| Claim                   | Value                                                                                              |
-| ----------------------- | -------------------------------------------------------------------------------------------------- |
-| `iss`                   | `PUBLIC_BASE_URL/api/v1/issuers/<issuerId>`                                                        |
-| `issuer_name`           | Issuer display name                                                                                |
-| `vct`                   | From the schema, e.g. `urn:univault:vct:KYCCredential:1`                                           |
-| `schema_version`        | From the schema, `"1.0"`                                                                           |
-| `jti`                   | The credential record ID                                                                           |
-| `iat`                   | Signing time (NumericDate)                                                                         |
-| `exp`                   | `expires_at` (NumericDate)                                                                         |
-| `cnf`                   | `{ "jwk": <holder's EC P-256 public key> }`                                                        |
-| `status`                | `{ "status_uri": "PUBLIC_BASE_URL/api/v1/status/<id>" }`                                           |
-| `kyc_verification_date` | **KYC only:** `YYYY-MM-DD` the pending record was created (when bank staff confirmed the CDD data) |
-| `_sd`, `_sd_alg`        | Disclosure digests, `sha-256`                                                                      |
+| Claim                   | Value                                                                                                                 |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `iss`                   | `PUBLIC_BASE_URL/api/v1/issuers/<issuerId>`                                                                           |
+| `issuer_name`           | Issuer display name                                                                                                   |
+| `vct`                   | From the schema, e.g. `urn:univault:vct:KYCCredential:1`                                                              |
+| `schema_version`        | From the schema, `"1.0"`                                                                                              |
+| `jti`                   | The credential record ID. Always visible (in crypto-core's `NON_DISCLOSABLE_CLAIMS`): the key for the status endpoint |
+| `iat`                   | Signing time (NumericDate)                                                                                            |
+| `exp`                   | `expires_at` in seconds (NumericDate); exactly equal, because `expires_at` is always a whole second                   |
+| `cnf`                   | `{ "jwk": <holder's EC P-256 public key> }`                                                                           |
+| `status`                | `{ "status_uri": "PUBLIC_BASE_URL/api/v1/status/<id>" }`: the public status endpoint ([status-api.md](status-api.md)) |
+| `kyc_verification_date` | **KYC only:** `YYYY-MM-DD` the pending record was created (when bank staff confirmed the CDD data)                    |
+| `_sd`, `_sd_alg`        | Disclosure digests, `sha-256`                                                                                         |
 
 The JWT header is `{ "alg": "RS256", "typ": "dc+sd-jwt", "kid": "<issuer key thumbprint>" }`.
 A verifier picks the key from `GET /api/v1/issuers/:issuerId/keys` by that `kid`.
@@ -393,7 +401,7 @@ events backfilled by migration `0005` whose staff member is unknown. The
 replacement's history starts with its own creation; follow
 `replacesCredentialId` for the earlier credential.
 
-### 6.4 Development-only: simulated redemption (temporary)
+### 6.4 Development-only: simulated redemption and expiry (temporary)
 
 Until Sprint 2 builds wallet redemption, a pending credential can only become
 `valid` through `POST /api/v1/dev/credentials/:credentialId/simulate-redemption`
@@ -403,8 +411,23 @@ and `loadConfig` refuses that setting in production. It calls `signCredential()`
 with a throwaway P-256 key generated on the server and returns
 `{ "simulated": true, "credential": … }` – never the SD-JWT. Code:
 `backend/src/routes/dev.routes.ts`; tests: `backend/test/dev-routes.test.ts`.
-**Remove it in Sprint 2 when wallet redemption ships** (route, config variable,
-start-up warning and tests).
+
+`POST /api/v1/dev/credentials/:credentialId/simulate-expiry` (same flag and guards:
+admin, own issuer, refused in production, metadata only) shows the `expired` status
+without waiting a year. For a credential whose effective status is `valid`, in one
+transaction it:
+
+1. sets `expires_at` to one minute before now (whole seconds);
+2. moves `issued_at` to one second before the new expiry if the credential was signed
+   within the last minute, so the database rule `expires_at > issued_at` still holds;
+3. records a status event `valid → valid` with reason `dev_simulated_expiry` and the
+   admin as staff (migration 0007 allows that one same-status event).
+
+Any other effective status → `409 CREDENTIAL_NOT_VALID` (`details.effectiveStatus`).
+
+**Remove both routes in Sprint 2 when wallet redemption ships** (routes, config
+variable, start-up warning and tests). Keep migration 0007: history rows that use the
+reason must stay valid.
 
 ## 7. Errors
 
@@ -424,6 +447,7 @@ start-up warning and tests).
 | Revoke or reissue a revoked credential                                                                                  | 409    | `CREDENTIAL_ALREADY_REVOKED`                                             |
 | Revoke or reissue a superseded credential                                                                               | 409    | `CREDENTIAL_SUPERSEDED` (`details.replacedBy` = replacement id)          |
 | Reissue a pending credential                                                                                            | 409    | `CREDENTIAL_NOT_REISSUABLE` (revoke it and issue a new one)              |
+| Dev only: simulate expiry of a credential that is not effectively `valid`                                               | 409    | `CREDENTIAL_NOT_VALID` (`details.effectiveStatus`)                       |
 
 Signing errors are listed in section 4.
 
@@ -455,8 +479,6 @@ Signing errors are listed in section 4.
   the offer and call `signCredential`. Offer creation (`POST /credential-offers`)
   is done: see [credential-offers-api.md](credential-offers-api.md). Then remove
   the development-only simulate route (section 6.4).
-- **Status endpoint:** `GET /status/:credentialId`, the `status_uri` in every
-  credential. It will report `revoked` and `superseded` from the columns above.
 - **Holder record updates:** there is no update endpoint yet, so "reissue with
   the holder's current data" only differs from the original once holder updates exist.
 - **Expiring stale pending credentials:** a pending credential that is never

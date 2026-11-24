@@ -56,8 +56,12 @@ const envSchema = z
     LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
     LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(20),
     LOGIN_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).default(15),
-    // DEVELOPMENT ONLY: mount POST /api/v1/dev/credentials/:id/simulate-redemption, which signs a
-    // pending credential with a throwaway wallet key until Sprint 2 wallet redemption exists
+    // Public credential status endpoint (GET /api/v1/status/:id): requests per IP per window
+    STATUS_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(60),
+    STATUS_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).default(1),
+    // DEVELOPMENT ONLY (TEMPORARY, remove in Sprint 2): mount /api/v1/dev/credentials/:id/
+    // simulate-redemption (signs a pending credential with a throwaway wallet key) and
+    // simulate-expiry (moves a valid credential's expiry into the past)
     DEV_SIMULATE_REDEMPTION: z
       .enum(['true', 'false'])
       .default('false')

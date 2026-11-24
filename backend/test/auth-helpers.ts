@@ -29,6 +29,7 @@ export interface AuthedTestApp {
 export async function authedTestApp(
   overrides: Record<string, string> = {},
   logger: Logger = pino({ level: 'silent' }),
+  deps: { now?: () => Date } = {},
 ): Promise<AuthedTestApp> {
   const database = await freshDatabase();
   await seedDatabase(database.db, { dataDir: FIXTURES, staffPassword: PASSWORD });
@@ -39,7 +40,7 @@ export async function authedTestApp(
       ...overrides,
     }),
     logger,
-    { database },
+    { database, ...deps },
   );
   const login = (email: string, password = PASSWORD) =>
     request(app).post('/api/v1/auth/login').send({ email, password });

@@ -61,8 +61,11 @@ export function createErrorHandler(options: {
       body.message = err.message; // development only – helps debugging
     }
 
-    // Unexpected errors (5xx) are logged with the full error; client errors as warnings
+    // Unexpected errors (5xx) are logged with the full error; client errors as warnings,
+    // unless the route lowered its log level (the public status route: debug)
     if (status >= 500) req.log?.error({ err }, 'Unhandled error');
+    else if (res.locals.logLevel === 'debug')
+      req.log?.debug({ code: body.code, status }, body.message);
     else req.log?.warn({ code: body.code, status }, body.message);
 
     const requestId = typeof req.id === 'string' ? req.id : undefined;

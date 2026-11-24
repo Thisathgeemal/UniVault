@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { AuthMiddleware } from '../auth/middleware.js';
 import { AppError } from '../lib/errors.js';
 import { getValidated, validate } from '../middleware/validate.js';
+import { EFFECTIVE_STATUSES } from '../services/credential-status.js';
 import {
   REISSUE_REASONS,
   REVOCATION_REASONS,
@@ -19,6 +20,8 @@ export const issueCredentialBody = z.object({
 
 export const listCredentialsQuery = z.object({
   status: z.enum(['pending', 'valid', 'revoked', 'superseded']).optional(),
+  // Computed status (credential-status.ts), e.g. ?effectiveStatus=expired
+  effectiveStatus: z.enum(EFFECTIVE_STATUSES).optional(),
   holderId: z.uuid('must be a UUID').optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).max(100_000).default(0),
@@ -60,7 +63,7 @@ export const reissueCredentialBody = z
 /**
  * /api/v1/credentials – issue, list, revoke and reissue (FR-ISS-01, FR-ISS-03). Requires login.
  *   POST /                         officer/admin – create a PENDING credential from a holder record
- *   GET  /                         list (status, holderId, paging) – metadata only
+ *   GET  /                         list (status, effectiveStatus, holderId, paging) – metadata only
  *   GET  /:credentialId            one credential's metadata
  *   POST /:credentialId/revoke     admin – pending or valid → revoked; open offers invalidated
  *   POST /:credentialId/reissue    officer/admin – valid → superseded + new pending replacement

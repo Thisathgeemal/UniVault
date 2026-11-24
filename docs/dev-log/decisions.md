@@ -26,6 +26,7 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 | [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)              | Credential signing deferred to wallet redemption (holder binding)                  | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
 | [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                  | OpenID4VCI pre-authorised code offer format                                        | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
 | [012](#decision-012-reissue-supersedes-immediately-status-changes-recorded-as-append-only-events) | Reissue supersedes immediately; status changes recorded as append-only events      | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-03, FR-BAK-01, NFR-06, NFR-08                          |
+| [013](#decision-013-per-credential-status-endpoint-ietf-token-status-list-as-future-work)         | Per-credential status endpoint; IETF Token Status List as future work              | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06, NFR-08    |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -988,8 +989,8 @@ accountability), given that the credential row only holds its current state.
   deactivated instead.
 - Notes may contain personal data: they are stored only in the history, returned only to the
   credential's issuer, never logged, and limited to 500 characters.
-- The future status endpoint (FR-BAK-01) reads `revoked` and `superseded` from the credential
-  row; wallets and verifiers treat both as "not valid".
+- The status endpoint (FR-BAK-01, built in Decision 013) reads `revoked` and `superseded` from
+  the credential row; wallets and verifiers treat both as "not valid".
 - Reason values are limited to the API enums in the database too (migration 0006, CHECK
   constraints added `NOT VALID`, so free-text reasons stored before 0005/0006 are kept). Adding
   a reason means a new migration as well as a code change.
@@ -1000,3 +1001,116 @@ accountability), given that the credential row only holds its current state.
   refused in production, one warning logged at start-up when enabled) is the only way to make
   a credential `valid` for manual testing. It is removed in Sprint 2 when wallet redemption
   ships.
+
+## Decision 013: Per-credential status endpoint; IETF Token Status List as future work
+
+- **Date:** Tue 24 Nov 2026
+- **Sprint:** S2 (Sprint 1 carry-over)
+- **Status:** Draft – review
+- **Requirements:** FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06, NFR-08
+- **Related:** [status-api.md](../api/status-api.md),
+  [credentials-api.md](../api/credentials-api.md) (sections 2, 4 and 6.4),
+  [database-design.md](../database/database-design.md) (section 4), Decision 003 (the
+  `status` claim), Decision 006 (status-list code not bundled), Decision 012 (revoke and
+  reissue), migration `backend/migrations/0007_dev_simulated_expiry_event.sql`
+- **Evidence:** [`backend/test/credential-status.test.ts`](../../backend/test/credential-status.test.ts)
+  (status rules, boundary, 404 hiding, headers, CORS, rate limit, logging, `jti`/`exp`),
+  [`backend/test/dev-routes.test.ts`](../../backend/test/dev-routes.test.ts) (simulated
+  expiry); evidence script `scripts/evidence/s1-status.ps1` (sections 1–7)
+
+### Context
+
+A verifier that checks an SD-JWT's signature and `exp` still can't tell whether the issuer
+has since revoked or replaced it (Decision 012). FR-BAK-01 needs an online way to ask "is
+this credential still good?". Every credential already carries `jti` (the credential ID,
+always visible) and `status.status_uri` (Decision 003). What was left open was how
+verifiers get the status, and what that costs in privacy.
+
+The IETF OAuth working group's **Token Status List (TSL)**
+(draft-ietf-oauth-status-list) is the emerging standard for this. When checked on 24 Nov
+2026, the datatracker listed draft -21 (21 June 2026) as "Proposed Standard" with IESG
+state "RFC Ed Queue" and RFC Editor status "In Progress (Second Edit)". It has been
+approved for publication but has no RFC number yet.
+
+### Options considered
+
+1. **Per-credential lookup** (`GET /status/:credentialId`): the verifier asks about one
+   credential and gets `valid`, `revoked`, `superseded` or `expired`. Simple to build and
+   test, and the answer is always current. But the issuer sees every lookup (which
+   credential, when, and from which network address), so it can observe where a holder
+   uses the credential. And `jti` is the same value at every verifier, so verifiers who
+   collude can link presentations.
+2. **IETF Token Status List:** the issuer publishes a signed, compressed bit array (a
+   status list token); each credential carries `status.status_list.{idx, uri}`. A verifier
+   downloads the whole list (which can be cached) and reads one entry. The issuer can't
+   tell which credential was checked (herd privacy, better for large lists), and there is
+   no per-credential identifier to leak. The costs: a signed list per issuer, index
+   allocation, list signing and refresh, cache-lifetime trade-offs, a different `status`
+   claim shape, and client code in the wallet and verifier (the status-list code that
+   Decision 006 left out). The specification was not yet published as an RFC.
+3. **No online status:** rely on short credential lifetimes and `exp` only. No lookups to
+   leak, but revocation (FR-ISS-03) would have no effect until expiry, which is a year or
+   more. This fails FR-BAK-01.
+
+### Decision
+
+- **Option 1 for the prototype:** a public, unauthenticated
+  `GET /api/v1/status/:credentialId` that returns exactly
+  `{ credentialId, status, expiresAt, checkedAt }`.
+- **One status rule:** `effectiveStatus(record, now)` in `credential-status.ts`, with
+  precedence revoked > superseded > expired > valid. Expired is inclusive (`now >=
+expires_at`) and computed, never stored. The issuer portal's `effectiveStatus` field
+  uses the same function. The clock is injected.
+- **Minimise what the endpoint reveals:**
+  - only signed credentials (`issued_at` set) have a public status: unknown IDs and
+    credentials that were never signed (pending, or revoked while pending) get the same
+    `404 CREDENTIAL_STATUS_NOT_FOUND`;
+  - no reasons, replacements, holder or staff data;
+  - `Cache-Control: no-store`;
+  - a per-IP rate limit (`STATUS_RATE_LIMIT_MAX` / `_WINDOW_MINUTES`);
+  - CORS open to any origin for this `GET` route only, without credentials.
+- **Minimise what the issuer keeps:** lookups are logged at debug level only (credential ID
+  and result, never the IP) and never stored in the database. Every log line of this route
+  shows the route template `/api/v1/status/:credentialId` instead of the URL.
+- **Token and status always agree:** `jti` is the credential ID (non-disclosable), and
+  `expires_at` is stored in whole seconds so that `exp` equals it exactly.
+- **Token Status List is recorded as future work.**
+
+### Reason
+
+- The project scope is a single-issuer-per-organisation prototype with a handful of
+  credentials. Herd privacy, TSL's main benefit, needs large lists to mean anything.
+- Option 1 reuses the existing table and the Decision 012 columns: no new signing
+  artefact, no index allocation, no list refresh job. It can be tested end to end
+  within the sprint.
+- Revocation takes effect at once (no list cache lifetime), which is easy to demonstrate
+  for FR-ISS-03 and FR-BAK-01.
+- TSL was approved but not yet an RFC, and `@sd-jwt/core` (Decision 006) doesn't bundle
+  status-list support. Adding it now would mean new library code in the wallet and the
+  verifier.
+- The privacy cost is known, written down and reduced (minimal answer, no stored lookups,
+  debug-only logs, rate limit) rather than ignored.
+
+### Consequences
+
+- **Privacy trade-off:**
+  - the issuer _could_ observe when and from where a credential is checked;
+  - `jti` is a correlatable identifier across verifiers.
+    These are accepted for the prototype, and the dissertation should discuss them (NFR-08).
+- The `status` claim uses UniVault's own `status_uri` shape, not TSL's
+  `status_list.{idx, uri}`. Moving to TSL later means a new claim shape for newly issued
+  credentials. Old credentials can keep the per-credential endpoint until they expire.
+- A credential revoked while pending is hidden (404) like any never-signed credential: no
+  verifier can hold it. The issuer API still shows `revoked` for it (`effectiveStatus()` is
+  unchanged).
+- **FR-BAK-01 push-pull:** this endpoint is the **pull** half of FR-BAK-01's dual push-pull
+  synchronisation. Verifiers and wallets ask when they need to, and `checkedAt` is the
+  staleness timestamp: how old the answer is. The **push** half (notifying wallets of
+  status changes) is planned for a later sprint.
+- Verifiers must treat `revoked`, `superseded` and `expired` as "not valid", and an
+  unreachable endpoint as "status unknown" (verifier policy, Sprint 3).
+- The rate limiter counts in memory. Several backend instances would need a shared store.
+- **Temporary:** `POST /api/v1/dev/credentials/:id/simulate-expiry` (same
+  `DEV_SIMULATE_REDEMPTION` guards) exists only to demonstrate `expired`. It needs a
+  `valid → valid` event with reason `dev_simulated_expiry`, which migration 0007 allows.
+  The route is removed in Sprint 2 with simulate-redemption; the migration stays.

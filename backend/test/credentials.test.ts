@@ -131,7 +131,9 @@ const midnightUtc = (date: string) => new Date(`${date}T00:00:00.000Z`);
 /** The expiry was computed from "now" somewhere between `before` and `after`. */
 function expectExpiryBetween(expiresAt: string, before: Date, after: Date, duration: string) {
   const actual = new Date(expiresAt).getTime();
-  expect(actual).toBeGreaterThanOrEqual(addIsoDuration(before, duration).getTime());
+  expect(actual % 1000).toBe(0); // whole seconds, so the SD-JWT exp equals expires_at
+  const lowest = Math.floor(addIsoDuration(before, duration).getTime() / 1000) * 1000;
+  expect(actual).toBeGreaterThanOrEqual(lowest);
   expect(actual).toBeLessThanOrEqual(addIsoDuration(after, duration).getTime());
 }
 

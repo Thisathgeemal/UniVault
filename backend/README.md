@@ -17,7 +17,7 @@ npm run dev                 # http://localhost:4000/api/v1/health
 | `npm run dev`           | Start with auto-restart on file changes (tsx)                                                    |
 | `npm run build`         | Compile TypeScript to `dist/`                                                                    |
 | `npm start`             | Run the compiled server (`dist/server.js`)                                                       |
-| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 371 tests, 14 files)                      |
+| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 409 tests, 15 files)                      |
 | `npm run test:coverage` | Tests with a coverage report; fails below 88 / 85 / 93 / 89 % (stmts / branches / funcs / lines) |
 | `npm run typecheck`     | Type-check without emitting files                                                                |
 | `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                                                 |
@@ -56,9 +56,9 @@ src/
   routes/issuers.routes.ts            issuers, JWKS, key generation
   routes/holders.routes.ts            holder records
   routes/credentials.routes.ts        credential issuance (pending), list, get, revoke, reissue, events
-  routes/dev.routes.ts                DEV ONLY: simulated redemption (DEV_SIMULATE_REDEMPTION=true)
+  routes/dev.routes.ts                DEV ONLY (temporary): simulated redemption and expiry
   routes/credential-offers.routes.ts  QR offers and status; wallet redemption planned (Sprint 2)
-  routes/status.routes.ts             credential status (planned)
+  routes/status.routes.ts             PUBLIC credential status (open CORS, rate limit, no-store)
   routes/verifications.routes.ts      verification sessions (planned)
   services/issuer-keys.service.ts  key generation, rotation, JWKS publication
   services/holders.service.ts      holder records (schema-validated, issuer-scoped)
@@ -66,6 +66,7 @@ src/
                                    revoke, reissue (supersede), status history
   services/credential-offers.service.ts  pre-authorised offers (hash only), status, findOfferByCode
   services/credential-schemas.ts   loads docs/schemas and validates claims
+  services/credential-status.ts    effectiveStatus() (shared status rule) and the public lookup
   db/schema.ts           Drizzle table definitions and relations
   db/client.ts           database connection (embedded PGlite or PostgreSQL server)
   db/migrate.ts          SQL migration runner
@@ -102,19 +103,22 @@ JSON body (size-limited) → `/api/v1` routes → 404 → error handler.
 | GET    | `/credential-offers/:offerId`                        | Login            | ✅ Implemented (status polling)                              |
 | POST   | `/credential-offers/token`                           | Public (code)    | 501 – Sprint 2 (wallet)                                      |
 | POST   | `/credential-offers/credential`                      | Public (code)    | 501 – Sprint 2 (wallet)                                      |
-| GET    | `/status/:credentialId`                              | Public           | 501 – Sprint 1                                               |
+| GET    | `/status/:credentialId`                              | Public           | ✅ Implemented (any origin, rate limited, `no-store`)        |
 | POST   | `/verifications`                                     | Public           | 501 – Sprint 3                                               |
 | GET    | `/verifications/:verificationId/request`             | Public           | 501 – Sprint 3                                               |
 | POST   | `/verifications/:verificationId/response`            | Public           | 501 – Sprint 3                                               |
 | GET    | `/verifications/:verificationId/result`              | Public           | 501 – Sprint 3                                               |
 | POST   | `/dev/credentials/:credentialId/simulate-redemption` | Admin (own)      | **Dev only**, mounted only if `DEV_SIMULATE_REDEMPTION=true` |
+| POST   | `/dev/credentials/:credentialId/simulate-expiry`     | Admin (own)      | **Dev only**, same flag (temporary, removed in Sprint 2)     |
 
 Credentials are **signed when the wallet redeems its offer** (Sprint 2), by
 `signCredential()` in `services/credentials.service.ts`; `POST /credentials`
 only creates the pending record. `POST /credential-offers` turns it into a one-time
 QR offer. Revoke and reissue invalidate a credential's open offers, and every status
-change is recorded in `credential_status_events` (Decision 012). See
-`docs/api/credentials-api.md` and `docs/api/credential-offers-api.md`.
+change is recorded in `credential_status_events` (Decision 012). Verifiers check a
+credential with the public `GET /status/:credentialId` (Decision 013). See
+`docs/api/credentials-api.md`, `docs/api/credential-offers-api.md` and
+`docs/api/status-api.md`.
 
 Planned routes already validate their input. Each returns `501 NOT_IMPLEMENTED`
 with the sprint it is planned for, until its handler is written.
@@ -144,6 +148,7 @@ Every error, from validation to unknown routes to crashes, has the same shape:
 | `INVALID_JSON`            | 400    |
 | `CORS_ORIGIN_NOT_ALLOWED` | 403    |
 | `NOT_FOUND`               | 404    |
+| `RATE_LIMITED`            | 429    |
 | `PAYLOAD_TOO_LARGE`       | 413    |
 | `NOT_IMPLEMENTED`         | 501    |
 | `INTERNAL_ERROR`          | 500    |

@@ -101,6 +101,59 @@
   and `backend/test/credential-revocation.test.ts` (422 `HOLDER_DATA_INVALID`),
   `backend/test/dev-routes.test.ts` (start-up warning).
 
+### Tue 24 Nov (Sprint 1 carry-over: credential status endpoint)
+
+- **Done:** Public credential status API (FR-BAK-01, Decision 013, draft).
+  - `GET /api/v1/status/:credentialId` replaces the `501` placeholder. It needs no login and
+    returns exactly `{ credentialId, status, expiresAt, checkedAt }`.
+  - Unknown and pending IDs get the same `404 CREDENTIAL_STATUS_NOT_FOUND` (extended in the
+    follow-up below to every never-signed credential).
+  - `Cache-Control: no-store`; CORS open to any origin for `GET` on this route only.
+  - Per-IP rate limit (`STATUS_RATE_LIMIT_MAX` 60 / `STATUS_RATE_LIMIT_WINDOW_MINUTES` 1).
+  - Lookups are logged at debug level only and never stored.
+  - One pure `effectiveStatus(record, now)` (revoked > superseded > expired > valid,
+    inclusive expiry; `expired` computed, never stored) with an injected clock. It also
+    gives the portal's new `effectiveStatus` field and `?effectiveStatus=` list filter.
+  - `jti` was already the credential ID (non-disclosable). Expiry instants are now whole
+    seconds, so the SD-JWT `exp` equals `expires_at` exactly.
+  - Dev-only `simulate-expiry` route; migration `0007` allows its `dev_simulated_expiry`
+    event.
+  - Evidence script `scripts/evidence/s1-status.ps1`: run end to end against a throwaway
+    database on PowerShell 5.1, all seven sections as expected.
+  - Backend tests: 371 → 407 (14 → 15 files), all passing; coverage 89.31% statements,
+    85.84% branches, 93.08% functions, 89.86% lines (thresholds 88 / 85 / 93 / 89).
+- **Temporary (remove in Sprint 2):** `POST /api/v1/dev/credentials/:id/simulate-expiry`, next
+  to simulate-redemption (same `DEV_SIMULATE_REDEMPTION` flag, admin, own issuer, refused in
+  production). Remove both routes, the flag and their tests when wallet redemption ships; keep
+  migration 0007.
+- **Next:** Supervisor review of Decisions 012 and 013; Sprint 2 wallet redemption; verifier
+  policy for `revoked` / `superseded` / `expired` / unreachable status (Sprint 3).
+- **Blockers:** None.
+- **Evidence:** `backend/test/credential-status.test.ts`, `backend/test/dev-routes.test.ts`;
+  screenshots of the seven sections of `scripts/evidence/s1-status.ps1` (to be taken:
+  `evidence/s1-2026-11-24-status-<section>.png`).
+
+### Tue 24 Nov (follow-up: status visibility, push-pull, log template)
+
+- **Done:**
+  - **Visibility rule:** only signed credentials (`issued_at` set) have a public status. A
+    credential revoked while pending now gets the same `404 CREDENTIAL_STATUS_NOT_FOUND` as an
+    unknown ID (it used to report `revoked`). `effectiveStatus()` is unchanged, so the issuer
+    API still shows `revoked`. The rule is applied in the status service.
+  - Decision 013: requirements are now FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06 and
+    NFR-08. A consequence records that the endpoint is the **pull** half of FR-BAK-01's
+    push-pull synchronisation (`checkedAt` = staleness timestamp); the **push** half
+    (notifying wallets) is planned for a later sprint.
+  - **Logging:** every log line of the status route (request lines, 4xx, the 429 warning) shows
+    the route template `/api/v1/status/:credentialId` instead of the URL. Other methods under
+    `/status` get a 404 whose message has no credential ID.
+  - Backend tests: 407 → 409 (15 files), all passing; coverage 89.35% statements,
+    85.81% branches, 93.11% functions, 89.90% lines.
+  - `scripts/evidence/s1-status.ps1` is unchanged: section 2 already revokes a credential
+    after simulate-redemption, so its screenshot stays valid.
+- **Next / Blockers:** As above / none.
+- **Evidence:** `backend/test/credential-status.test.ts` (visibility, log template, 429 log).
+
 ## Testing evidence
 
 Record the tests that show the sprint goal is met, with links to output in `evidence/`.
@@ -238,3 +291,28 @@ Record the tests that show the sprint goal is met, with links to output in `evid
   without a BOM.
 - **Lesson:** Check which PowerShell version is installed before relying on newer cmdlet
   parameters.
+
+### Issue 10: A NULL reason passed the new "same-status event" CHECK (24 Nov 2026)
+
+- **Task:** Credential status endpoint (migration 0007)
+- **Symptom:** The migration test showed the database accepting a `valid → valid` status event
+  with no reason. The new rule was meant to allow that only for `dev_simulated_expiry`.
+- **Cause:** The rule was `from_status IS DISTINCT FROM to_status OR (reason =
+'dev_simulated_expiry' AND …)`. With a NULL reason this is `false OR NULL`, which is NULL,
+  and PostgreSQL lets a CHECK that evaluates to NULL pass.
+- **Resolution:** Compare with `IS NOT DISTINCT FROM` so that a NULL reason gives `false`.
+  Migration 0007 had only run in tests, so it was corrected before being applied anywhere else.
+- **Lesson:** Write a negative test for every CHECK, including the NULL case. SQL's
+  three-valued logic makes CHECKs fail open.
+
+### Issue 11: SD-JWT `exp` and the stored expiry could differ by up to a second (24 Nov 2026)
+
+- **Task:** Credential status endpoint
+- **Symptom:** `exp` in the signed credential is whole seconds (`floor(expires_at)`), but
+  `expires_at` kept the milliseconds of the issuance time. For up to a second, the token would
+  say "expired" while the status endpoint still said "valid".
+- **Resolution:** Expiry instants are rounded down to whole seconds when a credential is created
+  or reissued (date caps were midnight already). A test checks `exp * 1000 == expires_at`.
+  Rows created earlier may still carry milliseconds (development data only).
+- **Lesson:** When the same instant is stored in two places with different precision, fix the
+  precision at the source.

@@ -27,19 +27,19 @@ UniVault credentials are **SD-JWT Verifiable Credentials** signed with **RS256**
 
 ## 3. Envelope claims (both credentials, always visible)
 
-| Claim                   | Type / format                                       | Purpose                                                                                            |
-| ----------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `iss`                   | URL string                                          | Issuer identifier. The verifier uses it to fetch the issuer's public key (`GET /issuers/:id/keys`) |
-| `issuer_name`           | string                                              | Issuer display name shown in the wallet and the verifier result (e.g. the employer or bank name)   |
-| `vct`                   | string                                              | Credential type: `urn:univault:vct:EmploymentCredential:1` or `urn:univault:vct:KYCCredential:1`   |
-| `schema_version`        | string                                              | `"1.0"`                                                                                            |
-| `jti`                   | UUID v4                                             | Unique credential ID, also the revocation/status key                                               |
-| `iat`                   | NumericDate                                         | Issued at                                                                                          |
-| `exp`                   | NumericDate                                         | Expiry (see section 6)                                                                             |
-| `cnf`                   | object `{ "jwk": … }`                               | Holder's public key; binds the credential to the wallet device (used for the key-binding JWT)      |
-| `status`                | object `{ "status_uri": "<backend>/status/<jti>" }` | Where verifiers and the wallet check valid / revoked / superseded (FR-BAK-01)                      |
-| `kyc_verification_date` | date                                                | **KYC only.** Date the bank completed CDD verification                                             |
-| `_sd`, `_sd_alg`        | SD-JWT internals                                    | Disclosure digests; `_sd_alg` = `sha-256`                                                          |
+| Claim                   | Type / format                                       | Purpose                                                                                                                        |
+| ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `iss`                   | URL string                                          | Issuer identifier. The verifier uses it to fetch the issuer's public key (`GET /issuers/:id/keys`)                             |
+| `issuer_name`           | string                                              | Issuer display name shown in the wallet and the verifier result (e.g. the employer or bank name)                               |
+| `vct`                   | string                                              | Credential type: `urn:univault:vct:EmploymentCredential:1` or `urn:univault:vct:KYCCredential:1`                               |
+| `schema_version`        | string                                              | `"1.0"`                                                                                                                        |
+| `jti`                   | UUID v4                                             | Unique credential ID, also the revocation/status key                                                                           |
+| `iat`                   | NumericDate                                         | Issued at                                                                                                                      |
+| `exp`                   | NumericDate                                         | Expiry (see section 6)                                                                                                         |
+| `cnf`                   | object `{ "jwk": … }`                               | Holder's public key; binds the credential to the wallet device (used for the key-binding JWT)                                  |
+| `status`                | object `{ "status_uri": "<backend>/status/<jti>" }` | Where verifiers and the wallet check valid / revoked / superseded / expired (FR-BAK-01, [status-api.md](../api/status-api.md)) |
+| `kyc_verification_date` | date                                                | **KYC only.** Date the bank completed CDD verification                                                                         |
+| `_sd`, `_sd_alg`        | SD-JWT internals                                    | Disclosure digests; `_sd_alg` = `sha-256`                                                                                      |
 
 Validity is shown by these claims and by the status check, not by subject fields. For example, a resigned employee's credential is **revoked**; it does not carry an "inactive" field.
 

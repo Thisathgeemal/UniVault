@@ -123,3 +123,76 @@ describe('POST /dev/credentials/:id/simulate-redemption', () => {
     expect(other.body.error.code).toBe('CREDENTIAL_NOT_FOUND');
   });
 });
+
+describe('POST /dev/credentials/:id/simulate-expiry', () => {
+  const expire = (app: AuthedTestApp, id: string, token: string) =>
+    request(app.app)
+      .post(`/api/v1/dev/credentials/${id}/simulate-expiry`)
+      .set('Authorization', `Bearer ${token}`);
+
+  async function validCredential(employeeId: string) {
+    const id = await pendingCredential(employeeId);
+    expect((await simulate(enabled, id, admin)).status).toBe(200);
+    return id;
+  }
+
+  it('is not mounted unless DEV_SIMULATE_REDEMPTION=true (404)', async () => {
+    const token = await disabled.tokenFor(STAFF.employerAdmin);
+    const res = await expire(disabled, '00000000-0000-4000-8000-000000000000', token);
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('moves a valid credential one minute into the past and records a dev event', async () => {
+    const id = await validCredential('DEV-00003');
+    const before = Date.now();
+    const res = await expire(enabled, id, admin);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      simulated: true,
+      credential: { id, status: 'valid', effectiveStatus: 'expired' },
+    });
+    expect(res.body).not.toHaveProperty('sdJwt');
+    const expiresAt = new Date(res.body.credential.expiresAt).getTime();
+    expect(expiresAt).toBeLessThanOrEqual(before - 59_000);
+    expect(expiresAt).toBeGreaterThan(before - 62_000);
+    // CHECK expires_at > issued_at still holds (issued_at moved back for a fresh credential)
+    expect(new Date(res.body.credential.issuedAt).getTime()).toBeLessThan(expiresAt);
+
+    const status = await request(enabled.app).get(`/api/v1/status/${id}`);
+    expect(status.body).toMatchObject({ credentialId: id, status: 'expired' });
+
+    const events = await request(enabled.app)
+      .get(`/api/v1/credentials/${id}/events`)
+      .set('Authorization', `Bearer ${admin}`);
+    expect(events.body.events.at(-1)).toMatchObject({
+      fromStatus: 'valid',
+      toStatus: 'valid',
+      reason: 'dev_simulated_expiry',
+      staff: { id: expect.any(String) },
+    });
+  });
+
+  it('refuses a credential that is not valid (409 CREDENTIAL_NOT_VALID)', async () => {
+    const pending = await pendingCredential('DEV-00004');
+    const res = await expire(enabled, pending, admin);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatchObject({
+      code: 'CREDENTIAL_NOT_VALID',
+      details: { effectiveStatus: 'pending' },
+    });
+    const expired = await validCredential('DEV-00005');
+    expect((await expire(enabled, expired, admin)).status).toBe(200);
+    const again = await expire(enabled, expired, admin);
+    expect(again.status).toBe(409);
+    expect(again.body.error.details).toEqual({ effectiveStatus: 'expired' });
+  });
+
+  it("is admin-only (403) and hides another issuer's credential (404)", async () => {
+    const id = await validCredential('DEV-00006');
+    expect((await expire(enabled, id, officer)).status).toBe(403);
+    const other = await expire(enabled, id, bankAdmin);
+    expect(other.status).toBe(404);
+    expect(other.body.error.code).toBe('CREDENTIAL_NOT_FOUND');
+  });
+});

@@ -3,6 +3,7 @@ import type { AuthService } from '../auth/auth-service.js';
 import type { AuthMiddleware } from '../auth/middleware.js';
 import type { Database } from '../db/client.js';
 import type { CredentialOffersService } from '../services/credential-offers.service.js';
+import type { CredentialStatusService } from '../services/credential-status.js';
 import type { CredentialsService } from '../services/credentials.service.js';
 import type { HoldersService } from '../services/holders.service.js';
 import type { IssuerKeysService } from '../services/issuer-keys.service.js';
@@ -26,8 +27,10 @@ export interface ApiRouterDeps {
   holders?: HoldersService;
   credentials?: CredentialsService;
   credentialOffers?: CredentialOffersService;
+  credentialStatus?: CredentialStatusService;
   auth: AuthMiddleware;
   loginRateLimit: { max: number; windowMinutes: number };
+  statusRateLimit: { max: number; windowMinutes: number };
   /** Mount the development-only /dev routes (never true in production; see loadConfig). */
   devSimulateRedemption?: boolean;
 }
@@ -55,7 +58,13 @@ export function apiRouter(deps: ApiRouterDeps): Router {
   if (deps.devSimulateRedemption && deps.credentials) {
     router.use('/dev', devRouter(deps.auth, deps.credentials));
   }
-  router.use('/status', statusRouter());
+  router.use(
+    '/status',
+    statusRouter({
+      rateLimit: deps.statusRateLimit,
+      ...(deps.credentialStatus ? { status: deps.credentialStatus } : {}),
+    }),
+  );
   router.use('/verifications', verificationsRouter());
   return router;
 }

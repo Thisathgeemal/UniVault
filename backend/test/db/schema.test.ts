@@ -7,7 +7,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase, type Database } from '../../src/db/client.js';
 import { MIGRATIONS_DIR, runMigrations } from '../../src/db/migrate.js';
 import * as schema from '../../src/db/schema.js';
-import { REISSUE_REASONS, REVOCATION_REASONS } from '../../src/services/credentials.service.js';
+import {
+  DEV_EVENT_REASONS,
+  REISSUE_REASONS,
+  REVOCATION_REASONS,
+} from '../../src/services/credentials.service.js';
 import { dbError, freshDatabase } from './helpers.js';
 
 const rows = async <T>(database: Database, query: ReturnType<typeof sql>) =>
@@ -29,6 +33,7 @@ describe('migrations', () => {
       '0004_offer_invalidation.sql',
       '0005_revocation_and_status_events.sql',
       '0006_reason_value_checks.sql',
+      '0007_dev_simulated_expiry_event.sql',
     ]);
     const tables = await rows<{ table_name: string }>(
       database,
@@ -57,6 +62,7 @@ describe('migrations', () => {
         '0004_offer_invalidation.sql',
         '0005_revocation_and_status_events.sql',
         '0006_reason_value_checks.sql',
+        '0007_dev_simulated_expiry_event.sql',
       ],
     });
   });
@@ -232,7 +238,12 @@ describe('migration 0006 (reason value CHECKs, NOT VALID)', () => {
     `);
     await insertRevoked(OLD_REVOKED, 'Left the company');
     await insertEvent(OLD_REVOKED, 'Designation changed');
-    const result = await runMigrations(database);
+    // Now 0006 only (0007 is tested separately)
+    await copyFile(
+      join(MIGRATIONS_DIR, '0006_reason_value_checks.sql'),
+      join(oldDir, '0006_reason_value_checks.sql'),
+    );
+    const result = await runMigrations(database, `${oldDir}/`);
     expect(result.applied).toEqual(['0006_reason_value_checks.sql']);
   });
   afterAll(async () => {
@@ -302,6 +313,63 @@ describe('migration 0006 (reason value CHECKs, NOT VALID)', () => {
     expect(values(defs[0]!.def)).toEqual([...REVOCATION_REASONS].sort());
     expect(values(defs[1]!.def)).toEqual(
       [...new Set([...REVOCATION_REASONS, ...REISSUE_REASONS])].sort(),
+    );
+  });
+});
+
+describe('migration 0007 (dev simulated expiry event)', () => {
+  let database: Database;
+  const KID = 'C'.repeat(43);
+  const HOLDER = '33333333-3333-4333-8333-333333333333';
+  const CREDENTIAL = 'c0000000-0000-4000-8000-000000000001';
+
+  const insertEvent = (from: string, to: string, reason: string | null) =>
+    database.exec(`
+      INSERT INTO credential_status_events (credential_id, issuer_id, from_status, to_status, reason)
+      VALUES ('${CREDENTIAL}', 'employer-a', '${from}', '${to}', ${reason ? `'${reason}'` : 'NULL'})`);
+
+  beforeAll(async () => {
+    database = await freshDatabase(); // every migration, 0007 included
+    await database.exec(`
+      INSERT INTO issuers (id, name, issuer_type) VALUES ('employer-a', 'Employer A', 'employer');
+      INSERT INTO issuer_keys (kid, issuer_id, public_jwk)
+        VALUES ('${KID}', 'employer-a', '{"kty":"RSA","kid":"${KID}"}');
+      INSERT INTO holders (id, issuer_id, record_type, external_ref, full_name, claims)
+        VALUES ('${HOLDER}', 'employer-a', 'employee', 'E-1', 'Test', '{}');
+      INSERT INTO credential_records (id, issuer_id, holder_id, credential_type, vct, status,
+          claims_snapshot, issuer_kid, holder_key_thumbprint, issued_at, expires_at)
+      VALUES ('${CREDENTIAL}', 'employer-a', '${HOLDER}', 'EmploymentCredential', 'v', 'valid',
+          '{}', '${KID}', 't', now() - interval '1 day', now() + interval '1 year');
+    `);
+  });
+  afterAll(() => database.close());
+
+  it("allows a valid → valid event only with reason 'dev_simulated_expiry'", async () => {
+    await insertEvent('valid', 'valid', 'dev_simulated_expiry');
+    expect(await dbError(insertEvent('valid', 'valid', null))).toContain(
+      'credential_status_events_changes_status',
+    );
+    expect(await dbError(insertEvent('valid', 'valid', 'other'))).toContain(
+      'credential_status_events_changes_status',
+    );
+    expect(await dbError(insertEvent('revoked', 'revoked', 'dev_simulated_expiry'))).toContain(
+      'credential_status_events_changes_status',
+    );
+  });
+
+  it('keeps the reason CHECK NOT VALID and adds the dev reason to the API values', async () => {
+    const [constraint] = await rows<{ convalidated: boolean; def: string }>(
+      database,
+      sql`select convalidated, pg_get_constraintdef(oid) as def from pg_constraint
+          where conname = 'credential_status_events_reason_value'`,
+    );
+    expect(constraint!.convalidated).toBe(false);
+    const values = [...constraint!.def.matchAll(/'([a-z_]+)'::text/g)].map((m) => m[1]).sort();
+    expect(values).toEqual(
+      [...new Set([...REVOCATION_REASONS, ...REISSUE_REASONS, ...DEV_EVENT_REASONS])].sort(),
+    );
+    expect(await dbError(insertEvent('valid', 'revoked', 'Left the company'))).toContain(
+      'credential_status_events_reason_value',
     );
   });
 });

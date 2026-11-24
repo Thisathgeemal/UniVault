@@ -24,7 +24,6 @@ describe('server and routing', () => {
   });
 
   it.each([
-    ['GET', `/api/v1/status/${UUID}`],
     ['POST', '/api/v1/credential-offers/token'],
     ['POST', '/api/v1/verifications'],
     ['GET', `/api/v1/verifications/${UUID}/result`],

@@ -22,6 +22,10 @@
  *                from the holder's CURRENT record, through the same code as create().
  * Every status change is written to credential_status_events (append-only) in the same
  * transaction as the change itself; events() returns that history.
+ *
+ * Metadata carries `effectiveStatus` next to the stored `status`: 'expired' is computed by
+ * effectiveStatus() in credential-status.ts (shared with the public status endpoint), never
+ * stored. Expiry instants are whole seconds, so the SD-JWT `exp` equals expires_at exactly.
  */
 import { createPublicKey } from 'node:crypto';
 import {
@@ -29,7 +33,7 @@ import {
   createSdJwt,
   loadIssuerPrivateKey,
 } from '@univault/crypto-core/node';
-import { and, asc, count, desc, eq, gt, inArray, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import type { StaffProfile } from '../auth/auth-service.js';
 import type { Db } from '../db/client.js';
@@ -46,9 +50,14 @@ import {
 } from '../db/schema.js';
 import { AppError } from '../lib/errors.js';
 import type { ClaimIssue, CredentialSchemas, CredentialTypeName } from './credential-schemas.js';
+import {
+  effectiveStatus,
+  type CredentialStatus,
+  type EffectiveStatus,
+} from './credential-status.js';
 import { ageOn, holderNotFound, ISSUER_RECORD_TYPES } from './holders.service.js';
 
-export type CredentialStatus = 'pending' | 'valid' | 'revoked' | 'superseded';
+export type { CredentialStatus, EffectiveStatus } from './credential-status.js';
 
 /** Why an admin revoked a credential (stored in revocation_reason and the status history). */
 export const REVOCATION_REASONS = [
@@ -70,6 +79,12 @@ export const REISSUE_REASONS = [
 ] as const;
 export type ReissueReason = (typeof REISSUE_REASONS)[number];
 
+/**
+ * DEVELOPMENT ONLY: reason of the status event written by simulateExpiry() (TEMPORARY, remove
+ * in Sprint 2 with the dev routes; migration 0007 allows it in the database).
+ */
+export const DEV_EVENT_REASONS = ['dev_simulated_expiry'] as const;
+
 export interface StaffRef {
   id: string;
   displayName: string;
@@ -83,7 +98,10 @@ export interface CredentialMetadata {
   credentialType: CredentialTypeName;
   vct: string;
   schemaVersion: string;
+  /** Stored status (the database value; never 'expired'). */
   status: CredentialStatus;
+  /** Status at the time of the request: the stored status, or 'expired' (credential-status.ts). */
+  effectiveStatus: EffectiveStatus;
   /** Public key ID the credential was signed with (null while pending). */
   issuerKid: string | null;
   issuedAt: string | null;
@@ -149,6 +167,8 @@ export interface CredentialStatusEventView {
 
 export interface ListCredentialsQuery {
   status?: CredentialStatus | undefined;
+  /** Filter on the computed status, e.g. 'expired' (stored valid, expires_at <= now). */
+  effectiveStatus?: EffectiveStatus | undefined;
   holderId?: string | undefined;
   limit: number;
   offset: number;
@@ -194,6 +214,11 @@ export interface CredentialsService {
   ): Promise<{ credentialId: string; events: CredentialStatusEventView[] }>;
   /** Signs a pending credential, bound to the holder's wallet key. Sprint 2 redemption calls this. */
   signCredential(credentialId: string, holderPublicJwk: unknown): Promise<SignedCredential>;
+  /**
+   * DEVELOPMENT ONLY (TEMPORARY, remove in Sprint 2): moves a valid credential's expiry one
+   * minute into the past and records a 'dev_simulated_expiry' event. Only the dev router calls it.
+   */
+  simulateExpiry(staff: StaffProfile, credentialId: string): Promise<CredentialMetadata>;
 }
 
 export interface CredentialsServiceOptions {
@@ -352,7 +377,7 @@ export function createCredentialsService(
 
   const loadMetadata = async (where: SQL | undefined): Promise<CredentialMetadata | null> => {
     const row = await db.query.credentialRecords.findFirst({ where, with: METADATA_RELATIONS });
-    return row ? toMetadata(row) : null;
+    return row ? toMetadata(row, now()) : null;
   };
 
   /** The issuer's active signing key. Pass `tx` inside a transaction (PGlite has one connection). */
@@ -450,6 +475,9 @@ export function createCredentialsService(
       }
       expiresAt = requested;
     }
+    // Whole seconds: the SD-JWT `exp` (seconds) then equals expires_at exactly, so the token
+    // and the status endpoint agree on the expiry instant (the date caps are midnight already)
+    expiresAt = new Date(Math.floor(expiresAt.getTime() / 1000) * 1000);
     return { schema, claims, expiresAt };
   };
 
@@ -582,9 +610,18 @@ export function createCredentialsService(
     },
 
     async list(staff, query) {
+      const at = now();
+      /** SQL twin of effectiveStatus() at `at` (same precedence and inclusive boundary). */
+      const effectiveStatusCondition = (status: EffectiveStatus): SQL => {
+        const valid = eq(credentialRecords.status, 'valid');
+        if (status === 'expired') return and(valid, lte(credentialRecords.expiresAt, at))!;
+        if (status === 'valid') return and(valid, gt(credentialRecords.expiresAt, at))!;
+        return eq(credentialRecords.status, status);
+      };
       const conditions = [eq(credentialRecords.issuerId, staff.issuer.id)]; // issuer scope
       if (query.status) conditions.push(eq(credentialRecords.status, query.status));
       if (query.holderId) conditions.push(eq(credentialRecords.holderId, query.holderId));
+      if (query.effectiveStatus) conditions.push(effectiveStatusCondition(query.effectiveStatus));
       const where = and(...conditions);
 
       const [rows, totals] = await Promise.all([
@@ -598,7 +635,7 @@ export function createCredentialsService(
         db.select({ n: count() }).from(credentialRecords).where(where),
       ]);
       return {
-        credentials: rows.map(toMetadata),
+        credentials: rows.map((row) => toMetadata(row, at)),
         total: totals[0]?.n ?? 0,
         limit: query.limit,
         offset: query.offset,
@@ -888,6 +925,46 @@ export function createCredentialsService(
 
       return { sdJwt, credential: (await loadMetadata(eq(credentialRecords.id, record.id)))! };
     },
+
+    async simulateExpiry(staff, credentialId) {
+      const at = now();
+      // Whole seconds, like every other expiry (see prepareClaims)
+      const expiresAt = new Date(Math.floor(at.getTime() / 1000) * 1000 - 60_000);
+      await db.transaction(async (tx) => {
+        const credential = await lockCredential(tx, staff, credentialId);
+        const current = effectiveStatus(credential, at);
+        if (current !== 'valid') {
+          throw new AppError(
+            409,
+            'CREDENTIAL_NOT_VALID',
+            `Only a valid credential can be expired (this one is ${current})`,
+            { effectiveStatus: current },
+          );
+        }
+        // CHECK expires_at > issued_at stays true: a credential signed in the last minute has
+        // its issued_at moved to one second before the new expiry (development data only)
+        const issuedAt =
+          credential.issuedAt && credential.issuedAt < expiresAt
+            ? credential.issuedAt
+            : new Date(expiresAt.getTime() - 1000);
+        await tx
+          .update(credentialRecords)
+          .set({ expiresAt, issuedAt })
+          .where(eq(credentialRecords.id, credential.id));
+        // valid → valid: the stored status does not change ('expired' is computed); migration
+        // 0007 allows a same-status event only with this reason
+        await recordEvent(tx, {
+          credentialId: credential.id,
+          issuerId: credential.issuerId,
+          fromStatus: 'valid',
+          toStatus: 'valid',
+          reason: DEV_EVENT_REASONS[0],
+          staffId: staff.id,
+          createdAt: at,
+        });
+      });
+      return (await loadMetadata(eq(credentialRecords.id, credentialId)))!;
+    },
   };
 }
 
@@ -909,7 +986,7 @@ type RecordWithRelations = typeof credentialRecords.$inferSelect & {
   replacedBy: { id: string }[];
 };
 
-function toMetadata(row: RecordWithRelations): CredentialMetadata {
+function toMetadata(row: RecordWithRelations, at: Date): CredentialMetadata {
   return {
     id: row.id,
     issuerId: row.issuerId,
@@ -918,6 +995,7 @@ function toMetadata(row: RecordWithRelations): CredentialMetadata {
     vct: row.vct,
     schemaVersion: row.schemaVersion,
     status: row.status,
+    effectiveStatus: effectiveStatus(row, at),
     issuerKid: row.issuerKid,
     issuedAt: row.issuedAt?.toISOString() ?? null,
     expiresAt: row.expiresAt.toISOString(),

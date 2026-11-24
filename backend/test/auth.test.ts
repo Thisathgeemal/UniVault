@@ -194,7 +194,10 @@ describe('AC3 – protected endpoints require valid authentication', () => {
     expect((await request(t.app).get('/api/v1/issuers')).status).toBe(200);
     // No key generated in this test app yet → 404, but never 401
     expect((await request(t.app).get('/api/v1/issuers/employer-a/keys')).status).toBe(404);
-    expect((await request(t.app).get(`/api/v1/status/${UUID}`)).status).toBe(501);
+    // Unknown credential → 404 CREDENTIAL_STATUS_NOT_FOUND, but never 401
+    const status = await request(t.app).get(`/api/v1/status/${UUID}`);
+    expect(status.status).toBe(404);
+    expect(status.body.error.code).toBe('CREDENTIAL_STATUS_NOT_FOUND');
     expect((await request(t.app).post('/api/v1/credential-offers/token')).status).toBe(501);
   });
 });
