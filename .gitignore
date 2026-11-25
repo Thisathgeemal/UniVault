@@ -118,3 +118,6 @@ desktop.ini
 # Test and coverage outputs
 # ------------------------------------------
 .nyc_output/
+# Playwright (issuer-portal e2e) reports and traces
+playwright-report/
+test-results/

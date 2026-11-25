@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+@import '@univault/portal-ui/theme.css';
+
+/* Let Tailwind see the class names used by the shared layout package */
+@source '../../portal-ui/src';
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+}

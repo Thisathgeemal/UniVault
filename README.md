@@ -71,6 +71,8 @@ UniVault/
 │
 ├── issuer-portal/     # React.js issuer application
 │
+├── portal-ui/         # Shared layout package for the two web portals
+│
 ├── wallet/            # React Native Expo mobile wallet
 │
 ├── verifier-portal/   # React.js verifier application

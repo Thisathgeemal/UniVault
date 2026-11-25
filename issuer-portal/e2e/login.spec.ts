@@ -1,0 +1,66 @@
+/**
+ * Staff sign-in against the real backend (throwaway database with the synthetic seed data):
+ * protected-route redirect, wrong password, admin sign-in back to the requested page, admin
+ * menu, sign-out, officer sign-in without admin items.
+ */
+import { expect, test, type Page } from '@playwright/test';
+
+const PASSWORD = process.env.UNIVAULT_E2E_PASSWORD ?? '';
+const ADMIN = 'admin@serendib-trading.example';
+const OFFICER = 'officer@serendib-trading.example';
+const ADMIN_ITEMS = ['Issuer keys', 'Staff'];
+const SHARED_ITEMS = ['Dashboard', 'Holders', 'Credentials', 'Credential offers'];
+
+async function signIn(page: Page, email: string, password: string) {
+  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+}
+
+const nav = (page: Page) => page.getByRole('navigation', { name: 'Main navigation' });
+
+test('staff sign-in, role-based menu and sign-out', async ({ page }) => {
+  expect(PASSWORD, 'playwright.config.ts sets UNIVAULT_E2E_PASSWORD').not.toBe('');
+
+  // A protected page sends a signed-out visitor to the login page, remembering the page
+  await page.goto('/holders');
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Fholders$/);
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+
+  // Wrong password: one generic message
+  await signIn(page, ADMIN, 'not-the-password-123');
+  await expect(page.getByRole('alert')).toHaveText('The email address or password is not correct.');
+
+  // Admin: lands on the page asked for, with the admin menu items
+  await signIn(page, ADMIN, PASSWORD);
+  await expect(page).toHaveURL(/\/holders$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Holders' })).toBeVisible();
+  await expect(page.getByTestId('header-org')).toHaveText('Serendib Trading Company (Demo)');
+  for (const name of [...SHARED_ITEMS, ...ADMIN_ITEMS]) {
+    await expect(nav(page).getByRole('link', { name })).toBeVisible();
+  }
+
+  // The token is in sessionStorage only, never in localStorage
+  const storage = await page.evaluate(() => ({
+    session: Object.keys(sessionStorage),
+    local: JSON.stringify(localStorage),
+  }));
+  expect(storage.session).toContain('univault.issuer-portal.token');
+  expect(storage.local).not.toMatch(/eyJ/); // no JWT anywhere in localStorage
+
+  // Sign out: back to the login page, session gone
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate(() => sessionStorage.length)).toBe(0);
+
+  // Officer: the shared items only
+  await signIn(page, OFFICER, PASSWORD);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { level: 1, name: /^Welcome, / })).toBeVisible();
+  for (const name of SHARED_ITEMS) {
+    await expect(nav(page).getByRole('link', { name })).toBeVisible();
+  }
+  for (const name of ADMIN_ITEMS) {
+    await expect(nav(page).getByRole('link', { name })).toHaveCount(0);
+  }
+});

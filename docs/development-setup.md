@@ -8,14 +8,14 @@ add app-specific steps.
 
 ## Prerequisites
 
-| Tool               | Version         | Used for                                                 |
-| ------------------ | --------------- | -------------------------------------------------------- |
-| Node.js            | 20 LTS or newer | Backend, crypto core, portals, wallet, tooling           |
-| npm                | 10 or newer     | Package management (ships with Node.js)                  |
-| Git                | Any recent      | Version control                                          |
-| Python             | 3.10 or newer   | AI anomaly detection service                             |
-| Expo Go            | Latest (phone)  | Running the wallet on a physical device                  |
-| VS Code (optional) | Latest          | Install the ESLint, Prettier and EditorConfig extensions |
+| Tool               | Version        | Used for                                                                                                         |
+| ------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Node.js            | 22.22 or newer | Backend, crypto core, portals, wallet, tooling (the portals' React Router 8 needs 22.22+; the repo uses Node 26) |
+| npm                | 10 or newer    | Package management (ships with Node.js)                                                                          |
+| Git                | Any recent     | Version control                                                                                                  |
+| Python             | 3.10 or newer  | AI anomaly detection service                                                                                     |
+| Expo Go            | Latest (phone) | Running the wallet on a physical device                                                                          |
+| VS Code (optional) | Latest         | Install the ESLint, Prettier and EditorConfig extensions                                                         |
 
 For wallet testing on a phone, the phone and the laptop must be on the same Wi-Fi network.
 
@@ -39,13 +39,13 @@ For wallet testing on a phone, the phone and the laptop must be on the same Wi-F
 
 2. Create a local `.env` file for each component from its template:
 
-   | Template                       | Copy to                |
-   | ------------------------------ | ---------------------- |
-   | `backend/.env.example`         | `backend/.env`         |
-   | `issuer-portal/.env.example`   | `issuer-portal/.env`   |
-   | `verifier-portal/.env.example` | `verifier-portal/.env` |
-   | `wallet/.env.example`          | `wallet/.env`          |
-   | `ai-service/.env.example`      | `ai-service/.env`      |
+   | Template                       | Copy to                                                             |
+   | ------------------------------ | ------------------------------------------------------------------- |
+   | `backend/.env.example`         | `backend/.env`                                                      |
+   | `issuer-portal/.env.example`   | `issuer-portal/.env` (optional: only to change `VITE_API_BASE_URL`) |
+   | `verifier-portal/.env.example` | `verifier-portal/.env`                                              |
+   | `wallet/.env.example`          | `wallet/.env`                                                       |
+   | `ai-service/.env.example`      | `ai-service/.env`                                                   |
 
    macOS/Linux: `cp backend/.env.example backend/.env`
    Windows (PowerShell): `Copy-Item backend/.env.example backend/.env`
@@ -81,7 +81,22 @@ For wallet testing on a phone, the phone and the laptop must be on the same Wi-F
    npm run dev         # http://localhost:4000/api/v1/health
    ```
 
-6. Check that no secrets are tracked before your first commit:
+6. Set up and run the issuer portal (needs the backend from step 5 running):
+
+   ```bash
+   cd portal-ui && npm install
+   cd ../issuer-portal && npm install
+   npm run dev         # http://localhost:5173 (builds portal-ui first)
+   ```
+
+   Run the backend and the portal in two terminals (`backend: npm run dev`, `issuer-portal:
+npm run dev`). The backend's `CORS_ORIGINS` must include `http://localhost:5173` (it does
+   by default and in `backend/.env.example`). Sign in with a seeded account, e.g.
+   `admin@serendib-trading.example` or `officer@serendib-trading.example`, with the
+   development seed password printed by `npm run db:seed` (development only). For the
+   Playwright e2e test, install its browser once: `npx playwright install chromium`.
+
+7. Check that no secrets are tracked before your first commit:
 
    ```bash
    npm run check:secrets
@@ -102,24 +117,26 @@ run on the server side.
 - `.env` and `.env.*` files are gitignored; only `.env.example` templates are committed.
 - `*.pem`, `*.key` and `keys/` directories are gitignored. The issuer's RS256 signing keys live
   in `backend/keys/` (see `ISSUER_KEYS_DIR`) and must never be committed.
-- `npm run check:secrets` fails if any `.env`, `.pem` or `.key` file is tracked by Git. If it
+- `npm run check:secrets` fails if a tracked or staged file is a `.env`, `.pem`, `.key` or
+  `*.bundle.b64` file, or contains a PEM private key (also base64-encoded). If it
   fails, run `git rm --cached <file>` and rotate the leaked secret.
 
 ## Scripts
 
 Run these from the repository root.
 
-| Command                 | What it does                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------ |
-| `npm run lint`          | Lints all JS/TS code with ESLint 9 (flat config)                                     |
-| `npm run lint:fix`      | Lints and auto-fixes what ESLint can fix                                             |
-| `npm run format`        | Formats all supported files with Prettier                                            |
-| `npm run format:check`  | Checks formatting without changing files (use before committing)                     |
-| `npm run check:secrets` | Fails if any `.env` (except `.env.example`), `.pem` or `.key` file is tracked by Git |
-| `npm run seed:generate` | Regenerates the synthetic data in `backend/seed-data/` and formats it                |
+| Command                 | What it does                                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run lint`          | Lints all JS/TS code with ESLint 9 (flat config)                                                                                    |
+| `npm run lint:fix`      | Lints and auto-fixes what ESLint can fix                                                                                            |
+| `npm run format`        | Formats all supported files with Prettier                                                                                           |
+| `npm run format:check`  | Checks formatting without changing files (use before committing)                                                                    |
+| `npm run check:secrets` | Fails if a tracked or staged file is a `.env` (except `.env.example`), `.pem`, `.key` or key-bundle file, or contains a private key |
+| `npm run seed:generate` | Regenerates the synthetic data in `backend/seed-data/` and formats it                                                               |
 
-Package tests run inside each package: `cd crypto-core && npm test` and
-`cd backend && npm test`. **On Windows, run them from PowerShell or cmd, not Git Bash**:
+Package tests run inside each package: `cd crypto-core && npm test`,
+`cd backend && npm test`, `cd portal-ui && npm test` and `cd issuer-portal && npm test`
+(the portal's Playwright test: `npm run test:e2e`, not part of `npm test`). **On Windows, run them from PowerShell or cmd, not Git Bash**:
 under Git Bash, Vitest fails in every test file because of how the drive path is reported.
 
 Python (run inside `ai-service/` with the virtual environment active):

@@ -12,22 +12,24 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 
 ## Decision index
 
-| #                                                                                                                           | Decision                                                                                                  | Date            | Sprint                   | Status         | Related requirements                                          |
-| --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------- | ------------------------ | -------------- | ------------------------------------------------------------- |
-| [001](#decision-001-typescript-for-all-javascript-components)                                                               | TypeScript for all JavaScript components                                                                  | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
-| [002](#decision-002-root-level-eslint-9-and-prettier-ruff-for-ai-service)                                                   | Root-level ESLint 9 and Prettier; Ruff for ai-service                                                     | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
-| [003](#decision-003-sd-jwt-vc-flat-claim-layout-instead-of-json-ld)                                                         | SD-JWT VC flat claim layout (W3C VC model); subject claims selectively disclosable                        | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-02, FR-VER-01, FR-VER-03, FR-BAK-01, NFR-01 |
-| [004](#decision-004-data-minimisation-in-credential-schemas)                                                                | Data minimisation in the credential schemas                                                               | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-VER-03, NFR-08                                  |
-| [005](#decision-005-derived-age_over_18-claim-and-under-18-handling)                                                        | Derived `age_over_18` claim and under-18 handling                                                         | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-03, FR-VER-03, NFR-08                       |
-| [006](#decision-006-sd-jwt-library-selection-sd-jwtcore)                                                                    | SD-JWT library: `@sd-jwt/core` pinned to 0.25.0                                                           | Thu 19 Nov 2026 | S1                       | Accepted       | FR-ISS-02, FR-VER-02, FR-WAL-06, NFR-01                       |
-| [007](#decision-007-es256-for-holder-key-binding)                                                                           | ES256 for holder key binding; issuer signatures stay RS256                                                | Thu 19 Nov 2026 | S1                       | Proposed       | NFR-01, FR-WAL-06, FR-VER-02                                  |
-| [008](#decision-008-postgresql-with-embedded-pglite-for-development-and-hand-written-migrations)                            | PostgreSQL, with embedded PGlite for development and hand-written migrations                              | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08 |
-| [009](#decision-009-issuer-staff-authentication-jwt-database-re-check-and-lockout)                                          | Issuer staff authentication (JWT, database re-check and lockout)                                          | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
-| [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)                                        | Credential signing deferred to wallet redemption (holder binding)                                         | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
-| [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                                            | OpenID4VCI pre-authorised code offer format                                                               | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
-| [012](#decision-012-reissue-supersedes-immediately-status-changes-recorded-as-append-only-events)                           | Reissue supersedes immediately; status changes recorded as append-only events                             | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-03, FR-BAK-01, NFR-06, NFR-08                          |
-| [013](#decision-013-per-credential-status-endpoint-ietf-token-status-list-as-future-work)                                   | Per-credential status endpoint; IETF Token Status List as future work                                     | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06, NFR-08    |
-| [014](#decision-014-encrypted-key-file-or-encrypted-env-bundle-decrypted-once-in-a-central-key-store-kmshsm-as-future-work) | Encrypted key file or encrypted env bundle, decrypted once in a central key store; KMS/HSM as future work | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-01, FR-ISS-02, NFR-08                                     |
+| #                                                                                                                                         | Decision                                                                                                                       | Date            | Sprint                   | Status         | Related requirements                                          |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------- | ------------------------ | -------------- | ------------------------------------------------------------- |
+| [001](#decision-001-typescript-for-all-javascript-components)                                                                             | TypeScript for all JavaScript components                                                                                       | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
+| [002](#decision-002-root-level-eslint-9-and-prettier-ruff-for-ai-service)                                                                 | Root-level ESLint 9 and Prettier; Ruff for ai-service                                                                          | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
+| [003](#decision-003-sd-jwt-vc-flat-claim-layout-instead-of-json-ld)                                                                       | SD-JWT VC flat claim layout (W3C VC model); subject claims selectively disclosable                                             | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-02, FR-VER-01, FR-VER-03, FR-BAK-01, NFR-01 |
+| [004](#decision-004-data-minimisation-in-credential-schemas)                                                                              | Data minimisation in the credential schemas                                                                                    | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-VER-03, NFR-08                                  |
+| [005](#decision-005-derived-age_over_18-claim-and-under-18-handling)                                                                      | Derived `age_over_18` claim and under-18 handling                                                                              | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-03, FR-VER-03, NFR-08                       |
+| [006](#decision-006-sd-jwt-library-selection-sd-jwtcore)                                                                                  | SD-JWT library: `@sd-jwt/core` pinned to 0.25.0                                                                                | Thu 19 Nov 2026 | S1                       | Accepted       | FR-ISS-02, FR-VER-02, FR-WAL-06, NFR-01                       |
+| [007](#decision-007-es256-for-holder-key-binding)                                                                                         | ES256 for holder key binding; issuer signatures stay RS256                                                                     | Thu 19 Nov 2026 | S1                       | Proposed       | NFR-01, FR-WAL-06, FR-VER-02                                  |
+| [008](#decision-008-postgresql-with-embedded-pglite-for-development-and-hand-written-migrations)                                          | PostgreSQL, with embedded PGlite for development and hand-written migrations                                                   | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08 |
+| [009](#decision-009-issuer-staff-authentication-jwt-database-re-check-and-lockout)                                                        | Issuer staff authentication (JWT, database re-check and lockout)                                                               | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
+| [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)                                                      | Credential signing deferred to wallet redemption (holder binding)                                                              | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
+| [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                                                          | OpenID4VCI pre-authorised code offer format                                                                                    | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
+| [012](#decision-012-reissue-supersedes-immediately-status-changes-recorded-as-append-only-events)                                         | Reissue supersedes immediately; status changes recorded as append-only events                                                  | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-03, FR-BAK-01, NFR-06, NFR-08                          |
+| [013](#decision-013-per-credential-status-endpoint-ietf-token-status-list-as-future-work)                                                 | Per-credential status endpoint; IETF Token Status List as future work                                                          | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06, NFR-08    |
+| [014](#decision-014-encrypted-key-file-or-encrypted-env-bundle-decrypted-once-in-a-central-key-store-kmshsm-as-future-work)               | Encrypted key file or encrypted env bundle, decrypted once in a central key store; KMS/HSM as future work                      | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-01, FR-ISS-02, NFR-08                                     |
+| [015](#decision-015-frontend-stack-react--vite--ts-react-router-tanstack-query-tailwind--shadcnui-react-i18next-shared-portal-ui-package) | Frontend stack: React + Vite + TS, React Router, TanStack Query, Tailwind + shadcn/ui, react-i18next, shared portal-ui package | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
+| [016](#decision-016-staff-token-in-memory--sessionstorage-never-localstorage-httponly-cookie-as-future-work)                              | Staff token in memory + sessionStorage, never localStorage; httpOnly cookie as future work                                     | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -1234,3 +1236,222 @@ depending on where it happened.
   window get the cached error without another decryption, so a broken key can't be used to make
   the server decrypt on every request. A fixed key is picked up after the window, or at once on
   `reload()` / rotation.
+
+## Decision 015: Frontend stack: React + Vite + TS, React Router, TanStack Query, Tailwind + shadcn/ui, react-i18next, shared portal-ui package
+
+- **Date:** Tue 24 Nov 2026
+- **Sprint:** S2 (Sprint 1 carry-over)
+- **Status:** Draft – review
+- **Requirements:** NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01
+- **Related:** [issuer-portal.md](../frontend/issuer-portal.md),
+  [portal-ui/README.md](../../portal-ui/README.md), Decision 001 (TypeScript), Decision 002
+  (root ESLint and Prettier), Decision 016 (token storage)
+- **Evidence:** `issuer-portal/test/` (Vitest, React Testing Library, MSW), `portal-ui/test/`,
+  `issuer-portal/e2e/login.spec.ts` (Playwright); screenshots listed in
+  [evidence/s1-portal-login-guide.md](evidence/s1-portal-login-guide.md)
+
+### Context
+
+The issuer portal is the first frontend; the verifier portal follows in Sprint 3. Both are
+staff-facing single-page apps that talk to the existing REST API with a bearer token. They
+need:
+
+- English and Sinhala (NFR-02);
+- usable and accessible screens (NFR-04, NFR-05);
+- no leaks of personal data or secrets (NFR-08).
+
+The issuer side must cover sign-in and, later, holders, credentials and offers (FR-ISS-01).
+The repository already uses TypeScript (pinned 5.9.3) with ESM, root ESLint and Prettier, and
+`file:` packages built with `tsc` (crypto-core). The developer works alone, on Windows, with a
+five-week schedule.
+
+### Options considered
+
+1. **Framework:**
+   - **React + Vite + TypeScript (SPA):** small, fast dev server, the portals' planned
+     stack (README). No server rendering needed: everything is behind a login and served as
+     static files.
+   - **Next.js:** routing, server rendering and API routes built in. But it needs a Node
+     server (or its own hosting model), adds a second backend layer next to Express, and its
+     server/client split is more to learn for little gain behind a login.
+2. **Component library:**
+   - **MUI or Ant Design:** complete component sets, fast to start. But they are large bundles
+     with their own styling systems (Emotion or CSS-in-JS, which needs `style-src
+'unsafe-inline'` or nonces under a strict CSP), are hard to restyle, and are opinionated
+     about Latin typography.
+   - **Tailwind CSS + shadcn/ui:** utility CSS compiled to one static stylesheet (CSP-friendly).
+     shadcn/ui components are copied into the code base (owned and editable, accessible markup
+     patterns), so only the components in use exist. More hand work per component.
+3. **Server state:**
+   - **Redux (Toolkit):** one global store. Its strengths (complex client state, middleware)
+     are not needed: almost all state here is server data plus the session.
+   - **TanStack Query:** caching, loading and error states and refetching for server data,
+     with a single `clear()` on logout. The session itself is small React context.
+4. **Routing:** React Router (data router: per-route error boundaries, nested layouts) or
+   TanStack Router (type-safe, newer). React Router is the more widely documented choice for a
+   report.
+5. **i18n:** react-i18next (mature, interpolation, typed keys, language detection hooks) or
+   FormatJS/react-intl (ICU messages, heavier). The strings are simple, so react-i18next.
+6. **Shared layout:**
+   - copy the layout into each portal;
+   - a shared **`portal-ui`** package (app-agnostic: no routes, API calls or text), built with
+     `tsc` like crypto-core and linked with `file:../portal-ui`.
+
+### Decision
+
+- **Stack:** React 19 + Vite 8 + TypeScript 5.9.3 (strict, ESM). All pinned exactly.
+  - **Routing:** React Router 8 (data router).
+  - **Server state:** TanStack Query 5.
+  - **Styling:** Tailwind CSS 4 with shadcn/ui-style components (copied by hand, only the ones
+    in use).
+  - **i18n:** react-i18next with bundled `en`/`si` resources.
+  - **Validation:** zod 4, with the backend's rules (e.g. the trimmed email).
+- **`@univault/portal-ui`** holds the reusable layout:
+  - AppShell, Sidebar with role filtering, Header, PageHeader;
+  - EmptyState/ComingSoon, ErrorBoundary/ErrorFallback, FullPageSpinner;
+  - the primitives and the design tokens.
+
+  The verifier portal will consume it in Sprint 3.
+
+- **Tests:**
+  - Vitest + React Testing Library + MSW for unit and component tests;
+  - one Playwright e2e spec (Chromium) against the real backend on a throwaway database, kept
+    out of `npm test`.
+- **Lint:** the root ESLint config adds react-hooks (with its React Compiler rules), jsx-a11y
+  and react-refresh, scoped to the portal packages.
+
+### Reason
+
+- **Static deployment:** a static SPA fits a portal that is used only after login. It can be
+  served by any static host with a strict CSP and no extra server.
+- **CSP-friendly styling:** Tailwind's static stylesheet works with `style-src 'self'`.
+  CSS-in-JS libraries would need `'unsafe-inline'` or nonces.
+- **Small bundle:** shadcn/ui keeps it small and the markup accessible, without a heavy library.
+- **Session clean-up:** TanStack Query covers what the portal does (load, cache, refetch, show
+  errors). Clearing the cache on logout is one call, which matters for NFR-08: no previous
+  user's data stays in memory.
+- **One layout:** a shared `portal-ui` package keeps the two portals consistent. Being
+  text-free and router-agnostic lets each portal keep its own routes and translations.
+- **Tooling:** the stack matches the repository's conventions (TypeScript, ESM, root lint, `file:`
+  packages).
+
+### Consequences
+
+- **Updating shadcn/ui components** is manual: they are copied, not a dependency.
+- **portal-ui must be built** before the portal runs. `pre…` scripts do this, and Tailwind
+  scans `portal-ui/src` (`@source`). Vite dedupes React, because portal-ui has its own copy for
+  its tests.
+- **Bundle size:** the production bundle is about 561 kB minified (about 175 kB gzip), split
+  into react, router, vendor and app chunks. zod and React DOM are the largest parts. Code
+  splitting per page can come later, if needed.
+- **Windows bindings:** Vite 8 and Tailwind 4 bring native bindings (rolldown, lightningcss,
+  oxide). Their win32-x64 packages are pinned in `optionalDependencies`, as in the backend.
+- **Sinhala wording** is a developer draft and needs native-speaker review before release.
+
+## Decision 016: Staff token in memory + sessionStorage, never localStorage; httpOnly cookie as future work
+
+- **Date:** Tue 24 Nov 2026
+- **Sprint:** S2 (Sprint 1 carry-over)
+- **Status:** Draft – review
+- **Requirements:** NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01
+- **Related:** [issuer-portal.md](../frontend/issuer-portal.md) (sections 3 and 6), Decision 009
+  (staff authentication: short-lived HS256 JWT, database re-check), Decision 015
+- **Evidence:** `issuer-portal/test/session.test.tsx` (restore, 401 mid-session, expiry timer,
+  logout, the localStorage spy), `issuer-portal/e2e/login.spec.ts` (sessionStorage only in a real
+  browser), `issuer-portal/test/csp.test.ts`
+
+### Context
+
+The backend issues a short-lived bearer JWT (`JWT_EXPIRES_IN_SECONDS`, default 1 hour) on
+staff login (Decision 009), and every API call re-checks the account in the database. The
+portal must keep that token somewhere:
+
+- staff expect a page refresh not to sign them out (NFR-04);
+- a stolen token lets an attacker act as that staff member until it expires (NFR-08: issuer
+  staff can see personal data).
+
+The main browser threat is **XSS**: a script running in the portal's origin can read anything
+JavaScript can read.
+
+### Options considered
+
+1. **localStorage:**
+   - **For:** survives refresh and browser restarts, shared by all tabs.
+   - **Against:** readable by any script on the origin (XSS exfiltrates it). It persists after
+     the tab and the browser are closed, so it is still there on a shared computer, and it
+     stays until it expires.
+2. **Memory only (React state):**
+   - **For:** not in any storage, gone when the tab closes, the smallest XSS window.
+   - **Against:** every refresh or new tab signs the user out, which is bad usability for a
+     daily work tool. An XSS script can still use the token while the page is open.
+3. **Memory + sessionStorage:**
+   - **For:** the live token is in memory, with one copy in sessionStorage, which survives a
+     refresh. sessionStorage is per tab and is cleared when the tab closes, so nothing
+     outlives the session on a shared computer.
+   - **Against:** XSS can still read it, like option 1, but only while the tab is open.
+4. **httpOnly, Secure, SameSite cookie, plus CSRF protection:**
+   - **For:** JavaScript cannot read the token at all, which is the strongest protection
+     against token theft by XSS.
+   - **Against:** it needs backend changes:
+     - a cookie-issuing login;
+     - CSRF tokens (or double-submit) for state-changing requests;
+     - CORS with credentials;
+     - SameSite rules across the portal's and the API's domains (different sites on most free
+       hosts make `SameSite=Strict` impossible).
+
+     XSS can still make requests _as_ the user while the page is open; it just can't take the
+     token away.
+
+### Decision
+
+- **Option 3:**
+  - the token lives in memory in `AuthProvider`, with **one copy in sessionStorage**
+    (`univault.issuer-portal.token`);
+  - it is **never written to localStorage**;
+  - localStorage holds only the language preference.
+- **Restore:** on load, a stored token is validated with `GET /auth/me`. The role and
+  organisation come from the server.
+- **Session end:** any 401 `TOKEN_EXPIRED` / `INVALID_TOKEN` / `UNAUTHENTICATED` ends the
+  session:
+  - the token, sessionStorage and the TanStack Query cache are cleared;
+  - the user goes to `/login` with a safe `returnTo` and a session-expired message.
+
+  The portal also signs out at the JWT's `exp`, which it reads for timing only and never
+  trusts.
+
+- **Logout:** calls the backend, then clears memory, sessionStorage and the query cache.
+- **Mitigating XSS**, the remaining risk:
+  - a strict production **CSP** (`script-src 'self'`, no inline scripts or eval, `connect-src`
+    limited to the portal and the API, `object-src 'none'`, `base-uri 'self'`);
+  - `frame-ancestors 'none'` sent by the host;
+  - React's escaping, and no `dangerouslySetInnerHTML`;
+  - no third-party scripts or CDNs;
+  - short token lifetime and the backend's re-check of the account on every request.
+- **httpOnly cookie with CSRF protection is future work.** It is the target once the portal and
+  the API share a site (one domain) in production.
+
+### Reason
+
+- **Usability:** a refresh keeps the session (option 2 fails this).
+- **Lifetime:** nothing outlives the tab, unlike localStorage. On a shared office computer,
+  closing the tab ends the session.
+- **Size of the change:** no backend redesign is needed now. Decision 009's bearer flow is
+  unchanged, and option 4's cookie, CSRF and CORS changes are too much for this sprint.
+- **The trade-off is explicit:** options 1–3 all expose the token to XSS. Option 3 limits how
+  long it is exposed, and the CSP makes XSS much harder to start with. Recording option 4 keeps
+  the path to a stronger design visible for the report.
+
+### Consequences
+
+- **Each tab has its own session:** a new tab means signing in again, because sessionStorage is
+  per tab. This is accepted (and arguably safer).
+- **Rule:** **never use localStorage for the token or any other secret**. A unit test (spy on
+  `localStorage.setItem`) and the e2e test check this. The rule is in CLAUDE.md.
+- **CSP:** the production build must keep the CSP. Adding an inline script, a CDN script or
+  CSS-in-JS would weaken the main XSS defence and needs a new decision.
+- **Expiry:** the token can't be revoked before it expires (no server-side session list). This
+  is unchanged from Decision 009: the database re-check rejects disabled accounts at once.
+- **Moving to option 4 later** needs:
+  - backend changes: login sets the cookie, `requireAuth` reads it, CSRF protection, CORS with
+    credentials;
+  - the API client to send `credentials: 'include'` instead of the Authorization header.

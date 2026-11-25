@@ -1,0 +1,4 @@
+# SPA fallback (Netlify / Cloudflare Pages format): every path serves index.html so that deep
+# links such as /holders work after a refresh. The static host is not chosen yet: see
+# docs/frontend/issuer-portal.md, "Deployment", for the equivalent on other hosts.
+/*    /index.html   200

@@ -1,0 +1,69 @@
+/*
+ * UniVault portal design tokens (Tailwind CSS v4 theme variables).
+ *
+ * Import AFTER Tailwind in the portal's stylesheet, and let Tailwind scan this package:
+ *
+ *   @import 'tailwindcss';
+ *   @import '@univault/portal-ui/theme.css';
+ *   @source '../../portal-ui/src';
+ *
+ * Every token becomes a CSS variable (e.g. --color-primary) and a utility (bg-primary,
+ * text-muted-foreground, w-sidebar, h-header). Components in this package use the semantic
+ * names only, so a portal can re-brand by overriding the variables.
+ *
+ * Fonts: no font is downloaded from a CDN (the portals' Content-Security-Policy allows
+ * font-src 'self' only). Latin text uses the system UI font; Sinhala glyphs fall through to
+ * "Noto Sans Sinhala" (self-hosted by the portal, e.g. @fontsource/noto-sans-sinhala) and then
+ * to the Sinhala fonts that ship with Windows (Nirmala UI, Iskoola Pota) and Android/macOS.
+ */
+@theme {
+  /* Brand: deep teal (trust) with an amber accent */
+  --color-brand-50: #effaf8;
+  --color-brand-100: #d6f1ec;
+  --color-brand-500: #14857a;
+  --color-brand-600: #0f6e65;
+  --color-brand-700: #0d5952;
+  --color-brand-900: #0a3a36;
+
+  /* Semantic colours (WCAG AA contrast against their foregrounds) */
+  --color-background: #f7f8fa;
+  --color-foreground: #111827;
+  --color-surface: #ffffff;
+  --color-muted: #eef0f3;
+  --color-muted-foreground: #4b5563;
+  --color-border: #d9dde3;
+  --color-ring: #14857a;
+  --color-primary: #0f6e65;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #fdf3e1;
+  --color-accent-foreground: #7a4b05;
+  --color-destructive: #b42318;
+  --color-destructive-foreground: #ffffff;
+  --color-destructive-muted: #fdecea;
+  --color-info: #1d4f91;
+  --color-info-muted: #e8f0fb;
+  --color-sidebar: #0a3a36;
+  --color-sidebar-foreground: #e6f4f1;
+  --color-sidebar-muted: #9cc9c1;
+  --color-sidebar-active: #14857a;
+
+  /* Typography */
+  --font-sans:
+    system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans Sinhala', 'Nirmala UI',
+    'Iskoola Pota', 'Sinhala Sangam MN', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  --text-page-title: 1.5rem;
+  --text-page-title--line-height: 2rem;
+
+  /* Layout spacing */
+  --spacing-sidebar: 16rem;
+  --spacing-header: 4rem;
+  --spacing-page: 1.5rem;
+
+  --radius-card: 0.75rem;
+}
+
+/* Sinhala script needs more line height than Latin to keep vowel signs readable */
+:lang(si) {
+  line-height: 1.7;
+}

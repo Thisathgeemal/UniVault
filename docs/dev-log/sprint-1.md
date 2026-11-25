@@ -233,6 +233,63 @@ ISSUER_KEY_UNAVAILABLE` with a generic message; the code goes to the log with is
 - **Evidence:** `backend/vitest.config.ts`; three consecutive `test:coverage` runs (see
   Issue 15).
 
+### Tue 24 Nov (Sprint 1 carry-over: issuer portal login and protected layout)
+
+- **Done:** First frontend task (FR-ISS-01, NFR-02, NFR-04, NFR-05, NFR-08; Decisions 015 and
+  016, draft). Design doc: `docs/frontend/issuer-portal.md`.
+  - **Stack:** React 19 + Vite 8 + TypeScript 5.9.3, React Router 8 (data router), TanStack
+    Query 5, Tailwind 4 with shadcn/ui-style components, react-i18next and zod 4. Everything
+    is pinned exactly, with the win32-x64 native bindings in `optionalDependencies`. Root
+    ESLint now has react-hooks 7, jsx-a11y and react-refresh for the portal packages.
+  - **`@univault/portal-ui`** is a new shared package, built with `tsc` like crypto-core and
+    linked with `file:`. It holds:
+    - AppShell, a role-filtered Sidebar with an accessible mobile drawer, Header, PageHeader;
+    - ComingSoon/EmptyState, ErrorBoundary/ErrorFallback, FullPageSpinner;
+    - the primitives and the design tokens.
+
+    It has no text, routes or API calls. The verifier portal will use it in Sprint 3.
+
+  - **Sign-in:**
+    - plain messages per error code (`INVALID_CREDENTIALS` generic; `ACCOUNT_LOCKED` with the
+      time in Asia/Colombo; 429; `VALIDATION_ERROR`; network);
+    - client validation with the backend's rules;
+    - a show/hide toggle and the right autocomplete attributes.
+  - **Session:**
+    - the token is in memory plus sessionStorage, never localStorage;
+    - it is restored through `/auth/me`;
+    - any session-ending 401 or the token's expiry signs out with a safe returnTo and the
+      session-expired message;
+    - logout calls the backend and clears storage and the query cache.
+  - **Routes:** one route config drives both the guards and the sidebar. Officers can't see or
+    open Issuer keys and Staff (they get "Not permitted"). Placeholder pages show their
+    sprint, and there are 404 and route error boundaries.
+  - **i18n:** English and Sinhala (the Sinhala file is marked "needs native-speaker review").
+    The switcher is in the header and on the login page, and `<html lang>` follows it. Noto
+    Sans Sinhala is self-hosted.
+  - **Security and hosting:**
+    - a production CSP `<meta>` (`script-src 'self'`, `connect-src` = API origin), checked in
+      a real browser with no violations;
+    - the host headers are documented, including `frame-ancestors 'none'`;
+    - `public/_redirects` gives the SPA fallback, because the host is undecided.
+  - **Tests:**
+    - issuer portal 60 (Vitest, React Testing Library, MSW): coverage 96.05 / 90.42 / 97.22 /
+      98.50, thresholds 95 / 89 / 96 / 97;
+    - portal-ui 22: coverage 100 / 94 / 100 / 100, thresholds 99 / 93 / 99 / 99;
+    - 1 Playwright e2e test (Chromium) against the real backend on a throwaway database.
+
+    The backend is unchanged (471).
+
+  - **Production build:** 561 kB JS minified (175 kB gzip) in react, router, vendor and app
+    chunks, plus 17 kB CSS.
+- **Next:** Supervisor review of Decisions 015 and 016. A native speaker should review
+  `si.ts`. Take the screenshots in `evidence/s1-portal-login-guide.md`. The holders and
+  credentials pages follow (Sprint 2).
+- **Blockers:** None. The static host for the portal is not chosen yet, so the SPA fallback
+  is host-neutral (`_redirects` plus the equivalents in the design doc).
+- **Evidence:** `issuer-portal/test/*.test.ts(x)`, `portal-ui/test/*.test.tsx`,
+  `issuer-portal/e2e/login.spec.ts`; screenshots per
+  [evidence/s1-portal-login-guide.md](evidence/s1-portal-login-guide.md) (to be taken).
+
 ## Testing evidence
 
 Record the tests that show the sprint goal is met, with links to output in `evidence/`.
@@ -470,3 +527,33 @@ Record the tests that show the sprint goal is met, with links to output in `evid
 - **Lesson:** Time a slow test alone before treating it as a bug. Keep tests that start real
   processes or use the disk apart from the parallel in-process ones, and always clean up
   processes in a hook, not only on the success path.
+
+### Issue 16: Logout sometimes landed on /login?returnTo=... (24 Nov 2026)
+
+- **Task:** Issuer portal login and layout
+- **Symptom:** A test expected logout to go to plain `/login`. It ended at
+  `/login?returnTo=%2Fholders` instead.
+- **Cause:** Two navigations raced:
+  - the logout handler navigated to `/login`;
+  - clearing the session made the protected layout render its own redirect, with a returnTo
+    for the current page.
+
+  Whichever ran last won.
+
+- **Resolution:** The auth provider never navigates. It records why the session ended
+  (`sessionExpired` or `signedOut`). The protected layout is the one place that redirects:
+  with a returnTo after an expiry, plain `/login` after a logout.
+- **Lesson:** Give each redirect one owner. Navigation in event handlers plus declarative
+  `<Navigate>` elements is a race waiting to happen.
+
+### Issue 17: MSW 3 silently ignored the "unhandled request" option (24 Nov 2026)
+
+- **Task:** Issuer portal tests
+- **Symptom:** `tsc` reported that `onUnhandledRequest` does not exist on
+  `server.listen()` options. The tests had passed, which means unhandled requests would only
+  have warned, not failed.
+- **Cause:** MSW 3 renamed the option to `onUnhandledFrame` (it now covers WebSockets too).
+- **Resolution:** `server.listen({ onUnhandledFrame: 'error' })`. The suite still passes, so
+  no test was talking to anything unmocked.
+- **Lesson:** Type-check the test set-up too. A misspelt option in a plain object is silently
+  ignored at runtime.
