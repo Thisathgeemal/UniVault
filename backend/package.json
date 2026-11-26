@@ -29,6 +29,7 @@
     "predb:seed:demo": "npm run build:deps",
     "db:seed:demo": "tsx src/db/cli.ts seed-demo",
     "db:inspect": "tsx src/db/cli.ts inspect",
+    "db:holder:set": "tsx src/db/cli.ts holder-set",
     "db:reset": "tsx src/db/cli.ts reset",
     "prekeys:init": "npm run build:deps",
     "keys:init": "tsx src/db/cli.ts keys",

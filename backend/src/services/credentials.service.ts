@@ -29,7 +29,21 @@
  */
 import { createPublicKey } from 'node:crypto';
 import { computeEcJwkThumbprint, createSdJwt } from '@univault/crypto-core/node';
-import { and, asc, count, desc, eq, gt, inArray, isNull, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  ilike,
+  inArray,
+  isNull,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { z } from 'zod';
 import type { StaffProfile } from '../auth/auth-service.js';
 import type { Db } from '../db/client.js';
@@ -226,13 +240,68 @@ export interface CredentialStatusEventView {
   createdAt: string;
 }
 
+/** GET /credentials sort orders (ties broken by creation time, then id). */
+export const LIST_SORTS = [
+  'newest',
+  'oldest',
+  'expires',
+  'expires_desc',
+  'holder',
+  'holder_desc',
+] as const;
+export type ListSort = (typeof LIST_SORTS)[number];
+
 export interface ListCredentialsQuery {
   status?: CredentialStatus | undefined;
   /** Filter on the computed status, e.g. 'expired' (stored valid, expires_at <= now). */
   effectiveStatus?: EffectiveStatus | undefined;
   holderId?: string | undefined;
+  /** Holder name or reference (contains, case-insensitive) or credential id (prefix). */
+  q?: string | undefined;
+  sort?: ListSort | undefined;
   limit: number;
   offset: number;
+}
+
+/** A list row: the metadata plus whether a usable wallet offer exists (never the code). */
+export interface CredentialListItem extends CredentialMetadata {
+  hasActiveOffer: boolean;
+}
+
+/**
+ * Per effective status, the credentials matching the list's issuer, holderId and q filters
+ * (not the status filter): the portal's tab counts. Same rule as the list filter
+ * (effectiveStatusCondition), so a tab count always equals that tab's total.
+ */
+export type CredentialStatusCounts = Record<EffectiveStatus | 'all', number>;
+
+export interface CredentialListResult {
+  credentials: CredentialListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  counts: CredentialStatusCounts;
+}
+
+/**
+ * POST /credentials/:id/reissue/preview: what a reissue would produce now, from the SAME code
+ * as POST /credentials/:id/reissue up to the writes (no lock, nothing written).
+ */
+export interface ReissuePreview {
+  credentialId: string;
+  credentialType: CredentialTypeName;
+  holder: { id: string; externalRef: string; fullName: string };
+  current: { claims: Record<string, unknown>; expiresAt: string; effectiveStatus: EffectiveStatus };
+  replacement: {
+    claims: Record<string, unknown>;
+    expiresAt: string;
+    defaultExpiresAt: string;
+    cappedBy: ExpiryCap | null;
+    validUntilRange: { min: string; max: string };
+  };
+  /** Claim names whose value differs between the current credential and the replacement. */
+  changedFields: string[];
+  warnings: string[];
 }
 
 /** An EC P-256 public JWK, as placed in `cnf.jwk`. */
@@ -255,10 +324,7 @@ export interface CredentialsService {
   preview(staff: StaffProfile, input: CreateCredentialInput): Promise<CredentialPreview>;
   /** The schemas the staff member's issuer may issue (one per issuer type today). */
   issuableSchemas(staff: StaffProfile): IssuableSchema[];
-  list(
-    staff: StaffProfile,
-    query: ListCredentialsQuery,
-  ): Promise<{ credentials: CredentialMetadata[]; total: number; limit: number; offset: number }>;
+  list(staff: StaffProfile, query: ListCredentialsQuery): Promise<CredentialListResult>;
   get(staff: StaffProfile, credentialId: string): Promise<CredentialDetail>;
   /** Pending or valid → revoked (the route allows admins only). */
   revoke(
@@ -272,6 +338,12 @@ export interface CredentialsService {
     credentialId: string,
     input: ReissueCredentialInput,
   ): Promise<ReissueResult>;
+  /** What reissue() would produce now: the same checks and values, without writing anything. */
+  reissuePreview(
+    staff: StaffProfile,
+    credentialId: string,
+    input: ReissueCredentialInput,
+  ): Promise<ReissuePreview>;
   /** The credential's status history, oldest first. */
   events(
     staff: StaffProfile,
@@ -554,9 +626,17 @@ export function createCredentialsService(
     return holder;
   };
 
-  /** Locks a credential row (issuer-scoped). Another issuer's credential is "not found". */
-  const lockCredential = async (tx: Executor, staff: StaffProfile, credentialId: string) => {
-    const [credential] = await tx
+  /**
+   * A credential row (issuer-scoped), locked FOR UPDATE unless `lock` is false (the reissue
+   * preview). Another issuer's credential is "not found".
+   */
+  const lockCredential = async (
+    tx: Executor,
+    staff: StaffProfile,
+    credentialId: string,
+    lock = true,
+  ) => {
+    const query = tx
       .select()
       .from(credentialRecords)
       .where(
@@ -564,8 +644,8 @@ export function createCredentialsService(
           eq(credentialRecords.id, credentialId),
           eq(credentialRecords.issuerId, staff.issuer.id),
         ),
-      )
-      .for('update');
+      );
+    const [credential] = lock ? await query.for('update') : await query;
     if (!credential) throw credentialNotFound();
     return credential;
   };
@@ -648,11 +728,15 @@ export function createCredentialsService(
     return expectedType;
   };
 
-  /** Rejects a second pending or valid credential of the same type for one holder. */
+  /**
+   * Rejects a second pending or valid credential of the same type for one holder. `excludeId`:
+   * the credential a reissue is about to supersede (it does not count against its replacement).
+   */
   const assertNoActiveCredential = async (
     tx: Executor,
     holderId: string,
     type: CredentialTypeName,
+    excludeId?: string,
   ) => {
     const [existing] = await tx
       .select({ id: credentialRecords.id })
@@ -662,6 +746,7 @@ export function createCredentialsService(
           eq(credentialRecords.holderId, holderId),
           eq(credentialRecords.credentialType, type),
           inArray(credentialRecords.status, ACTIVE_STATUSES),
+          ...(excludeId ? [ne(credentialRecords.id, excludeId)] : []),
         ),
       )
       .limit(1);
@@ -786,6 +871,46 @@ export function createCredentialsService(
     return { holder, type, prepared };
   };
 
+  /**
+   * The ONE reissue path up to the writes, shared by reissue() and reissuePreview(). In order:
+   * the old credential of this issuer (404), not pending (409 CREDENTIAL_NOT_REISSUABLE), not
+   * revoked or superseded (409), the holder's CURRENT record through prepareClaims() (422 /
+   * 400 validUntil), an active signing key (409), and no OTHER active credential of the type
+   * (409). Nothing is written here.
+   *
+   * Stored 'valid' includes credentials whose expiry has passed (effective status 'expired'):
+   * reissuing one is a renewal (Decision 012 follow-up), so expiry is deliberately not checked.
+   *
+   * `lock` (default true, reissue): the old credential and then the holder are locked FOR
+   * UPDATE, so a second reissue of the same credential waits, then sees 'superseded' (409).
+   * The preview passes `lock: false`.
+   */
+  const prepareReissue = async (
+    executor: Executor,
+    staff: StaffProfile,
+    credentialId: string,
+    input: ReissueCredentialInput,
+    issuedOn: Date,
+    { lock = true }: { lock?: boolean } = {},
+  ) => {
+    const old = await lockCredential(executor, staff, credentialId, lock);
+    if (old.status === 'pending') {
+      throw new AppError(
+        409,
+        'CREDENTIAL_NOT_REISSUABLE',
+        'A pending credential has not been delivered yet, so it cannot be reissued. Revoke it and issue a new one.',
+      );
+    }
+    await assertNotFinal(executor, old);
+    const holder = await lockHolder(executor, staff, old.holderId, lock);
+    const prepared = prepareClaims(old.credentialType, holder, issuedOn, {
+      validUntil: input.validUntil,
+    });
+    if (!(await activeKey(staff.issuer.id, executor))) throw issuerKeyMissing();
+    await assertNoActiveCredential(executor, holder.id, old.credentialType, old.id);
+    return { old, holder, prepared };
+  };
+
   return {
     async create(staff, input) {
       const issuedOn = now();
@@ -858,28 +983,95 @@ export function createCredentialsService(
 
     async list(staff, query) {
       const at = now();
-      const conditions = [eq(credentialRecords.issuerId, staff.issuer.id)]; // issuer scope
-      if (query.status) conditions.push(eq(credentialRecords.status, query.status));
-      if (query.holderId) conditions.push(eq(credentialRecords.holderId, query.holderId));
-      if (query.effectiveStatus)
-        conditions.push(effectiveStatusCondition(query.effectiveStatus, at));
-      const where = and(...conditions);
+      // Issuer scope, holder and search: shared by the page, its total and the tab counts
+      const base: SQL[] = [eq(credentialRecords.issuerId, staff.issuer.id)];
+      if (query.holderId) base.push(eq(credentialRecords.holderId, query.holderId));
+      if (query.q) base.push(listSearchCondition(query.q));
+      const filtered = [...base];
+      if (query.status) filtered.push(eq(credentialRecords.status, query.status));
+      if (query.effectiveStatus) filtered.push(effectiveStatusCondition(query.effectiveStatus, at));
+      const where = and(...filtered);
+      const joined = () =>
+        db
+          .select({ id: credentialRecords.id })
+          .from(credentialRecords)
+          .innerJoin(holders, eq(holders.id, credentialRecords.holderId));
 
-      const [rows, totals] = await Promise.all([
-        db.query.credentialRecords.findMany({
-          where,
-          with: METADATA_RELATIONS,
-          orderBy: [desc(credentialRecords.createdAt), desc(credentialRecords.id)],
-          limit: query.limit,
-          offset: query.offset,
-        }),
-        db.select({ n: count() }).from(credentialRecords).where(where),
+      // A fixed number of queries per page, whatever its size (no N+1): the page's ids (sorted
+      // with the holder name available), the total, the tab counts, the rows' metadata, and
+      // which rows have a usable offer
+      const countIf = (status: EffectiveStatus) =>
+        sql<number>`count(*) filter (where ${effectiveStatusCondition(status, at)})`.mapWith(
+          Number,
+        );
+      const [page, totals, countRows] = await Promise.all([
+        joined()
+          .where(where)
+          .orderBy(...LIST_ORDER[query.sort ?? 'newest'])
+          .limit(query.limit)
+          .offset(query.offset),
+        db
+          .select({ n: count() })
+          .from(credentialRecords)
+          .innerJoin(holders, eq(holders.id, credentialRecords.holderId))
+          .where(where),
+        db
+          .select({
+            all: count(),
+            pending: countIf('pending'),
+            valid: countIf('valid'),
+            expired: countIf('expired'),
+            revoked: countIf('revoked'),
+            superseded: countIf('superseded'),
+          })
+          .from(credentialRecords)
+          .innerJoin(holders, eq(holders.id, credentialRecords.holderId))
+          .where(and(...base)),
       ]);
+      const ids = page.map((r) => r.id);
+      const [rows, offers] =
+        ids.length === 0
+          ? [[], []]
+          : await Promise.all([
+              db.query.credentialRecords.findMany({
+                where: inArray(credentialRecords.id, ids),
+                with: METADATA_RELATIONS,
+              }),
+              // Same rule as offerStatus() 'active' and get()'s activeOffer
+              db
+                .selectDistinct({ credentialId: credentialOffers.credentialId })
+                .from(credentialOffers)
+                .where(
+                  and(
+                    inArray(credentialOffers.credentialId, ids),
+                    isNull(credentialOffers.redeemedAt),
+                    isNull(credentialOffers.invalidatedAt),
+                    gt(credentialOffers.expiresAt, at),
+                  ),
+                ),
+            ]);
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const withOffer = new Set(offers.map((o) => o.credentialId));
+      const counts = countRows[0]!;
       return {
-        credentials: rows.map((row) => toMetadata(row, at)),
+        credentials: ids.map((id) => {
+          const metadata = toMetadata(byId.get(id)!, at);
+          return {
+            ...metadata,
+            hasActiveOffer: metadata.status === 'pending' && withOffer.has(id),
+          };
+        }),
         total: totals[0]?.n ?? 0,
         limit: query.limit,
         offset: query.offset,
+        counts: {
+          all: counts.all,
+          pending: counts.pending,
+          valid: counts.valid,
+          expired: counts.expired,
+          revoked: counts.revoked,
+          superseded: counts.superseded,
+        },
       };
     },
 
@@ -967,25 +1159,15 @@ export function createCredentialsService(
     async reissue(staff, credentialId, input) {
       const issuedOn = now();
       const result = await db.transaction(async (tx) => {
-        // Old credential first, then the holder: a second reissue of the same credential
-        // waits on this lock, then sees 'superseded' and gets 409
-        const old = await lockCredential(tx, staff, credentialId);
-        if (old.status === 'pending') {
-          throw new AppError(
-            409,
-            'CREDENTIAL_NOT_REISSUABLE',
-            'A pending credential has not been delivered yet, so it cannot be reissued. Revoke it and issue a new one.',
-          );
-        }
-        await assertNotFinal(tx, old);
+        // Old credential first, then the holder (both locked): every check, then the writes
+        const { old, holder, prepared } = await prepareReissue(
+          tx,
+          staff,
+          credentialId,
+          input,
+          issuedOn,
+        );
 
-        const holder = await lockHolder(tx, staff, old.holderId);
-        const prepared = prepareClaims(old.credentialType, holder, issuedOn, {
-          validUntil: input.validUntil,
-        });
-        if (!(await activeKey(staff.issuer.id, tx))) throw issuerKeyMissing();
-
-        // Supersede first, so the "one active credential" check no longer counts the old one
         await tx
           .update(credentialRecords)
           .set({
@@ -995,7 +1177,6 @@ export function createCredentialsService(
             statusUpdatedAt: issuedOn,
           })
           .where(and(eq(credentialRecords.id, old.id), eq(credentialRecords.status, 'valid')));
-        await assertNoActiveCredential(tx, holder.id, old.credentialType);
 
         const newId = await insertPending(
           tx,
@@ -1029,6 +1210,39 @@ export function createCredentialsService(
         credential: (await loadMetadata(eq(credentialRecords.id, result.newId)))!,
         replaces: { id: result.oldId, status: 'superseded' },
         invalidatedOfferIds: result.invalidatedOfferIds,
+      };
+    },
+
+    async reissuePreview(staff, credentialId, input) {
+      const issuedOn = now();
+      // Same checks as reissue(), without a lock and without a transaction: nothing is written
+      const { old, holder, prepared } = await prepareReissue(
+        db,
+        staff,
+        credentialId,
+        input,
+        issuedOn,
+        { lock: false },
+      );
+      const current = old.claimsSnapshot;
+      return {
+        credentialId: old.id,
+        credentialType: old.credentialType,
+        holder: { id: holder.id, externalRef: holder.externalRef, fullName: holder.fullName },
+        current: {
+          claims: current,
+          expiresAt: old.expiresAt.toISOString(),
+          effectiveStatus: effectiveStatus(old, issuedOn),
+        },
+        replacement: {
+          claims: prepared.claims,
+          expiresAt: prepared.expiresAt.toISOString(),
+          defaultExpiresAt: prepared.defaultExpiresAt.toISOString(),
+          cappedBy: prepared.cappedBy,
+          validUntilRange: prepared.validUntilRange,
+        },
+        changedFields: changedClaimNames(current, prepared.claims),
+        warnings: prepared.claims.age_over_18 === false ? ['holder_under_18'] : [],
       };
     },
 
@@ -1224,6 +1438,56 @@ export function createCredentialsService(
       return (await loadMetadata(eq(credentialRecords.id, credentialId)))!;
     },
   };
+}
+
+/** ORDER BY per list sort; the holder name comes from the joined holders row. */
+const LIST_ORDER: Record<ListSort, SQL[]> = {
+  newest: [desc(credentialRecords.createdAt), desc(credentialRecords.id)],
+  oldest: [asc(credentialRecords.createdAt), asc(credentialRecords.id)],
+  expires: [asc(credentialRecords.expiresAt), asc(credentialRecords.id)],
+  expires_desc: [desc(credentialRecords.expiresAt), desc(credentialRecords.id)],
+  holder: [asc(holders.fullName), desc(credentialRecords.createdAt), asc(credentialRecords.id)],
+  holder_desc: [
+    desc(holders.fullName),
+    desc(credentialRecords.createdAt),
+    desc(credentialRecords.id),
+  ],
+};
+
+/**
+ * The list search: holder name or reference containing `q` (case-insensitive), or a credential
+ * id starting with it. LIKE wildcards in `q` are escaped (backslash is PostgreSQL's default
+ * LIKE escape), so "%" or "_" match themselves.
+ */
+function listSearchCondition(q: string): SQL {
+  const escaped = q.replace(/[\\%_]/g, (c) => `\\${c}`);
+  return or(
+    ilike(holders.fullName, `%${escaped}%`),
+    ilike(holders.externalRef, `%${escaped}%`),
+    sql`${credentialRecords.id}::text ilike ${`${escaped.toLowerCase()}%`}`,
+  )!;
+}
+
+/** JSON with object keys sorted, so equal claims compare equal whatever their key order. */
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    );
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableJson(v)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'undefined';
+}
+
+/** Claim names (top level, sorted) whose value differs, including added or removed claims. */
+export function changedClaimNames(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): string[] {
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .filter((name) => stableJson(before[name]) !== stableJson(after[name]))
+    .sort();
 }
 
 /** Related rows loaded with every credential's metadata. */

@@ -75,15 +75,16 @@ below (`NOT VALID`: free-text reasons stored before 0005/0006 are kept).
 
 ## 3. Endpoints (login required)
 
-| Method | Path                                        | Access           | Purpose                                                  |
-| ------ | ------------------------------------------- | ---------------- | -------------------------------------------------------- |
-| POST   | `/api/v1/credentials`                       | Officer or admin | Create a pending credential from a holder record         |
-| POST   | `/api/v1/credentials/preview`               | Officer or admin | What POST would create, without writing anything         |
-| GET    | `/api/v1/credentials`                       | Officer or admin | List the issuer's credentials (filter, paging)           |
-| GET    | `/api/v1/credentials/:credentialId`         | Officer or admin | One credential's metadata                                |
-| POST   | `/api/v1/credentials/:credentialId/revoke`  | **Admin only**   | Pending or valid → revoked (section 6.1)                 |
-| POST   | `/api/v1/credentials/:credentialId/reissue` | Officer or admin | Valid → superseded, plus a new pending replacement (6.2) |
-| GET    | `/api/v1/credentials/:credentialId/events`  | Officer or admin | Status history, oldest first (6.3)                       |
+| Method | Path                                                | Access           | Purpose                                                                   |
+| ------ | --------------------------------------------------- | ---------------- | ------------------------------------------------------------------------- |
+| POST   | `/api/v1/credentials`                               | Officer or admin | Create a pending credential from a holder record                          |
+| POST   | `/api/v1/credentials/preview`                       | Officer or admin | What POST would create, without writing anything                          |
+| GET    | `/api/v1/credentials`                               | Officer or admin | List the issuer's credentials (filters, search, sort, paging, tab counts) |
+| GET    | `/api/v1/credentials/:credentialId`                 | Officer or admin | One credential's metadata                                                 |
+| POST   | `/api/v1/credentials/:credentialId/revoke`          | **Admin only**   | Pending, valid or expired → revoked (section 6.1, 6.5)                    |
+| POST   | `/api/v1/credentials/:credentialId/reissue`         | Officer or admin | Valid or expired → superseded, plus a new pending replacement (6.2, 6.5)  |
+| POST   | `/api/v1/credentials/:credentialId/reissue/preview` | Officer or admin | What reissue would produce, without writing anything (6.6)                |
+| GET    | `/api/v1/credentials/:credentialId/events`          | Officer or admin | Status history, oldest first (6.3)                                        |
 
 All routes are issuer-scoped through `req.auth`: another issuer's credential is
 `404 CREDENTIAL_NOT_FOUND`. (`requireOwnIssuer` is not used, because these
@@ -161,17 +162,61 @@ material. The holder-key thumbprint is not returned either.
 
 ### GET `/api/v1/credentials`
 
-| Query             | Default | Meaning                                                                                                                                             |
-| ----------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `status`          | –       | Stored status: `pending`, `valid`, `revoked` or `superseded`                                                                                        |
-| `effectiveStatus` | –       | Computed status: the four above or `expired`. `expired` = stored `valid` with `expires_at <= now`; `valid` = stored `valid` with `expires_at > now` |
-| `holderId`        | –       | Only this holder's credentials (UUID)                                                                                                               |
-| `limit`           | 20      | 1–100                                                                                                                                               |
-| `offset`          | 0       | Number of records to skip                                                                                                                           |
+The issuer portal's credentials table ([issuer-portal.md](../frontend/issuer-portal.md) §12).
 
-**Response:** `{ "credentials": [ …metadata as above… ], "total": 7, "limit": 20, "offset": 0 }`,
-newest first. Only the logged-in issuer's credentials are listed. A `holderId`
-belonging to another issuer gives an empty list.
+| Query             | Default  | Meaning                                                                                                                                             |
+| ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`          | –        | Stored status: `pending`, `valid`, `revoked` or `superseded`                                                                                        |
+| `effectiveStatus` | –        | Computed status: the four above or `expired`. `expired` = stored `valid` with `expires_at <= now`; `valid` = stored `valid` with `expires_at > now` |
+| `holderId`        | –        | Only this holder's credentials (UUID)                                                                                                               |
+| `q`               | –        | Trimmed, at most 100 characters (empty = no search). Holder name or reference **containing** it (any case), or a credential id **starting** with it |
+| `sort`            | `newest` | `newest`, `oldest` (creation time), `expires`, `expires_desc`, `holder`, `holder_desc` (holder name). Ties: creation time, then id                  |
+| `limit`           | 20       | 1–100                                                                                                                                               |
+| `offset`          | 0        | Number of records to skip                                                                                                                           |
+
+**Response:**
+
+```json
+{
+  "credentials": [
+    {
+      "id": "3b9f…",
+      "holder": { "id": "…", "externalRef": "STC-00003", "fullName": "Malith Wijesinghe" },
+      "credentialType": "EmploymentCredential",
+      "vct": "urn:…",
+      "status": "valid",
+      "effectiveStatus": "expired",
+      "issuedAt": "…",
+      "expiresAt": "…",
+      "createdAt": "…",
+      "replacesCredentialId": null,
+      "replacedByCredentialId": null,
+      "hasActiveOffer": false,
+      "…": "the other metadata fields of section 3"
+    }
+  ],
+  "total": 7,
+  "limit": 20,
+  "offset": 0,
+  "counts": { "all": 18, "pending": 3, "valid": 7, "expired": 1, "revoked": 2, "superseded": 5 }
+}
+```
+
+- **Rows are metadata only.** The holder appears as id, reference and name, with no ID numbers
+  or other claims. `issuedAt` is the signing time (null while pending).
+- **`hasActiveOffer`**: the credential is `pending` and has an offer that is not redeemed, not
+  invalidated and not expired. This is the same rule as `activeOffer` on the detail. The code is
+  never included.
+- **`counts`**: per effective status, the credentials that match the issuer, `holderId` and `q`
+  filters but **not** the status filter, so the portal can show its tab counts. They use the
+  same SQL rule as the filter (`effectiveStatusCondition`), so a tab's count always equals that
+  tab's `total`. Revoked-while-pending credentials count as `revoked` here; the dashboard leaves
+  them out of its issued figures.
+- **No N+1:** each page takes a fixed number of queries (page ids sorted with the holder
+  joined, the total, the counts, the rows' metadata, the rows with an active offer).
+
+Only the logged-in issuer's credentials are listed. A `holderId` belonging to another issuer
+gives an empty list.
 
 ### GET `/api/v1/credentials/:credentialId`
 
@@ -180,7 +225,8 @@ Returns the same metadata object. Another issuer's credential returns `404`.
 It adds **`activeOffer`**: `{ offerId, expiresAt }` of the credential's newest offer that is
 not redeemed, not invalidated and not expired (only while the credential is `pending`), or
 `null`. Never the code. The portal uses it to say that a QR code cannot be shown again
-(Decision 021; [credential-offers-api.md](credential-offers-api.md)). The list does not carry it.
+(Decision 021; [credential-offers-api.md](credential-offers-api.md)). List rows carry only the
+`hasActiveOffer` boolean instead.
 
 ### POST `/api/v1/credentials/preview` (officer or admin)
 
@@ -360,6 +406,8 @@ plus an optional earlier `validUntil` (section 6.2).
 
 1. Allowed from `valid` **and** `pending`. A pending credential would otherwise
    block new issuance for that holder (`ACTIVE_CREDENTIAL_EXISTS`) until it expired.
+   An **expired** credential (stored `valid`, past its expiry) can be revoked too
+   (section 6.5).
 2. Sets `status = 'revoked'`, `revoked_at`, `revoked_by_staff_id`,
    `revocation_reason`, `status_updated_at`.
 3. Invalidates every offer of the credential that is neither redeemed nor already
@@ -405,8 +453,16 @@ no longer valid from that instant, so `"validUntil": "2027-06-30"` gives
 18th birthday), which also end at 00:00 UTC. In Sri Lanka (UTC+05:30) that
 instant is 05:30 local time on the same date.
 
-Only a **valid** credential can be reissued. A pending one has not been
+Only a **valid** credential can be reissued, and stored `valid` **includes expired** ones:
+reissuing an expired credential is a renewal (section 6.5). A pending one has not been
 delivered, so it is revoked and issued again instead (`409 CREDENTIAL_NOT_REISSUABLE`).
+
+All checks before any write live in one function, `prepareReissue()`, which the reissue
+preview (section 6.6) shares. They run in this order: the credential of this issuer (404), not
+pending (409 `CREDENTIAL_NOT_REISSUABLE`), not revoked or superseded (409), the holder's current
+record through `prepareClaims()` (422 / 400 `validUntil`), an active signing key (409), and no
+**other** active credential of the type (409 `ACTIVE_CREDENTIAL_EXISTS`; the credential being
+replaced does not count).
 
 **What the server does (one transaction):**
 
@@ -419,8 +475,8 @@ delivered, so it is revoked and issued again instead (`409 CREDENTIAL_NOT_REISSU
    `HOLDER_DATA_INVALID`**, exactly as in issuance; no active issuer key →
    `409 ISSUER_KEY_MISSING`.
 3. Sets the old credential to `superseded` (`superseded_at`,
-   `superseded_by_staff_id`). It no longer counts as active, so the
-   one-active-credential check passes for the replacement.
+   `superseded_by_staff_id`). The one-active-credential check in step 1 already
+   leaves it out, so the replacement passes.
 4. Inserts the replacement as `pending` with `replaces_credential_id` = old id
    (UNIQUE: a credential has at most one replacement).
 5. Invalidates the old credential's open offers.
@@ -491,6 +547,67 @@ events backfilled by migration `0005` whose staff member is unknown. The
 replacement's history starts with its own creation; follow
 `replacesCredentialId` for the earlier credential.
 
+### 6.5 Expired credentials: renew by reissue, revoke allowed
+
+An **expired** credential is stored `valid` with `expires_at <= now`; `expired` is never stored
+(Decision 013).
+
+| Action  | Expired credential  | Why                                                                                                                                                                                   |
+| ------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reissue | **Allowed**         | A renewal: the old one becomes `superseded`, the replacement is `pending` with a new expiry counted from today (section 5). Any reissue reason; `validity_extension` is the usual one |
+| Revoke  | **Allowed** (admin) | It hides nothing (it is not valid anyway) and records the issuer's intent (e.g. `employment_ended`); the public status changes from `expired` to `revoked`                            |
+
+The portal shows **Renew** instead of **Reissue** for an expired credential; it is the same
+endpoint. `test/credentials-table.test.ts` covers both rules. Both follow from the stored-status
+checks of Decision 012 (recorded in its consequences), so there is no new decision.
+
+### 6.6 POST `/api/v1/credentials/:credentialId/reissue/preview` – officer or admin
+
+What `POST /credentials/:id/reissue` would produce **now**, without writing anything. The body
+is the same as for reissue (`reason`, `note`, `validUntil`) and is validated the same way. It
+runs the same `prepareReissue()` up to the writes, without a lock or a transaction, so it
+raises **the same errors in the same order**: 404; 409 `CREDENTIAL_NOT_REISSUABLE`,
+`CREDENTIAL_ALREADY_REVOKED`, `CREDENTIAL_SUPERSEDED`, `ISSUER_KEY_MISSING`,
+`ACTIVE_CREDENTIAL_EXISTS`; 422 `HOLDER_DATA_INVALID`; 400 `validUntil`. As with the issuance
+preview (Decision 019), a later reissue can still fail if something changes in between.
+
+**Response:** `200 OK`, `Cache-Control: no-store` (it holds claims; the debug log has ids and
+the reason only):
+
+```json
+{
+  "credentialId": "fa1c…",
+  "credentialType": "EmploymentCredential",
+  "holder": { "id": "…", "externalRef": "STC-00003", "fullName": "Malith Wijesinghe" },
+  "current": {
+    "claims": { "designation": "HR Executive", "…": "…" },
+    "expiresAt": "2027-10-01T05:00:00.000Z",
+    "effectiveStatus": "valid"
+  },
+  "replacement": {
+    "claims": { "designation": "Senior HR Executive", "…": "…" },
+    "expiresAt": "2027-11-26T05:00:00.000Z",
+    "defaultExpiresAt": "2027-11-26T05:00:00.000Z",
+    "cappedBy": null,
+    "validUntilRange": { "min": "2026-11-27", "max": "2027-11-26" }
+  },
+  "changedFields": ["designation"],
+  "warnings": []
+}
+```
+
+- `current.claims` is the snapshot the old credential was created with. `replacement.claims` is
+  built from the holder's **current** record (`age_over_18` recalculated).
+- `changedFields`: the top-level claim names whose value differs, sorted. Objects are compared
+  by content in any key order; added and removed claims count. It may be empty: a reissue is
+  still allowed, for example after a lost wallet or to extend the validity.
+- `cappedBy`, `defaultExpiresAt` and `validUntilRange` mean the same as in the issuance preview.
+- `warnings`: `holder_under_18` when `age_over_18` is false.
+
+`test/credentials-table.test.ts` checks that the preview equals a following real reissue at the
+same clock (claims and expiry) and that it writes nothing (credential rows, events and offers
+are unchanged).
+
 ### 6.4 Development-only: simulated redemption and expiry (temporary)
 
 Until Sprint 2 builds wallet redemption, a pending credential can only become
@@ -536,7 +653,7 @@ reason must stay valid.
 | Revoke by an officer                                                                                                    | 403    | `FORBIDDEN`                                                                                                                                     |
 | Revoke or reissue a revoked credential                                                                                  | 409    | `CREDENTIAL_ALREADY_REVOKED`                                                                                                                    |
 | Revoke or reissue a superseded credential                                                                               | 409    | `CREDENTIAL_SUPERSEDED` (`details.replacedBy` = replacement id)                                                                                 |
-| Reissue a pending credential                                                                                            | 409    | `CREDENTIAL_NOT_REISSUABLE` (revoke it and issue a new one)                                                                                     |
+| Reissue (or its preview) of a pending credential                                                                        | 409    | `CREDENTIAL_NOT_REISSUABLE` (revoke it and issue a new one)                                                                                     |
 | Dev only: simulate expiry of a credential that is not effectively `valid`                                               | 409    | `CREDENTIAL_NOT_VALID` (`details.effectiveStatus`)                                                                                              |
 
 Signing errors are listed in section 4.

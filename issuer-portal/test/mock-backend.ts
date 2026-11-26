@@ -409,10 +409,66 @@ export const holderHandlers = [
     const url = new URL(request.url);
     record(request, `/credentials${url.search}`);
     if (!staffFor(request)) return unauthenticated();
-    const credentials = credentialStore.get(url.searchParams.get('holderId') ?? '') ?? [];
-    return HttpResponse.json({ credentials, total: credentials.length, limit: 100, offset: 0 });
+    const staff = staffFor(request)!;
+    const holderId = url.searchParams.get('holderId');
+    if (holderId) {
+      const credentials = credentialStore.get(holderId) ?? [];
+      return HttpResponse.json({ credentials, total: credentials.length, limit: 100, offset: 0 });
+    }
+    return HttpResponse.json(mockCredentialList(staff, url.searchParams));
   }),
 ];
+
+/** GET /credentials for the table: the backend's filters, search, sorts, paging and counts. */
+export function mockCredentialList(staff: Staff, params: URLSearchParams) {
+  const own = [...issuedStore.values()].filter(
+    (c) => holderStore.find((h) => h.id === c.holder.id)?.issuerId === staff.issuer.id,
+  );
+  const q = (params.get('q') ?? '').trim().toLowerCase();
+  const searched = q
+    ? own.filter(
+        (c) =>
+          c.holder.fullName.toLowerCase().includes(q) ||
+          c.holder.externalRef.toLowerCase().includes(q) ||
+          c.id.startsWith(q),
+      )
+    : own;
+  const status = params.get('effectiveStatus');
+  const filtered = status ? searched.filter((c) => c.effectiveStatus === status) : searched;
+  const sort = params.get('sort') ?? 'newest';
+  const cmp: Record<string, (a: MockCredential, b: MockCredential) => number> = {
+    newest: (a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
+    oldest: (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+    expires: (a, b) => a.expiresAt.localeCompare(b.expiresAt) || a.id.localeCompare(b.id),
+    expires_desc: (a, b) => b.expiresAt.localeCompare(a.expiresAt) || b.id.localeCompare(a.id),
+    holder: (a, b) =>
+      a.holder.fullName.localeCompare(b.holder.fullName) || a.id.localeCompare(b.id),
+    holder_desc: (a, b) =>
+      b.holder.fullName.localeCompare(a.holder.fullName) || b.id.localeCompare(a.id),
+  };
+  const sorted = [...filtered].sort(cmp[sort] ?? cmp.newest);
+  const limit = Number(params.get('limit') ?? 20);
+  const offset = Number(params.get('offset') ?? 0);
+  const count = (s: string) => searched.filter((c) => c.effectiveStatus === s).length;
+  return {
+    credentials: sorted.slice(offset, offset + limit).map(({ claims: _claims, ...c }) => ({
+      ...c,
+      vct: `urn:univault:vct:${c.credentialType}:1`,
+      hasActiveOffer: c.status === 'pending' && activeOfferOfCredential(c.id) !== null,
+    })),
+    total: filtered.length,
+    limit,
+    offset,
+    counts: {
+      all: searched.length,
+      pending: count('pending'),
+      valid: count('valid'),
+      expired: count('expired'),
+      revoked: count('revoked'),
+      superseded: count('superseded'),
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Issuance: GET /credential-schemas, POST /credentials/preview, POST /credentials,
@@ -470,8 +526,41 @@ export function mockSchemaResponse(type: 'EmploymentCredential' | 'KYCCredential
   };
 }
 
-/** Credentials created through POST /credentials in this test (id -> metadata). */
-export const issuedStore = new Map<string, CredentialMetadata>();
+/** A credential in the mock: metadata plus the detail fields and the claims snapshot. */
+export interface MockCredential extends CredentialMetadata {
+  revokedAt?: string | null;
+  revocationReason?: string | null;
+  revokedBy?: { id: string; displayName: string } | null;
+  supersededAt?: string | null;
+  replacesCredentialId?: string | null;
+  replacedByCredentialId?: string | null;
+  createdBy?: { id: string; displayName: string } | null;
+  /** The claims the credential was created with (reissue preview "current"). */
+  claims?: Record<string, unknown>;
+}
+
+/** Credentials created in this test (id -> credential). */
+export const issuedStore = new Map<string, MockCredential>();
+
+export interface MockEvent {
+  id: string;
+  fromStatus: CredentialMetadata['status'] | null;
+  toStatus: CredentialMetadata['status'];
+  reason: string | null;
+  note: string | null;
+  staff: { id: string; displayName: string } | null;
+  createdAt: string;
+}
+/** Status history per credential (GET /credentials/:id/events). */
+export const eventStore = new Map<string, MockEvent[]>();
+const pushEvent = (
+  credentialId: string,
+  event: Omit<MockEvent, 'id' | 'note'> & { note?: string | null },
+) => {
+  const list = eventStore.get(credentialId) ?? [];
+  list.push({ id: `ev-${credentialId}-${list.length + 1}`, note: null, ...event });
+  eventStore.set(credentialId, list);
+};
 const activeCredentialOf = (holderId: string) =>
   (credentialStore.get(holderId) ?? []).find((c) =>
     ['pending', 'valid'].includes(c.effectiveStatus),
@@ -658,23 +747,72 @@ const offerStatusAt = (offer: MockOffer, at: number): OfferStatus =>
         ? 'expired'
         : 'active';
 
-/** A pending credential for `holderId` (an employer-a employee by default), for offer tests. */
+/**
+ * A credential for `holderId` (an employer-a employee by default) in the given EFFECTIVE
+ * status, with its claims snapshot (the holder's claims now) and a matching history.
+ * 'expired' = stored valid with an expiry in the past.
+ */
 export function addPendingCredential(
   holderId: string = HOLDER_IDS.nimesha,
-  status: CredentialMetadata['status'] = 'pending',
+  effective: CredentialMetadata['effectiveStatus'] = 'pending',
+  extra: Partial<MockCredential> = {},
 ): string {
   const holder = holderStore.find((h) => h.id === holderId)!;
   const id = `e0000000-0000-4000-8000-${String(issuedStore.size + 1).padStart(12, '0')}`;
+  const status = effective === 'expired' ? 'valid' : effective;
+  const signed = status !== 'pending' && !(status === 'revoked' && extra.issuedAt === null);
+  const officer = { id: OFFICER.id, displayName: OFFICER.displayName };
+  const admin = { id: ADMIN.id, displayName: ADMIN.displayName };
   issuedStore.set(id, {
     id,
     holder: { id: holder.id, externalRef: holder.externalRef, fullName: holder.fullName },
     credentialType: holder.credentialType,
     status,
-    effectiveStatus: status,
-    issuedAt: status === 'pending' ? null : MOCK_NOW,
-    expiresAt: '2027-11-26T04:30:00.000Z',
-    createdAt: MOCK_NOW,
+    effectiveStatus: effective,
+    issuedAt: signed ? '2026-11-21T05:00:00.000Z' : null,
+    expiresAt: effective === 'expired' ? '2026-11-25T00:00:00.000Z' : '2027-11-26T04:30:00.000Z',
+    createdAt: '2026-11-21T04:30:00.000Z',
+    createdBy: officer,
+    claims: structuredClone(holder.claims),
+    ...(status === 'revoked'
+      ? { revokedAt: MOCK_NOW, revocationReason: 'employment_ended', revokedBy: admin }
+      : {}),
+    ...extra,
   });
+  pushEvent(id, {
+    fromStatus: null,
+    toStatus: 'pending',
+    reason: null,
+    staff: officer,
+    createdAt: '2026-11-21T04:30:00.000Z',
+  });
+  if (signed) {
+    pushEvent(id, {
+      fromStatus: 'pending',
+      toStatus: 'valid',
+      reason: null,
+      staff: null,
+      createdAt: '2026-11-21T05:00:00.000Z',
+    });
+  }
+  if (status === 'revoked') {
+    pushEvent(id, {
+      fromStatus: signed ? 'valid' : 'pending',
+      toStatus: 'revoked',
+      reason: 'employment_ended',
+      staff: admin,
+      createdAt: MOCK_NOW,
+    });
+  }
+  if (status === 'superseded') {
+    pushEvent(id, {
+      fromStatus: 'valid',
+      toStatus: 'superseded',
+      reason: 'details_changed',
+      staff: officer,
+      createdAt: MOCK_NOW,
+    });
+  }
   return id;
 }
 
@@ -751,13 +889,14 @@ function offerDetail(offer: MockOffer) {
   };
 }
 
-const activeOfferOf = (credentialId: string) => {
+const activeOfferOf = (credentialId: string) => activeOfferOfCredential(credentialId);
+function activeOfferOfCredential(credentialId: string) {
   const at = serverNow();
   const offer = [...offerStore.values()]
     .filter((o) => o.credentialId === credentialId && offerStatusAt(o, at) === 'active')
     .at(-1);
   return offer ? { offerId: offer.offerId, expiresAt: iso(offer.expiresAt)! } : null;
-};
+}
 
 /** The credential if it belongs to the staff member's issuer. */
 const ownCredential = (staff: Staff, credentialId: string) => {
@@ -779,8 +918,9 @@ export const offerHandlers = [
         status: 404,
       });
     }
+    const { claims: _claims, ...metadata } = known; // the backend never returns claims here
     return HttpResponse.json({
-      ...known,
+      ...metadata,
       activeOffer: known.status === 'pending' ? activeOfferOf(known.id) : null,
     });
   }),
@@ -857,11 +997,208 @@ export const offerHandlers = [
   }),
 ];
 
+// ---------------------------------------------------------------------------
+// Revoke, reissue, reissue preview and the status history (the backend's rules and codes)
+
+const credentialNotFound = () =>
+  HttpResponse.json(errorBody('CREDENTIAL_NOT_FOUND', 'Credential not found'), { status: 404 });
+const conflict = (code: string, message: string, details?: unknown) =>
+  HttpResponse.json(errorBody(code, message, details), { status: 409 });
+
+/** The same order of checks as the backend's prepareReissue(). */
+function reissueCheck(
+  credential: MockCredential,
+  body: { reason?: string; note?: string; validUntil?: string },
+) {
+  if (credential.status === 'pending') {
+    return conflict('CREDENTIAL_NOT_REISSUABLE', 'A pending credential cannot be reissued');
+  }
+  if (credential.status === 'revoked')
+    return conflict('CREDENTIAL_ALREADY_REVOKED', 'Already revoked');
+  if (credential.status === 'superseded') {
+    return conflict('CREDENTIAL_SUPERSEDED', 'Already replaced', {
+      replacedBy: credential.replacedByCredentialId ?? null,
+    });
+  }
+  if (body.reason === 'other' && !body.note) {
+    return HttpResponse.json(
+      errorBody('VALIDATION_ERROR', 'Invalid request', [{ path: 'note', message: 'is required' }]),
+      { status: 400 },
+    );
+  }
+  if (body.validUntil && (body.validUntil < '2026-11-27' || body.validUntil > '2027-11-26')) {
+    return HttpResponse.json(
+      errorBody('VALIDATION_ERROR', 'Invalid validUntil', [
+        { path: 'validUntil', message: 'out of range' },
+      ]),
+      { status: 400 },
+    );
+  }
+  return null;
+}
+
+export function mockReissuePreview(credential: MockCredential, validUntil?: string) {
+  const holder = holderStore.find((h) => h.id === credential.holder.id)!;
+  const current = credential.claims ?? {};
+  const replacement = structuredClone(holder.claims);
+  const names = [...new Set([...Object.keys(current), ...Object.keys(replacement)])];
+  return {
+    credentialId: credential.id,
+    credentialType: credential.credentialType,
+    holder: credential.holder,
+    current: {
+      claims: current,
+      expiresAt: credential.expiresAt,
+      effectiveStatus: credential.effectiveStatus,
+    },
+    replacement: {
+      claims: replacement,
+      expiresAt: validUntil ? `${validUntil}T00:00:00.000Z` : '2027-11-26T04:30:00.000Z',
+      defaultExpiresAt: '2027-11-26T04:30:00.000Z',
+      cappedBy: validUntil ? 'validUntil' : null,
+      validUntilRange: { min: '2026-11-27', max: '2027-11-26' },
+    },
+    changedFields: names
+      .filter((n) => JSON.stringify(current[n]) !== JSON.stringify(replacement[n]))
+      .sort(),
+    warnings: [],
+  };
+}
+
+const ownCredentialOf = (staff: Staff, id: string) => {
+  const known = issuedStore.get(id);
+  const holder = known && holderStore.find((h) => h.id === known.holder.id);
+  return known && holder && holder.issuerId === staff.issuer.id ? known : undefined;
+};
+
+export const credentialActionHandlers = [
+  http.get(`${API}/credentials/:credentialId/events`, ({ request, params }) => {
+    const id = String(params.credentialId);
+    record(request, `/credentials/${id}/events`);
+    const staff = staffFor(request);
+    if (!staff) return unauthenticated();
+    if (!ownCredentialOf(staff, id)) return credentialNotFound();
+    return HttpResponse.json({ credentialId: id, events: eventStore.get(id) ?? [] });
+  }),
+  http.post(`${API}/credentials/:credentialId/revoke`, async ({ request, params }) => {
+    const id = String(params.credentialId);
+    const body = (await request.json()) as { reason?: string; note?: string };
+    record(request, `/credentials/${id}/revoke`, body);
+    const staff = staffFor(request);
+    if (!staff) return unauthenticated();
+    if (staff.role !== 'admin') {
+      return HttpResponse.json(errorBody('FORBIDDEN', 'Admins only'), { status: 403 });
+    }
+    const credential = ownCredentialOf(staff, id);
+    if (!credential) return credentialNotFound();
+    if (credential.status === 'revoked')
+      return conflict('CREDENTIAL_ALREADY_REVOKED', 'Already revoked');
+    if (credential.status === 'superseded') {
+      return conflict('CREDENTIAL_SUPERSEDED', 'Already replaced', {
+        replacedBy: credential.replacedByCredentialId ?? null,
+      });
+    }
+    const by = { id: staff.id, displayName: staff.displayName };
+    const updated: MockCredential = {
+      ...credential,
+      status: 'revoked',
+      effectiveStatus: 'revoked',
+      revokedAt: MOCK_NOW,
+      revocationReason: body.reason ?? null,
+      revokedBy: by,
+    };
+    issuedStore.set(id, updated);
+    for (const offer of offerStore.values()) {
+      if (offer.credentialId === id && offer.redeemedAt === null && offer.invalidatedAt === null) {
+        mockInvalidateOffer(offer.offerId, 'credential_revoked');
+      }
+    }
+    pushEvent(id, {
+      fromStatus: credential.status,
+      toStatus: 'revoked',
+      reason: body.reason ?? null,
+      staff: by,
+      createdAt: MOCK_NOW,
+    });
+    const { claims: _claims, ...metadata } = updated;
+    return HttpResponse.json(metadata);
+  }),
+  http.post(`${API}/credentials/:credentialId/reissue/preview`, async ({ request, params }) => {
+    const id = String(params.credentialId);
+    const body = (await request.json()) as { reason?: string; note?: string; validUntil?: string };
+    record(request, `/credentials/${id}/reissue/preview`, body);
+    const staff = staffFor(request);
+    if (!staff) return unauthenticated();
+    const credential = ownCredentialOf(staff, id);
+    if (!credential) return credentialNotFound();
+    const refused = reissueCheck(credential, body);
+    if (refused) return refused;
+    return HttpResponse.json(mockReissuePreview(credential, body.validUntil), {
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  }),
+  http.post(`${API}/credentials/:credentialId/reissue`, async ({ request, params }) => {
+    const id = String(params.credentialId);
+    const body = (await request.json()) as { reason?: string; note?: string; validUntil?: string };
+    record(request, `/credentials/${id}/reissue`, body);
+    const staff = staffFor(request);
+    if (!staff) return unauthenticated();
+    const credential = ownCredentialOf(staff, id);
+    if (!credential) return credentialNotFound();
+    const refused = reissueCheck(credential, body);
+    if (refused) return refused;
+    const preview = mockReissuePreview(credential, body.validUntil);
+    const newId = `e0000000-0000-4000-8000-${String(issuedStore.size + 1).padStart(12, '0')}`;
+    const by = { id: staff.id, displayName: staff.displayName };
+    const replacement: MockCredential = {
+      id: newId,
+      holder: credential.holder,
+      credentialType: credential.credentialType,
+      status: 'pending',
+      effectiveStatus: 'pending',
+      issuedAt: null,
+      expiresAt: preview.replacement.expiresAt,
+      createdAt: MOCK_NOW,
+      createdBy: by,
+      replacesCredentialId: id,
+      claims: preview.replacement.claims,
+    };
+    issuedStore.set(newId, replacement);
+    issuedStore.set(id, {
+      ...credential,
+      status: 'superseded',
+      effectiveStatus: 'superseded',
+      supersededAt: MOCK_NOW,
+      replacedByCredentialId: newId,
+    });
+    pushEvent(newId, {
+      fromStatus: null,
+      toStatus: 'pending',
+      reason: null,
+      staff: by,
+      createdAt: MOCK_NOW,
+    });
+    pushEvent(id, {
+      fromStatus: 'valid',
+      toStatus: 'superseded',
+      reason: body.reason ?? null,
+      staff: by,
+      createdAt: MOCK_NOW,
+    });
+    const { claims: _claims, ...metadata } = replacement;
+    return HttpResponse.json(
+      { credential: metadata, replaces: { id, status: 'superseded' } },
+      { status: 201 },
+    );
+  }),
+];
+
 export const server = setupServer(
   ...handlers,
   ...holderHandlers,
   ...issuanceHandlers,
   ...offerHandlers,
+  ...credentialActionHandlers,
 );
 
 export function resetMockBackend() {
@@ -869,6 +1206,7 @@ export function resetMockBackend() {
   requests.length = 0;
   holderStore.splice(0, holderStore.length, ...seedHolders());
   issuedStore.clear();
+  eventStore.clear();
   offerStore.clear();
   mockServerClock.offsetMs = 0;
 }

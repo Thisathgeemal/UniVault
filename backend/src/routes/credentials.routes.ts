@@ -5,6 +5,7 @@ import { AppError } from '../lib/errors.js';
 import { getValidated, validate } from '../middleware/validate.js';
 import { EFFECTIVE_STATUSES } from '../services/credential-status.js';
 import {
+  LIST_SORTS,
   REISSUE_REASONS,
   REVOCATION_REASONS,
   type CredentialsService,
@@ -27,6 +28,14 @@ export const listCredentialsQuery = z.object({
   // Computed status (credential-status.ts), e.g. ?effectiveStatus=expired
   effectiveStatus: z.enum(EFFECTIVE_STATUSES).optional(),
   holderId: z.uuid('must be a UUID').optional(),
+  // Holder name / reference (contains) or credential id (prefix); empty = no search
+  q: z
+    .string()
+    .trim()
+    .max(100, 'must be at most 100 characters')
+    .optional()
+    .transform((q) => (q ? q : undefined)),
+  sort: z.enum(LIST_SORTS).default('newest'),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).max(100_000).default(0),
 });
@@ -68,10 +77,13 @@ export const reissueCredentialBody = z
  * /api/v1/credentials – issue, list, revoke and reissue (FR-ISS-01, FR-ISS-03). Requires login.
  *   POST /                         officer/admin – create a PENDING credential from a holder record
  *   POST /preview                  officer/admin – what POST / would create, without writing anything
- *   GET  /                         list (status, effectiveStatus, holderId, paging) – metadata only
+ *   GET  /                         list (status, effectiveStatus, holderId, q, sort, paging) –
+ *                                  metadata + hasActiveOffer, plus tab counts per effective status
  *   GET  /:credentialId            one credential's metadata
  *   POST /:credentialId/revoke     admin – pending or valid → revoked; open offers invalidated
- *   POST /:credentialId/reissue    officer/admin – valid → superseded + new pending replacement
+ *   POST /:credentialId/reissue    officer/admin – valid (also expired: renewal) → superseded +
+ *                                  new pending replacement
+ *   POST /:credentialId/reissue/preview  officer/admin – what reissue would produce, no writes
  *   GET  /:credentialId/events     status history, oldest first
  * Credentials are signed later, when the wallet redeems the offer (Sprint 2).
  * Every route is issuer-scoped: another issuer's credential is 404 CREDENTIAL_NOT_FOUND.
@@ -199,6 +211,25 @@ export function credentialsRouter(auth: AuthMiddleware, credentials?: Credential
         'Credential reissued (old credential superseded)',
       );
       res.status(201).location(`${req.baseUrl}/${credential.id}`).json({ credential, replaces });
+    },
+  );
+
+  router.post(
+    '/:credentialId/reissue/preview',
+    auth.requireRole('officer', 'admin'),
+    validate({ params: credentialIdParams, body: reissueCredentialBody }),
+    async (req, res) => {
+      const { params, body } = getValidated<{
+        params: z.infer<typeof credentialIdParams>;
+        body: z.infer<typeof reissueCredentialBody>;
+      }>(res);
+      const preview = await service().reissuePreview(req.auth!, params.credentialId, body);
+      // Holds claims: never cached; logged at debug with ids only
+      req.log?.debug(
+        { credentialId: preview.credentialId, staffId: req.auth?.id, reason: body.reason },
+        'Reissue previewed',
+      );
+      res.set('Cache-Control', 'no-store').json(preview);
     },
   );
 

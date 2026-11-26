@@ -9,6 +9,9 @@
  *                        <ISSUER_KEYS_DIR>/issuer-keys.bundle.b64 (add --force to replace it)
  *   npm run db:seed:demo dashboard demo credentials for Serendib Trading only (development;
  *                        skips if present; add --reset to remove only the demo rows)
+ *   npm run db:holder:set -- <ref> <claim> <value>
+ *                        DEVELOPMENT ONLY: change one text claim of a holder record (to show a
+ *                        reissue difference; prints the claim name only)
  */
 import 'dotenv/config';
 import { rm } from 'node:fs/promises';
@@ -23,6 +26,7 @@ import { createIssuerKeysService } from '../services/issuer-keys.service.js';
 import { loadCredentialSchemas } from '../services/credential-schemas.js';
 import { DEFAULT_SEED_PASSWORD, seedDatabase } from './seed.js';
 import { demoCountsTable, removeDemoData, seedDemoData } from './seed-demo.js';
+import { devUpdateHolderClaim } from './dev-holder-update.js';
 
 const TABLES = [
   ['issuers', schema.issuers],
@@ -94,6 +98,9 @@ async function main(): Promise<void> {
   const config = loadConfig();
   if (command === 'seed-demo' && config.NODE_ENV === 'production') {
     throw new Error('db:seed:demo is disabled in production');
+  }
+  if (command === 'holder-set' && config.NODE_ENV === 'production') {
+    throw new Error('db:holder:set is disabled in production');
   }
   if (command === 'reset') {
     if (config.NODE_ENV === 'production') throw new Error('db:reset is disabled in production');
@@ -173,7 +180,9 @@ async function main(): Promise<void> {
         await migrate(database);
         if (process.argv.includes('--reset')) {
           const removed = await removeDemoData(database.db, config.NODE_ENV);
-          console.log(`  removed   ${removed.credentials} demo credentials (other data untouched)`);
+          console.log(
+            `  removed   ${removed.credentials} demo credentials and ${removed.derived} replacement(s) made from them (other data untouched)`,
+          );
           break;
         }
         const result = await seedDemoData(database.db, {
@@ -191,9 +200,26 @@ async function main(): Promise<void> {
         console.table(demoCountsTable(result.counts)); // counts only
         break;
       }
+      case 'holder-set': {
+        const [externalRef, claim, value] = process.argv.slice(3);
+        if (!externalRef || !claim || value === undefined) {
+          console.log('Usage: npm run db:holder:set -- <externalRef> <claim> <value>');
+          process.exitCode = 1;
+          break;
+        }
+        await migrate(database);
+        const result = await devUpdateHolderClaim(
+          database.db,
+          loadCredentialSchemas(config.CREDENTIAL_SCHEMAS_DIR),
+          { externalRef, claim, value, nodeEnv: config.NODE_ENV },
+        );
+        // The claim name only: never the value (it may be personal data)
+        console.log(`  updated   ${result.claim} of holder ${result.holderId} (${externalRef})`);
+        break;
+      }
       default:
         console.log(
-          'Usage: tsx src/db/cli.ts <migrate | seed | inspect | reset | keys | bundle | seed-demo>',
+          'Usage: tsx src/db/cli.ts <migrate | seed | inspect | reset | keys | bundle | seed-demo | holder-set>',
         );
         process.exitCode = 1;
     }

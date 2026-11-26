@@ -66,7 +66,7 @@ const credentialsWith = (effectiveStatus: string) =>
 
 // Each card opens the credential list with the matching effectiveStatus filter. "Issued" has
 // no single status (it is active + revoked + superseded + expired) and "expiring soon" no
-// filter of its own, so they open the unfiltered and the 'valid' list respectively.
+// filter of its own, so they open the unfiltered list and the Active tab sorted by expiry.
 const PRIMARY_CARDS: readonly CardSpec[] = [
   { key: 'issued', href: '/credentials', icon: FileBadge },
   { key: 'active', href: credentialsWith('valid'), icon: ShieldCheck },
@@ -76,7 +76,7 @@ const SECONDARY_CARDS: readonly CardSpec[] = [
   { key: 'awaitingWallet', href: credentialsWith('pending'), icon: Hourglass },
   { key: 'superseded', href: credentialsWith('superseded'), icon: Replace },
   { key: 'expired', href: credentialsWith('expired'), icon: CalendarX },
-  { key: 'expiringSoon', href: credentialsWith('valid'), icon: CalendarClock },
+  { key: 'expiringSoon', href: `${credentialsWith('valid')}&sort=expires`, icon: CalendarClock },
   { key: 'holders', href: '/holders', icon: Users },
 ];
 

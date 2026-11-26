@@ -82,9 +82,14 @@ issuer-portal/    React 19 + Vite 8 + TS: staff sign-in, session, role-based lay
   src/holders/               form-model (form from the schema + FORM_UI), validation (portal
                              validator, server issues, messages), display, list-params
   src/pages/holders/         HoldersListPage, HolderRegisterPage, HolderDetailPage
-  src/pages/credentials/     CredentialsPage (holder picker), IssueCredentialPage (4 steps),
-                             CredentialPage (metadata; success page with ?issued=1),
-                             CredentialOfferPage (/credentials/:id/offer: wallet offer QR code)
+  src/pages/credentials/     CredentialsPage (the credentials table: tabs, search, sort, paging
+                             in the URL), IssueCredentialPage (4 steps; holder picker),
+                             CredentialPage (summary, timeline, actions; success page with
+                             ?issued=1), ReissueCredentialPage (/credentials/:id/reissue: reissue /
+                             renew with the server preview), CredentialOfferPage (wallet offer QR)
+  src/credentials/           actions.ts = credentialActions(): THE action rule (status x role) for
+                             table, page and tests; action-items, RevokeDialog, status badge,
+                             conflicts (409 messages), invalidate, list-params
   src/offers/                useNow (1 s clock), offer-config (poll interval, last minute)
   src/issuance/              claim-display (groups/formats PREVIEW values only), problems,
                              IssuanceProblemAlert, HolderPicker
@@ -98,7 +103,7 @@ portal-ui/        @univault/portal-ui: shared, app-agnostic layout (AppShell, Si
                   StackedBar, Skeleton, DataTable, Pagination, SearchInput, FormField,
                   ErrorSummary, StatusBadge, Toast, ConfirmDialog, Tooltip, Select, Stepper,
                   CredentialCardPreview, QrCode (qrcode 1.5.4 matrix → SVG), Countdown,
-                  FullscreenOverlay,
+                  FullscreenOverlay, Dialog, ActionMenu, FilterTabs, CopyButton,
                   shadcn-style primitives, theme.css tokens). Built with tsc to dist; the verifier portal
                   will use it in Sprint 3
 verifier-portal/  React (Vite) – Sprint 3
@@ -170,18 +175,21 @@ migrations by hand.
 ```
 cd crypto-core && npm test                  # crypto-core tests (158) + coverage: npm run test:coverage
 cd claims-validation && npm test | test:coverage | build | typecheck   # shared claim validation (23 tests)
-cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (65 tests)
+cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (74 tests)
 cd issuer-portal && npm run dev             # http://localhost:5173 (backend: npm run dev in backend/)
-cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 329 tests; build also checks the bundle
-cd issuer-portal && npm run test:e2e        # Playwright (8 tests), Chromium; own backend on :4100 + portal on :5180
+cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 396 tests; build also checks the bundle
+cd issuer-portal && npm run test:e2e        # Playwright (10 tests), Chromium; own backend on :4100 + portal on :5180
                                             # (first time: npx playwright install chromium)
-cd backend && npm test                      # backend tests (545; rebuilds crypto-core and claims-validation first)
+cd backend && npm test                      # backend tests (571; rebuilds crypto-core and claims-validation first)
 cd backend && npm run test:fast             # only the fast (parallel) project; test:heavy = only the heavy one
 cd backend && npm run test:coverage         # fails below thresholds: 90 / 86 / 93 / 90 (stmts/branches/funcs/lines)
 cd backend && npm run typecheck             # tsc --noEmit (also rebuilds crypto-core first)
 cd backend && npm run dev                   # http://localhost:4000/api/v1/health
 cd backend && npm run db:migrate | db:seed | db:inspect | db:reset | keys:init
 cd backend && npm run db:seed:demo [-- --reset]   # DEV ONLY: dashboard demo data for Serendib Trading
+cd backend && npm run db:holder:set -- <ref> <claim> <value>   # DEV ONLY: change one text claim of a
+                                            # holder (re-validated; prints the claim name only; backend
+                                            # stopped, PGlite is single-process); for a reissue diff
 cd backend && npm run keys:bundle [-- --force]   # encrypted active keys -> keys/issuer-keys.bundle.b64
 npm run seed:generate                       # from repo root: regenerate backend/seed-data
 npm run lint && npm run format:check && npm run check:secrets   # from repo root, before every commit
@@ -303,8 +311,8 @@ of `D:/...`. See Sprint 1, Issue 6.
 | ------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------- |
 | `pending`    | Created by staff from a holder record (or a reissue replacement). Not signed | `POST /credentials`, `POST /credentials/:id/reissue` |
 | `valid`      | Signed and delivered to the wallet                                           | `signCredential()` at redemption                     |
-| `revoked`    | Withdrawn by an admin (final). From `pending` or `valid`                     | `POST /credentials/:id/revoke`                       |
-| `superseded` | Replaced by a reissued credential (final). Only from `valid`                 | `POST /credentials/:id/reissue`                      |
+| `revoked`    | Withdrawn by an admin (final). From `pending` or `valid` (incl. expired)     | `POST /credentials/:id/revoke`                       |
+| `superseded` | Replaced by a reissued credential (final). Only from `valid` (incl. expired) | `POST /credentials/:id/reissue`                      |
 
 **`expired` is computed, never stored (Decision 013).** `effectiveStatus(record,
 now)` in `services/credential-status.ts` is the ONE status rule: revoked >
@@ -347,7 +355,8 @@ last 10 status events (reason codes and staff names only; never notes or claims)
 of every status through the real services (sign, reissue, revoke, `simulateExpiry`, offers;
 past steps with an injected clock). Every action is done by an inactive account
 `demo-data@serendib-trading.example`, which marks the demo rows: re-running skips, `--reset`
-removes only them (it lifts the append-only trigger on `credential_status_events` inside its
+removes only them plus credentials chained to them via `replaces_credential_id` (staff
+reissues of demo credentials, transitively) with their offers and events (it lifts the append-only trigger on `credential_status_events` inside its
 one transaction). Prints counts per status only. The e2e backend runs it too.
 
 **Revoke and reissue (Decision 012, draft).** Revoke is admin-only; reissue is
@@ -364,6 +373,19 @@ transaction; `GET /credentials/:id/events` returns it oldest first. Reasons are
 fixed enums (also enforced by CHECKs from migration 0006); a `note` (trimmed,
 ≤ 500) is required for `other` and never logged. `validUntil` (reissue,
 optional) means 00:00 UTC on that date.
+
+**Reissue preview and expired credentials (Decision 012 consequences).** `reissue()` and `POST
+/credentials/:id/reissue/preview` share `prepareReissue()` (like `prepareIssuance()`; the preview
+passes `{ lock: false }`, writes nothing, `no-store`, returns `current` / `replacement` claims and
+expiry, `cappedBy`, `changedFields` via `changedClaimNames()`). Its one-active-credential check
+runs BEFORE the supersede and excludes the credential being replaced. Checks use the STORED
+status, so an **expired** credential (stored `valid`) **can be renewed by reissue** (any reason,
+usually `validity_extension`; the portal calls it "Renew") and **revoked** by an admin. In the
+portal, `credentialActions()` (`issuer-portal/src/credentials/actions.ts`) is the one action rule:
+valid → Revoke (admin; officer sees it disabled "Only administrators can revoke credentials"),
+Reissue; pending → Revoke (admin), Create / Show wallet offer; expired → Renew, Revoke (admin);
+revoked / superseded → view only. After any action `invalidateAfterCredentialChange()` refreshes
+`['credentials']`, `['dashboard','summary']` and `['holders']`.
 
 **Error codes:** `CREDENTIAL_NOT_FOUND` (404, also other issuers),
 `ACTIVE_CREDENTIAL_EXISTS`, `ISSUER_KEY_MISSING`, `CREDENTIAL_NOT_PENDING`,
@@ -433,8 +455,8 @@ credential). Keep migration 0007.
 second `pending` or `valid` credential of the same type (`409
 ACTIVE_CREDENTIAL_EXISTS`). The check runs in a transaction that locks the
 holder row (`SELECT … FOR UPDATE`), so simultaneous requests can't both pass;
-there is no database constraint for it. Reissue supersedes the old credential
-before this check, so its replacement passes.
+there is no database constraint for it. Reissue's check leaves out the credential
+being replaced, so its replacement passes.
 
 **Unredeemed pending credentials** block a new one for that holder until they
 expire, unless an admin revokes them (revoke accepts `pending`).
@@ -587,13 +609,13 @@ secrets or personal data may appear in responses or logs.
 
 ## Done so far (Sprint 1)
 
-Test totals (26 Nov 2026, wallet offer QR screen): **crypto-core 158 tests** (6 files; 97.63%
+Test totals (26 Nov 2026, credentials table follow-up): **crypto-core 158 tests** (6 files; 97.63%
 statements, 93.89% branches, 100% functions, 99.14% lines), **backend
-545 tests** (22 files in two Vitest projects; 90.48% statements, 87.22% branches, 93.88% functions,
-91.15% lines; thresholds 90 / 86 / 93 / 90), **issuer-portal 329 tests** (15
-files; 97.52% statements, 92.47% branches, 98.57% functions, 98.57% lines;
-thresholds 96 / 91 / 97 / 98) plus **8 Playwright e2e tests**, **portal-ui 65
-tests** (6 files; 100% statements, 98.25% branches, 100% functions, 100% lines;
+571 tests** (23 files in two Vitest projects; 90.74% statements, 88.08% branches, 94.52% functions,
+91.13% lines; thresholds 90 / 86 / 93 / 90), **issuer-portal 396 tests** (17
+files; 97.56% statements, 92.11% branches, 98.01% functions, 98.56% lines;
+thresholds 96 / 91 / 97 / 98) plus **10 Playwright e2e tests**, **portal-ui 74
+tests** (7 files; 100% statements, 98.65% branches, 100% functions, 100% lines;
 thresholds 99 / 94 / 99 / 99) and **claims-validation 23 tests** (1 file; 98.63%
 statements, 90.47% branches, 100% functions, 98.57% lines; thresholds 98 / 89 / 100 / 98),
 all passing.
@@ -691,5 +713,16 @@ replaces }`.
   QR, countdown on the server clock, 5 s polling with a message per final state, full screen,
   regenerate / cancel with confirmation, reload message, code in memory only, dev-only
   decoded offer); portal-ui `QrCode`, `Countdown`, `FullscreenOverlay`.
+- **Credentials table, revoke and reissue in the issuer portal** (26 Nov,
+  `docs/frontend/issuer-portal.md` §12, `docs/api/credentials-api.md` §3 and §6.5–6.6, Decision
+  012 consequences): backend `GET /credentials` gains `q`, `sort`, `hasActiveOffer` per row and
+  tab `counts` (fixed number of queries, no N+1), `POST /credentials/:id/reissue/preview`
+  (`prepareReissue()` shared with reissue), expired credentials renewable and revocable (tested,
+  documented), dev-only `npm run db:holder:set`; portal `/credentials` table (short id + copy,
+  holder link, plain status badges, expiring-soon hint, tabs with counts, debounced search,
+  sort, paging, all in the URL; dashboard cards land on the tab), `credentialActions()`, revoke
+  dialog, `/credentials/:id/reissue` (Current vs Replacement, changes highlighted, confirmation,
+  → the replacement's offer), credential page with status timeline and Replaces / Replaced by,
+  409 messages + refresh; portal-ui `Dialog`, `ActionMenu`, `FilterTabs`, `CopyButton`.
 - **Planned routes (return `501` until built):** wallet redemption
   (`/credential-offers/token`, `/credential`), verifications.

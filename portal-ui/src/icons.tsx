@@ -50,3 +50,14 @@ export const SearchIcon = (props: IconProps) => (
     <path d="m20 20-3.5-3.5" />
   </Svg>
 );
+export const Copy = (props: IconProps) => (
+  <Svg width={16} height={16} {...props}>
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+  </Svg>
+);
+export const Check = (props: IconProps) => (
+  <Svg width={16} height={16} {...props}>
+    <path d="M20 6 9 17l-5-5" />
+  </Svg>
+);

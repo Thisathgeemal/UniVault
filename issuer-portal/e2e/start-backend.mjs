@@ -10,7 +10,9 @@
  * - CREDENTIAL_OFFER_TTL_SECONDS=15 (the offer spec watches a QR code expire);
  * - signing keys (keys:init) encrypted with a random passphrase, and the dashboard demo data
  *   (db:seed:demo: credentials of every status for Serendib Trading), so the dashboard shows
- *   real numbers.
+ *   real numbers;
+ * - one holder record changed after its credential was signed (db:holder:set STC-00003), so
+ *   the reissue e2e test sees a difference.
  *
  * Playwright starts this as a webServer and stops it after the run. Folders left behind by an
  * interrupted run are removed at the next start.
@@ -99,6 +101,15 @@ for (const command of ['keys', 'seed-demo']) {
   const step = node(['src/db/cli.ts', command], { stdio: 'inherit' });
   if (step.status !== 0) process.exit(step.status ?? 1);
 }
+
+// e2e/credentials.spec.ts: STC-00003 holds an active demo credential; changing the holder
+// record now (dev-only db:holder:set, before the server opens the database) gives the reissue
+// preview a real difference. Prints the claim name only.
+const change = node(
+  ['src/db/cli.ts', 'holder-set', 'STC-00003', 'designation', 'Senior HR Executive'],
+  { stdio: 'inherit' },
+);
+if (change.status !== 0) process.exit(change.status ?? 1);
 
 const server = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
   cwd: backendDir,

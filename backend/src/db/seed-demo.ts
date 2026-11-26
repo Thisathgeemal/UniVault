@@ -322,38 +322,73 @@ export async function seedDemoData(db: Db, options: DemoSeedOptions): Promise<De
   return { outcome: 'created', counts: await countDemoRows(db, staff.id, realNow()) };
 }
 
-/** Removes ONLY the demo rows (credentials created by the demo account, their offers and history). */
-export async function removeDemoData(db: Db, nodeEnv: string): Promise<{ credentials: number }> {
+/**
+ * Removes ONLY the demo rows and what was derived from them, in one transaction:
+ *
+ * - the demo credentials (created by the demo account);
+ * - every credential CHAINED to them through replaces_credential_id, followed transitively
+ *   (a replacement a staff member created by reissuing a demo credential, the replacement of
+ *   that replacement, …). These exist only because of the demo data, and leaving one behind
+ *   would either block the delete (foreign key) or, with the link cleared, leave a credential
+ *   that claims to replace nothing while its history says otherwise;
+ * - the offers and status events of all those credentials (whoever created them: an admin's
+ *   revoke of a demo credential is part of that credential's history);
+ * - the demo account.
+ *
+ * Nothing else is touched: holders, other credentials, their offers and events stay. The set
+ * only grows along replaces_credential_id FROM demo credentials, so a credential that does
+ * not descend from one can never be included.
+ */
+export async function removeDemoData(
+  db: Db,
+  nodeEnv: string,
+): Promise<{ credentials: number; derived: number }> {
   assertNotProduction(nodeEnv);
   const issuer = await findDemoIssuer(db);
   const staff = await findDemoStaff(db, demoStaffEmail(issuer));
-  if (!staff) return { credentials: 0 };
+  if (!staff) return { credentials: 0, derived: 0 };
   return db.transaction(async (tx) => {
-    const ids = (
+    const demoIds = (
       await tx
         .select({ id: credentialRecords.id })
         .from(credentialRecords)
         .where(eq(credentialRecords.createdByStaffId, staff.id))
     ).map((r) => r.id);
-    if (ids.length > 0) {
-      await tx.delete(credentialOffers).where(inArray(credentialOffers.credentialId, ids));
+    // Replacements chained to the demo credentials, level by level
+    const ids = new Set(demoIds);
+    let frontier = demoIds;
+    while (frontier.length > 0) {
+      const next = (
+        await tx
+          .select({ id: credentialRecords.id })
+          .from(credentialRecords)
+          .where(inArray(credentialRecords.replacesCredentialId, frontier))
+      )
+        .map((r) => r.id)
+        .filter((id) => !ids.has(id));
+      for (const id of next) ids.add(id);
+      frontier = next;
+    }
+    const all = [...ids];
+    if (all.length > 0) {
+      await tx.delete(credentialOffers).where(inArray(credentialOffers.credentialId, all));
       // credential_status_events is append-only (trigger from migration 0005). The development
-      // reset lifts that guard for THIS transaction only and only for the demo credentials'
-      // rows: DDL is transactional, so the trigger is back on at commit, and on any failure
-      // the rollback restores it too. Never available in production (assertNotProduction).
+      // reset lifts that guard for THIS transaction only and only for these credentials' rows:
+      // DDL is transactional, so the trigger is back on at commit, and on any failure the
+      // rollback restores it too. Never available in production (assertNotProduction).
       await tx.execute(
         sql`ALTER TABLE credential_status_events DISABLE TRIGGER credential_status_events_no_change`,
       );
       await tx
         .delete(credentialStatusEvents)
-        .where(inArray(credentialStatusEvents.credentialId, ids));
+        .where(inArray(credentialStatusEvents.credentialId, all));
       await tx.execute(
         sql`ALTER TABLE credential_status_events ENABLE TRIGGER credential_status_events_no_change`,
       );
-      // One statement: replaces_credential_id references between demo rows are checked at its end
-      await tx.delete(credentialRecords).where(inArray(credentialRecords.id, ids));
+      // One statement: replaces_credential_id references inside the set are checked at its end
+      await tx.delete(credentialRecords).where(inArray(credentialRecords.id, all));
     }
     await tx.delete(issuerStaff).where(eq(issuerStaff.id, staff.id));
-    return { credentials: ids.length };
+    return { credentials: demoIds.length, derived: all.length - demoIds.length };
   });
 }

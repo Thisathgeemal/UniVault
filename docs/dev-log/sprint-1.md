@@ -566,6 +566,113 @@ ISSUER_KEY_UNAVAILABLE` with a generic message; the code goes to the log with is
 - **Evidence:** `backend/test/config.test.ts`, `backend/test/credential-offers.test.ts`,
   `issuer-portal/test/offer.test.tsx`.
 
+### Thu 26 Nov (issuer portal: credentials table, revoke and reissue)
+
+- **Done:**
+  - **Backend:**
+    - `GET /credentials` returns what the table needs per row (holder id / reference / name only,
+      stored and effective status, dates, `replacesCredentialId`, `replacedByCredentialId`,
+      `hasActiveOffer`) with a fixed number of queries per page (no N+1). It also gains `q`
+      (holder name or reference contains, credential id prefix; LIKE wildcards escaped), `sort`
+      (newest, oldest, expires, expires_desc, holder, holder_desc) and tab `counts` per effective
+      status (same rule as the filter).
+    - `POST /credentials/:id/reissue/preview`: the reissue's checks moved into
+      `prepareReissue()`, shared with the preview (`{ lock: false }`, no writes, `no-store`).
+      It returns current vs replacement claims and expiry, `cappedBy`, `changedFields`
+      (`changedClaimNames()`) and warnings. A test shows the preview equals a following reissue
+      at the same clock and writes nothing. The one-active-credential check now runs before the
+      supersede and excludes the credential being replaced, so preview and reissue agree.
+    - **Expired credentials:** reissue (renewal) and revoke (admin) are both allowed. This was
+      already the code's behaviour, because the checks use the stored status. It is now tested
+      and documented (credentials-api.md §6.5; Decision 012 consequences, not a new decision).
+    - Dev only: `npm run db:holder:set -- <ref> <claim> <value>` (refused in production,
+      re-validated, prints the claim name only) to make a reissue difference without a holder
+      edit page.
+  - **Portal:**
+    - `/credentials` is now the credentials table: short id + copy, holder link, type, plain
+      status badge (Active, Awaiting wallet, Revoked, Replaced, Expired), issued, expires with
+      "Expires in n days" within 30 days, and an actions menu.
+    - Tabs with counts, debounced search, sort and paging, all in the URL. The dashboard cards
+      land on their tab ("Expiring in 30 days" → Active sorted by expiry). There is an empty
+      state per tab, plus loading and error + retry. "Issue credential" (holder picker) stays in
+      the header.
+    - `credentialActions()` is the one action rule (status x role) for the table, the page and
+      the tests. Officers see Revoke disabled with "Only administrators can revoke credentials".
+    - Revoke dialog: reason enum in plain words, note required for Other (500 max), the warnings
+      (plus the pending one), the button named after the holder, no double submit.
+    - `/credentials/:id/reissue` (Reissue, or Renew for expired): reason, note, optional Valid
+      until, then the server preview as Current vs Replacement with changed fields highlighted,
+      "No details changed" and the expiry change. The issuance confirmation is required. On
+      success it shows a toast and goes to `/credentials/<newId>/offer`.
+    - The credential page has the summary, the status timeline from `/events` (plain wording,
+      staff, reason, Asia/Colombo), Replaces / Replaced by links, the active offer's expiry and
+      link, and the same actions. Not found / another issuer → "Credential not found".
+    - After any action, the credentials, dashboard summary and holders queries are invalidated.
+      The 409 codes are explained in plain words, then the data is refreshed.
+  - **portal-ui:** `Dialog`, `ActionMenu`, `FilterTabs`, `CopyButton`.
+  - **Tests:**
+    - backend 561 (+16): 90.24 / 86.36 / 94.2 / 90.8;
+    - issuer portal 392 (+63): 97.56 / 92.11 / 98.01 / 98.56;
+    - portal-ui 74 (+9): 100 / 98.65 / 100 / 100;
+    - Playwright 10 (+2): admin revokes (Revoked +1, Active −1), and an officer sees Revoke
+      disabled and reissues after the holder record changed (diff shown, lands on the offer, old
+      one Replaced with a link);
+    - crypto-core and claims-validation unchanged.
+    - All thresholds are kept. The e2e launcher runs `db:holder:set STC-00003` before the server
+      starts.
+- **Next:** Native-speaker review of the new Sinhala strings. Screenshots
+  ([evidence/s1-credentials-table-guide.md](evidence/s1-credentials-table-guide.md)). Holder
+  edit endpoint and form (backlog), which would replace `db:holder:set` for real use.
+- **Blockers:** None.
+- **Evidence:** `backend/test/credentials-table.test.ts`, `issuer-portal/test/credentials-table.test.tsx`,
+  `issuer-portal/test/credential-actions.test.tsx`, `issuer-portal/e2e/credentials.spec.ts`,
+  `portal-ui/test/action-widgets.test.tsx`.
+
+### Thu 26 Nov (follow-up: demo reset, branch coverage, Sinhala wording)
+
+- **Done:**
+  - **`db:seed:demo -- --reset` works after staff reissued or revoked demo credentials.**
+    `removeDemoData()` now also removes every credential chained to a demo credential through
+    `replaces_credential_id`, followed level by level (a replacement of a replacement too),
+    with the offers and status events of all of them, in one transaction. It does not clear the
+    link: that would leave a credential whose history says it replaced one that no longer exists.
+    Nothing that does not descend from a demo credential is touched. The CLI prints "removed n
+    demo credentials and m replacement(s) made from them". Decision 017 consequences and
+    `dashboard-api.md` updated (Issue 34 resolved). The evidence guide's `db:reset` workaround and
+    the backlog note are gone.
+  - **Backend branch coverage 86.36% → 88.08%.** New tests, each with assertions:
+    - stored vs effective status filters combined with search and sort (expired is in
+      `status=valid`, not in `effectiveStatus=valid`; conflicting filters give nothing);
+    - holder filter on the tab counts;
+    - the service's default sort;
+    - a bank's wrong-type message;
+    - the reissue preview's under-18 warning (KYC, capped at the 18th birthday) and none for an
+      adult;
+    - signing after the issuer key was retired (409 `ISSUER_KEY_MISSING`, nothing written);
+    - `eighteenthBirthday()` with invalid dates;
+    - `db:holder:set` with a reference two issuers share;
+    - five routers without their service (503);
+    - the demo reset after reissues and a revoke;
+    - an issuer without an email domain (the demo account's fallback address, an interrupted
+      seed's account removed, seeding on the real clock).
+
+    Thresholds are unchanged. The reset test was checked against the old behaviour: with the
+    chain walk disabled it fails on the foreign key.
+
+  - **Sinhala "Awaiting wallet":** one wording everywhere, the issuance and offer screens'
+    පසුම්බිය සඳහා රැඳී ඇති (dashboard card, holder and offer status, credentials badge and tab,
+    credential page), and the same phrase in the sentences about pending credentials. "Renew" was
+    already අලුත් කරන්න. A new test in `i18n.test.tsx` keeps the labels identical.
+  - **Tests:**
+    - backend 571 (+10): 90.74 / 88.08 / 94.52 / 91.13;
+    - issuer portal 396 (+4): 97.56 / 92.11 / 98.01 / 98.56;
+    - Playwright 10;
+    - portal-ui 74 (unchanged).
+- **Next:** Native-speaker review of the Sinhala strings (including the five changed today).
+- **Blockers:** None.
+- **Evidence:** `backend/test/db/seed-demo.test.ts`, `backend/test/credentials-table.test.ts`,
+  `issuer-portal/test/i18n.test.tsx`.
+
 ## Backlog
 
 - **Holder update endpoint and edit form** (needed for reissue with reason `details_changed`):
@@ -575,8 +682,6 @@ ISSUER_KEY_UNAVAILABLE` with a generic message; the code goes to the log with is
   form reusing the registration form (`src/holders/form-model.ts`).
 - **Portrait upload** (optional `portrait` claim, JPEG data URI ≤ 40 KB, Decision 020) is not in the
   registration form yet (`OMITTED_CLAIMS`).
-- **Credential list** on `/credentials` (today a holder picker only). (The wallet offer QR
-  screen was done on 26 Nov.)
 - **`tx_code` (transaction PIN) for offers** once an SMS or e-mail channel to the holder
   exists: OpenID4VCI's optional PIN, sent out of band, so a photographed QR code alone cannot
   be redeemed. Deferred in Decision 021; a backend test checks it is absent today.
@@ -1054,3 +1159,56 @@ Record the tests that show the sprint goal is met, with links to output in `evid
   this check ran inside Vitest. It had to build with `NODE_ENV=production` (Vite derives
   `PROD` from it), and the parallel build slowed the other test files until the dashboard
   test's first `findBy` timed out. That test now allows 5 s.
+
+### Issue 32: A status tab was read out as "Active7" (26 Nov 2026)
+
+- **Task:** portal-ui `FilterTabs`
+- **Symptom:** The new test looked for the button "Active 7" and found nothing.
+- **Cause:** The count is a separate `<span>` right after the label. Visually the flex gap
+  separates them, but the accessible name joins the text nodes with no space: "Active7".
+- **Resolution:** A text space between the label and the count. Whitespace has no visual effect
+  in a flex container, and the name is now "Active 7".
+
+### Issue 33: "Other" without a note left the reissue button disabled with no explanation (26 Nov 2026)
+
+- **Task:** `/credentials/:id/reissue`
+- **Symptom:** With reason "Other" and no note, the page still said "Choose a reason to see the
+  replacement." The button was disabled (no preview yet), so the "note required" message that
+  appears on submit could never show.
+- **Resolution:** While the reason is "Other" and the note is empty, the prompt says "Enter a
+  note when the reason is "Other"." A test covers it.
+
+### Issue 34: The demo-data reset would be refused after a real reissue (26 Nov 2026)
+
+- **Task:** evidence guide for the credentials table
+- **Symptom:** Checking the "afterwards" step: `removeDemoData()` deletes only the credentials
+  the demo account created. A replacement that a real officer created for a demo credential
+  still references it (`replaces_credential_id`), so the delete would fail on the foreign key
+  and the transaction would roll back.
+- **Resolution:** Fixed in the follow-up the same day: `removeDemoData()` also removes every
+  credential chained to a demo credential through `replaces_credential_id` (followed
+  transitively), with their offers and events. A test reissues a demo credential twice and
+  revokes another, then resets and seeds again; it failed on this foreign key before the fix.
+
+### Issue 35: The e2e test could not change a holder record while the backend ran (26 Nov 2026)
+
+- **Task:** `e2e/credentials.spec.ts` (reissue after the holder's record changed)
+- **Symptom:** There is no holder update endpoint, and the dev command `db:holder:set` cannot
+  open the e2e database while the server holds it (embedded PGlite allows one process).
+- **Resolution:** `e2e/start-backend.mjs` runs `db:holder:set STC-00003 designation "Senior HR
+Executive"` after `db:seed:demo` and before the server starts. STC-00003 holds an active demo
+  credential created with the old designation, so the preview shows a real difference.
+
+### Issue 36: The first full portal test run timed out in 12 tests (26 Nov 2026)
+
+- **Task:** resuming the credentials table work
+- **Symptom:** One run of `npx vitest run` took 15 minutes, and 12 tests (offer, session) timed
+  out at 5 s.
+- **Cause:** Machine load: the same files passed in the next runs (about 30 s in total). A later
+  coverage run had one `holders-list` timeout that also passed when re-run.
+- **Resolution:** The `holders-list` timeout came back in a second coverage run. It is always the
+  file's first test, a cold render that waits with the default 1 s while the two new test files
+  add parallel load. As with the dashboard test (Issue 31), `openList()` now waits up to 5 s
+  for that first render. The two `holders-register` tests that type a whole form (success, bank
+  customer) once hit the 5 s test limit, so they get a named `FORM_TEST_TIMEOUT` of 15 s. The
+  global timeout is unchanged, as in Issue 15 for the backend.

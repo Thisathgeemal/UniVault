@@ -71,7 +71,7 @@ test('employer admin issues a credential and shows the wallet offer; a new QR co
   page,
 }) => {
   expect(PASSWORD, 'playwright.config.ts sets UNIVAULT_E2E_PASSWORD').not.toBe('');
-  await signInTo(page, '/credentials', 'admin@serendib-trading.example');
+  await signInTo(page, '/credentials/new', 'admin@serendib-trading.example');
   await page
     .getByRole('searchbox', { name: 'Search holders by name or reference' })
     .fill(ISSUE_REF);

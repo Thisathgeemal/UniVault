@@ -2,10 +2,11 @@
  * Dashboard demo data (npm run db:seed:demo): src/db/seed-demo.ts on a throwaway in-memory
  * database loaded with the real synthetic seed data (backend/seed-data).
  */
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { and, eq, isNotNull, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { StaffProfile } from '../../src/auth/auth-service.js';
 import type { Database } from '../../src/db/client.js';
@@ -13,9 +14,11 @@ import {
   credentialOffers,
   credentialRecords,
   credentialStatusEvents,
+  issuers,
   issuerStaff,
 } from '../../src/db/schema.js';
 import { seedDatabase } from '../../src/db/seed.js';
+import { hashPassword } from '../../src/lib/passwords.js';
 import {
   DEMO_STAFF_NAME,
   demoCountsTable,
@@ -25,6 +28,7 @@ import {
 } from '../../src/db/seed-demo.js';
 import { createKeyStore, type KeyStore } from '../../src/keys/key-store.js';
 import { loadCredentialSchemas } from '../../src/services/credential-schemas.js';
+import { createCredentialOffersService } from '../../src/services/credential-offers.service.js';
 import { createCredentialsService } from '../../src/services/credentials.service.js';
 import { createDashboardService } from '../../src/services/dashboard.service.js';
 import { createIssuerKeysService } from '../../src/services/issuer-keys.service.js';
@@ -212,7 +216,10 @@ describe('db:seed:demo', () => {
     expect(
       await database.db.select().from(issuerStaff).where(eq(issuerStaff.email, DEMO_EMAIL)),
     ).toEqual([]);
-    expect(await removeDemoData(database.db, 'development')).toEqual({ credentials: 0 });
+    expect(await removeDemoData(database.db, 'development')).toEqual({
+      credentials: 0,
+      derived: 0,
+    });
     // The append-only guard is back on after the reset
     const remove = database.db
       .delete(credentialStatusEvents)
@@ -238,6 +245,111 @@ describe('db:seed:demo', () => {
     expect(ownStill).toHaveLength(1);
   });
 
+  it('--reset also works after staff reissued and revoked demo credentials; other data stays', async () => {
+    // Runs after the previous test: fresh demo data exists, plus the officer's own pending one
+    const officer = await staffProfile('officer@serendib-trading.example');
+    const admin = await staffProfile('admin@serendib-trading.example');
+    const credentials = createCredentialsService(database.db, schemas, {
+      keyStore,
+      publicBaseUrl: BASE_URL,
+      now: () => NOW,
+    });
+    const offers = createCredentialOffersService(database.db, {
+      ttlSeconds: OFFER_TTL_SECONDS,
+      publicBaseUrl: BASE_URL,
+      now: () => NOW,
+    });
+    const walletKey = () =>
+      generateKeyPairSync('ec', { namedCurve: 'P-256' }).publicKey.export({ format: 'jwk' });
+    const [demoStaff] = await database.db
+      .select()
+      .from(issuerStaff)
+      .where(eq(issuerStaff.email, DEMO_EMAIL));
+    const demoValid = await database.db
+      .select({ id: credentialRecords.id })
+      .from(credentialRecords)
+      .where(
+        and(
+          eq(credentialRecords.createdByStaffId, demoStaff!.id),
+          eq(credentialRecords.status, 'valid'),
+        ),
+      );
+    expect(demoValid.length).toBeGreaterThanOrEqual(2);
+
+    // A chain two deep from a demo credential: officer reissues it, the replacement is signed,
+    // then an admin reissues the replacement; the newest one gets an open offer
+    const first = await credentials.reissue(officer, demoValid[0]!.id, {
+      reason: 'details_changed',
+    });
+    await credentials.signCredential(first.credential.id, walletKey());
+    const second = await credentials.reissue(admin, first.credential.id, {
+      reason: 'wallet_lost_or_compromised',
+    });
+    await offers.createOffer(officer, second.credential.id);
+    // An admin revokes another demo credential
+    await credentials.revoke(admin, demoValid[1]!.id, { reason: 'employment_ended' });
+
+    // Non-demo data that must survive: an officer's credential, signed and reissued (its own
+    // chain), with an offer on the replacement
+    const holder = await database.db.query.holders.findFirst({
+      where: (h, { eq: equals }) => equals(h.externalRef, 'STC-00047'),
+    });
+    const mine = await credentials.create(officer, { holderId: holder!.id });
+    await credentials.signCredential(mine.id, walletKey());
+    const mineNext = await credentials.reissue(officer, mine.id, { reason: 'details_changed' });
+    await offers.createOffer(officer, mineNext.credential.id);
+    const keep = [mine.id, mineNext.credential.id];
+    const before = await database.db.select().from(credentialRecords);
+    const otherIds = before
+      .filter((r) => r.createdByStaffId !== demoStaff!.id)
+      .map((r) => r.id)
+      .filter((id) => ![first.credential.id, second.credential.id].includes(id));
+    const otherEvents = await database.db
+      .select()
+      .from(credentialStatusEvents)
+      .where(inArray(credentialStatusEvents.credentialId, otherIds));
+    const otherOffers = await database.db
+      .select()
+      .from(credentialOffers)
+      .where(inArray(credentialOffers.credentialId, otherIds));
+    expect(otherIds).toEqual(expect.arrayContaining(keep));
+
+    const removed = await removeDemoData(database.db, 'development');
+    expect(removed).toEqual({ credentials: 15, derived: 2 });
+
+    // Exactly the non-demo credentials are left, with all their events and offers
+    const left = await database.db.select().from(credentialRecords);
+    expect(left.map((r) => r.id).sort()).toEqual([...otherIds].sort());
+    expect(
+      await database.db
+        .select()
+        .from(credentialStatusEvents)
+        .where(inArray(credentialStatusEvents.credentialId, otherIds)),
+    ).toHaveLength(otherEvents.length);
+    expect(await database.db.select().from(credentialStatusEvents)).toHaveLength(
+      otherEvents.length,
+    );
+    expect(await database.db.select().from(credentialOffers)).toHaveLength(otherOffers.length);
+    const [kept] = await database.db
+      .select()
+      .from(credentialRecords)
+      .where(eq(credentialRecords.id, mineNext.credential.id));
+    expect(kept!.replacesCredentialId).toBe(mine.id); // non-demo links untouched
+    expect(
+      await database.db.select().from(issuerStaff).where(eq(issuerStaff.email, DEMO_EMAIL)),
+    ).toEqual([]);
+    // The append-only guard is back on
+    await expect(
+      database.db
+        .delete(credentialStatusEvents)
+        .where(eq(credentialStatusEvents.credentialId, mine.id)),
+    ).rejects.toThrow();
+
+    // A fresh seed gives the expected counts again
+    const again = await seedDemoData(database.db, options());
+    expect(again).toEqual({ outcome: 'created', counts: EXPECTED_COUNTS });
+  });
+
   it('prints counts per status only', () => {
     const table = demoCountsTable(EXPECTED_COUNTS);
     expect(table).toHaveLength(8);
@@ -254,6 +366,57 @@ describe('db:seed:demo – missing prerequisites', () => {
       await expect(removeDemoData(empty.db, 'development')).rejects.toThrow(/db:seed/);
     } finally {
       await empty.close();
+    }
+  });
+
+  it('an issuer without an email domain: the fallback address, an interrupted seed reset, the real clock', async () => {
+    const plain = await freshDatabase();
+    const dir = await mkdtemp(join(tmpdir(), 'univault-demo-plain-'));
+    try {
+      await seedDatabase(plain.db, { staffPassword: 'test-password-123' });
+      await plain.db.update(issuers).set({ emailDomain: null }).where(eq(issuers.id, 'employer-a'));
+      const store = createKeyStore({
+        db: plain.db,
+        source: 'file',
+        keysDir: dir,
+        passphrase: PASSPHRASE,
+      });
+      await createIssuerKeysService(plain.db, {
+        keyStore: store,
+        publicBaseUrl: BASE_URL,
+      }).generateKey('employer-a');
+      const fallback = 'demo-data@employer-a.example';
+      // A seed interrupted after creating the demo account but before any credential
+      await plain.db.insert(issuerStaff).values({
+        issuerId: 'employer-a',
+        email: fallback,
+        displayName: DEMO_STAFF_NAME,
+        role: 'admin',
+        isActive: false,
+        passwordHash: await hashPassword(randomBytes(32).toString('base64url')),
+      });
+      expect(await removeDemoData(plain.db, 'development')).toEqual({ credentials: 0, derived: 0 });
+      expect(
+        await plain.db.select().from(issuerStaff).where(eq(issuerStaff.email, fallback)),
+      ).toEqual([]);
+
+      // No injected clock: the real time places the steps and counts them
+      const result = await seedDemoData(plain.db, {
+        keyStore: store,
+        schemas,
+        publicBaseUrl: BASE_URL,
+        offerTtlSeconds: OFFER_TTL_SECONDS,
+        nodeEnv: 'development',
+      });
+      expect(result).toEqual({ outcome: 'created', counts: EXPECTED_COUNTS });
+      const [account] = await plain.db
+        .select()
+        .from(issuerStaff)
+        .where(eq(issuerStaff.email, fallback));
+      expect(account).toMatchObject({ isActive: false, displayName: DEMO_STAFF_NAME });
+    } finally {
+      await plain.close();
+      await rm(dir, { recursive: true, force: true });
     }
   });
 

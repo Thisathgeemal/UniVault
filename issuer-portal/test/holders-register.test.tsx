@@ -20,6 +20,9 @@ import {
 } from './mock-backend.js';
 import { renderApp } from './render-app.js';
 
+/** Filling a whole form with userEvent takes 2–5 s under coverage and parallel load (Issue 36). */
+const FORM_TEST_TIMEOUT = 15_000;
+
 type User = ReturnType<typeof renderApp>['user'];
 const textbox = (name: string | RegExp) => screen.getByRole('textbox', { name });
 const combobox = (name: string | RegExp) => screen.getByRole('combobox', { name });
@@ -220,47 +223,55 @@ describe('validation', () => {
 });
 
 describe('submitting', () => {
-  it('success: sends the claims, goes to the new holder’s page and shows a toast', async () => {
-    const { user, location } = await openForm();
-    await fillEmployee(user);
-    await user.click(submit());
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Nimesha Perera' }),
-    ).toBeInTheDocument();
-    expect(location()).toMatch(/^\/holders\/aaaaaaaa-/);
-    expect(screen.getByText('Nimesha Perera was registered.')).toBeInTheDocument();
-    expect(postRequests()).toHaveLength(1);
-    expect(postRequests()[0]!.body).toEqual({
-      claims: {
-        full_name: 'Nimesha Perera',
-        employee_id: 'STC-90001',
-        designation: 'Sales Executive',
-        department: 'Sales',
-        employment_type: 'permanent',
-        date_of_joining: '2022-03-01',
-      },
-    });
-  });
+  it(
+    'success: sends the claims, goes to the new holder’s page and shows a toast',
+    async () => {
+      const { user, location } = await openForm();
+      await fillEmployee(user);
+      await user.click(submit());
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'Nimesha Perera' }),
+      ).toBeInTheDocument();
+      expect(location()).toMatch(/^\/holders\/aaaaaaaa-/);
+      expect(screen.getByText('Nimesha Perera was registered.')).toBeInTheDocument();
+      expect(postRequests()).toHaveLength(1);
+      expect(postRequests()[0]!.body).toEqual({
+        claims: {
+          full_name: 'Nimesha Perera',
+          employee_id: 'STC-90001',
+          designation: 'Sales Executive',
+          department: 'Sales',
+          employment_type: 'permanent',
+          date_of_joining: '2022-03-01',
+        },
+      });
+    },
+    FORM_TEST_TIMEOUT,
+  );
 
-  it('bank customer: sends externalRef and the address with country LK', async () => {
-    const { user } = await openForm(BANK_ADMIN);
-    await fillCustomer(user);
-    await user.click(submit());
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Dilani Jayasuriya' }),
-    ).toBeInTheDocument();
-    expect(postRequests()[0]!.body).toMatchObject({
-      externalRef: 'CUS-000500',
-      claims: {
-        id_document_type: 'nic',
-        nationality: 'LK',
-        permanent_address: { line1: 'No. 5, Lake Road', district: 'Kandy', country: 'LK' },
-      },
-    });
-    expect((postRequests()[0]!.body as { claims: object }).claims).not.toHaveProperty(
-      'age_over_18',
-    );
-  });
+  it(
+    'bank customer: sends externalRef and the address with country LK',
+    async () => {
+      const { user } = await openForm(BANK_ADMIN);
+      await fillCustomer(user);
+      await user.click(submit());
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'Dilani Jayasuriya' }),
+      ).toBeInTheDocument();
+      expect(postRequests()[0]!.body).toMatchObject({
+        externalRef: 'CUS-000500',
+        claims: {
+          id_document_type: 'nic',
+          nationality: 'LK',
+          permanent_address: { line1: 'No. 5, Lake Road', district: 'Kandy', country: 'LK' },
+        },
+      });
+      expect((postRequests()[0]!.body as { claims: object }).claims).not.toHaveProperty(
+        'age_over_18',
+      );
+    },
+    FORM_TEST_TIMEOUT,
+  );
 
   it('server field errors land on their fields; unknown paths go to the summary', async () => {
     server.use(

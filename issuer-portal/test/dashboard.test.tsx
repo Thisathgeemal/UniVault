@@ -70,7 +70,7 @@ describe('dashboard – counts and cards', () => {
       ['Awaiting wallet 3', '/credentials?effectiveStatus=pending'],
       ['Superseded 300', '/credentials?effectiveStatus=superseded'],
       ['Expired 200', '/credentials?effectiveStatus=expired'],
-      ['Expiring in 30 days 4', '/credentials?effectiveStatus=valid'],
+      ['Expiring in 30 days 4', '/credentials?effectiveStatus=valid&sort=expires'],
       ['Holders 25', '/holders'],
     ];
     for (const [name, href] of hrefs) {

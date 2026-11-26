@@ -76,3 +76,38 @@ describe('resource files', () => {
     }
   });
 });
+
+describe('one wording per status', () => {
+  // Dashboard card, holder and offer screens, credentials table badge and tab, credential page
+  const AWAITING = [
+    'dashboard.cards.awaitingWallet.label',
+    'holders.statuses.pending',
+    'credentials.statuses.pending',
+    'credentials.list.tabs.pending',
+  ];
+  it.each([
+    ['en', en],
+    ['si', si],
+  ])('"Awaiting wallet" is the same everywhere (%s)', (_name, resources) => {
+    expect(new Set(AWAITING.map((key) => leaf(resources, key))).size).toBe(1);
+  });
+
+  it('Sinhala sentences about pending credentials use the same phrase', () => {
+    const label = leaf(si, 'credentials.statuses.pending');
+    for (const key of [
+      'credentials.detail.events.pending',
+      'credentials.list.empty.pending.title',
+      'credentials.conflicts.notReissuable',
+      'offer.states.notPending.title',
+    ]) {
+      expect(leaf(si, key)).toContain(label);
+    }
+  });
+
+  it('"Renew" is අලුත් කරන්න in every renew label', () => {
+    expect(leaf(si, 'credentials.actions.renew')).toBe('අලුත් කරන්න');
+    for (const key of ['credentials.reissue.renewTitle', 'credentials.reissue.submitRenew']) {
+      expect(leaf(si, key)).toContain('අලුත් කරන්න');
+    }
+  });
+});

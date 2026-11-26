@@ -790,8 +790,10 @@ describe('GET /credentials and /credentials/:id', () => {
     const list = await getCredentials(tokens.bankOfficer, '?limit=1');
     const res = await getCredentials(tokens.bankOfficer, `/${list.body.credentials[0].id}`);
     expect(res.status).toBe(200);
-    // The detail adds activeOffer (the list does not); no offer exists for this one
-    expect(res.body).toEqual({ ...list.body.credentials[0], activeOffer: null });
+    // The detail adds activeOffer; the list row has hasActiveOffer instead
+    const { hasActiveOffer, ...row } = list.body.credentials[0];
+    expect(hasActiveOffer).toBe(false);
+    expect(res.body).toEqual({ ...row, activeOffer: null });
   });
 
   it("hides another issuer's credential (404 CREDENTIAL_NOT_FOUND)", async () => {

@@ -204,9 +204,11 @@ existing seed holders through the real services:
   time. They change over time: open offers drop to 0 once they pass
   `CREDENTIAL_OFFER_TTL_SECONDS`, and the 3 "expiring" credentials become expired 6–23 days
   after the first run.
-- **`--reset`** (`npm run db:seed:demo -- --reset`) removes **only** the demo rows (their
-  offers, status events and credentials, and the demo account); then run it again without the
-  flag for fresh data. Because `credential_status_events` is append-only, the reset lifts that
+- **`--reset`** (`npm run db:seed:demo -- --reset`) removes **only** the demo rows and what was
+  derived from them: the demo credentials, every credential chained to them through
+  `replaces_credential_id` (e.g. a staff member's reissue of a demo credential, followed
+  transitively), the offers and status events of all those, and the demo account. Then run it
+  again without the flag for fresh data. Because `credential_status_events` is append-only, the reset lifts that
   trigger inside its one transaction for the demo rows only (Decision 017).
 - **Output:** counts per status only (no ids, names, claims or keys):
 

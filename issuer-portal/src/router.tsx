@@ -9,6 +9,7 @@
  *     /credentials/new      issue a credential (the Credentials route's roles)
  *     /credentials/:id      one credential; the success page after issuing (?issued=1)
  *     /credentials/:id/offer  the wallet offer (QR code) for a pending credential
+ *     /credentials/:id/reissue  reissue / renew a credential (preview, then confirm)
  *     *                     404
  */
 import type { ReactNode } from 'react';
@@ -20,6 +21,7 @@ import { ComingSoonPage } from './pages/ComingSoonPage.js';
 import { CredentialOfferPage } from './pages/credentials/CredentialOfferPage.js';
 import { CredentialPage } from './pages/credentials/CredentialPage.js';
 import { CredentialsPage } from './pages/credentials/CredentialsPage.js';
+import { ReissueCredentialPage } from './pages/credentials/ReissueCredentialPage.js';
 import { IssueCredentialPage } from './pages/credentials/IssueCredentialPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { HolderDetailPage } from './pages/holders/HolderDetailPage.js';
@@ -99,6 +101,15 @@ export function createRoutes(): RouteObject[] {
               element: (
                 <RequireRole roles={CREDENTIALS.roles}>
                   <CredentialOfferPage />
+                </RequireRole>
+              ),
+              errorElement: <RouteErrorPage />,
+            },
+            {
+              path: '/credentials/:credentialId/reissue',
+              element: (
+                <RequireRole roles={CREDENTIALS.roles}>
+                  <ReissueCredentialPage />
                 </RequireRole>
               ),
               errorElement: <RouteErrorPage />,

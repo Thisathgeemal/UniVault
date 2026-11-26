@@ -159,3 +159,214 @@ export async function fetchCredential(
   );
   return credentialMetadataSchema.parse(body);
 }
+
+// ---------------------------------------------------------------------------
+// The credentials table, revoke and reissue (docs/api/credentials-api.md §2 and §6,
+// Decision 012). Rows carry the holder's name and reference only: never claims or ID numbers.
+
+const staffRef = z.object({ id: z.string(), displayName: z.string() }).nullable();
+
+export const credentialListItemSchema = credentialMetadataSchema.extend({
+  vct: z.string().optional(),
+  replacesCredentialId: z.string().nullable().default(null),
+  replacedByCredentialId: z.string().nullable().default(null),
+  hasActiveOffer: z.boolean().default(false),
+});
+export type CredentialListItem = z.infer<typeof credentialListItemSchema>;
+
+export const LIST_SORTS = [
+  'newest',
+  'oldest',
+  'expires',
+  'expires_desc',
+  'holder',
+  'holder_desc',
+] as const;
+export type CredentialListSort = (typeof LIST_SORTS)[number];
+
+const statusCounts = z.object({
+  all: z.number(),
+  pending: z.number(),
+  valid: z.number(),
+  expired: z.number(),
+  revoked: z.number(),
+  superseded: z.number(),
+});
+export type CredentialStatusCounts = z.infer<typeof statusCounts>;
+
+const credentialListSchemaFull = z.object({
+  credentials: z.array(credentialListItemSchema),
+  total: z.number().int().min(0),
+  counts: statusCounts,
+});
+export type CredentialList = z.infer<typeof credentialListSchemaFull>;
+
+export interface CredentialListParams {
+  effectiveStatus?: EffectiveStatus | undefined;
+  q?: string | undefined;
+  sort: CredentialListSort;
+  limit: number;
+  offset: number;
+}
+
+/** Every credential query starts with this key: invalidating it refreshes list, detail, events. */
+export const CREDENTIALS_QUERY_KEY = ['credentials'] as const;
+
+export async function listCredentials(
+  api: ApiClient,
+  params: CredentialListParams,
+  signal?: AbortSignal,
+): Promise<CredentialList> {
+  const search = new URLSearchParams({
+    sort: params.sort,
+    limit: String(params.limit),
+    offset: String(params.offset),
+  });
+  if (params.effectiveStatus) search.set('effectiveStatus', params.effectiveStatus);
+  if (params.q) search.set('q', params.q);
+  const body = await api.request<unknown>(`/credentials?${search}`, signal ? { signal } : {});
+  return credentialListSchemaFull.parse(body);
+}
+
+/** GET /credentials/:id with everything the detail page shows. */
+export const credentialDetailSchema = credentialMetadataSchema.extend({
+  revokedAt: z.string().nullable().default(null),
+  revocationReason: z.string().nullable().default(null),
+  revokedBy: staffRef.default(null),
+  supersededAt: z.string().nullable().default(null),
+  supersededBy: staffRef.default(null),
+  replacesCredentialId: z.string().nullable().default(null),
+  replacedByCredentialId: z.string().nullable().default(null),
+  createdBy: staffRef.default(null),
+});
+export type CredentialDetail = z.infer<typeof credentialDetailSchema>;
+
+export async function fetchCredentialDetail(
+  api: ApiClient,
+  credentialId: string,
+  signal?: AbortSignal,
+): Promise<CredentialDetail> {
+  const body = await api.request<unknown>(
+    `/credentials/${encodeURIComponent(credentialId)}`,
+    signal ? { signal } : {},
+  );
+  return credentialDetailSchema.parse(body);
+}
+
+const statusEventSchema = z.object({
+  id: z.string(),
+  fromStatus: z.enum(['pending', 'valid', 'revoked', 'superseded']).nullable(),
+  toStatus: z.enum(['pending', 'valid', 'revoked', 'superseded']),
+  reason: z.string().nullable(),
+  staff: staffRef,
+  createdAt: z.string(),
+});
+export type CredentialStatusEvent = z.infer<typeof statusEventSchema>;
+
+export const credentialEventsQueryKey = (id: string) =>
+  [...CREDENTIALS_QUERY_KEY, 'events', id] as const;
+
+/** GET /credentials/:id/events (oldest first). Notes are not used by the portal. */
+export async function fetchCredentialEvents(
+  api: ApiClient,
+  credentialId: string,
+  signal?: AbortSignal,
+): Promise<CredentialStatusEvent[]> {
+  const body = await api.request<unknown>(
+    `/credentials/${encodeURIComponent(credentialId)}/events`,
+    signal ? { signal } : {},
+  );
+  return z.object({ events: z.array(statusEventSchema) }).parse(body).events;
+}
+
+/** The backend's enums (credentials.service.ts REVOCATION_REASONS / REISSUE_REASONS). */
+export const REVOCATION_REASONS = [
+  'details_changed',
+  'employment_ended',
+  'relationship_ended',
+  'wallet_lost_or_compromised',
+  'issued_in_error',
+  'other',
+] as const;
+export type RevocationReason = (typeof REVOCATION_REASONS)[number];
+export const REISSUE_REASONS = [
+  'details_changed',
+  'wallet_lost_or_compromised',
+  'validity_extension',
+  'other',
+] as const;
+export type ReissueReason = (typeof REISSUE_REASONS)[number];
+/** The backend's note limit (credentials.routes.ts noteSchema). */
+export const NOTE_MAX_LENGTH = 500;
+
+export async function revokeCredential(
+  api: ApiClient,
+  credentialId: string,
+  input: { reason: RevocationReason; note?: string },
+): Promise<CredentialMetadata> {
+  const body = await api.request<unknown>(
+    `/credentials/${encodeURIComponent(credentialId)}/revoke`,
+    { method: 'POST', body: { reason: input.reason, ...(input.note ? { note: input.note } : {}) } },
+  );
+  return credentialMetadataSchema.parse(body);
+}
+
+export interface ReissueInput {
+  reason: ReissueReason;
+  note?: string;
+  validUntil?: string;
+}
+const reissueBody = (input: ReissueInput) => ({
+  reason: input.reason,
+  ...(input.note ? { note: input.note } : {}),
+  ...(input.validUntil ? { validUntil: input.validUntil } : {}),
+});
+
+export const reissuePreviewSchema = z.object({
+  credentialId: z.string(),
+  credentialType,
+  holder: z.object({ id: z.string(), externalRef: z.string(), fullName: z.string() }),
+  current: z.object({
+    claims: z.record(z.string(), z.unknown()),
+    expiresAt: z.string(),
+    effectiveStatus: z.enum(EFFECTIVE_STATUSES),
+  }),
+  replacement: z.object({
+    claims: z.record(z.string(), z.unknown()),
+    expiresAt: z.string(),
+    defaultExpiresAt: z.string(),
+    cappedBy: z.enum(CAPPED_BY).nullable(),
+    validUntilRange: z.object({ min: z.string(), max: z.string() }),
+  }),
+  changedFields: z.array(z.string()),
+  warnings: z.array(z.string()),
+});
+export type ReissuePreview = z.infer<typeof reissuePreviewSchema>;
+
+/** POST /credentials/:id/reissue/preview – the same path as reissue, nothing written. */
+export async function previewReissue(
+  api: ApiClient,
+  credentialId: string,
+  input: ReissueInput,
+  signal?: AbortSignal,
+): Promise<ReissuePreview> {
+  const body = await api.request<unknown>(
+    `/credentials/${encodeURIComponent(credentialId)}/reissue/preview`,
+    { method: 'POST', body: reissueBody(input), ...(signal ? { signal } : {}) },
+  );
+  return reissuePreviewSchema.parse(body);
+}
+
+export async function reissueCredential(
+  api: ApiClient,
+  credentialId: string,
+  input: ReissueInput,
+): Promise<{ credential: CredentialMetadata; replaces: { id: string } }> {
+  const body = await api.request<unknown>(
+    `/credentials/${encodeURIComponent(credentialId)}/reissue`,
+    { method: 'POST', body: reissueBody(input) },
+  );
+  return z
+    .object({ credential: credentialMetadataSchema, replaces: z.object({ id: z.string() }) })
+    .parse(body);
+}

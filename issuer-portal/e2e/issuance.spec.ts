@@ -33,6 +33,9 @@ async function awaitingWallet(page: Page): Promise<number> {
 }
 
 async function pickHolder(page: Page, reference: string) {
+  // /credentials is the credentials table; "Issue credential" opens the holder picker
+  await page.getByRole('main').getByRole('link', { name: 'Issue credential' }).first().click();
+  await expect(page).toHaveURL(/\/credentials\/new$/);
   await page
     .getByRole('searchbox', { name: 'Search holders by name or reference' })
     .fill(reference);

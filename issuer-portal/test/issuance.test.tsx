@@ -86,13 +86,15 @@ describe('step 1 – holder and schema', () => {
     expect(await screen.findByRole('radio', { name: 'Employment credential' })).toBeInTheDocument();
   });
 
-  it('from the Credentials page: search, pick, start', async () => {
+  it('from the Credentials page: "Issue credential", then search, pick, start', async () => {
     const { user, location } = renderApp('/credentials', { signedInAs: ADMIN });
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Credentials' }),
     ).toBeInTheDocument();
+    await user.click(screen.getAllByRole('link', { name: 'Issue credential' })[0]!);
+    expect(location()).toBe('/credentials/new');
     await user.type(
-      screen.getByRole('searchbox', { name: 'Search holders by name or reference' }),
+      await screen.findByRole('searchbox', { name: 'Search holders by name or reference' }),
       'amal',
     );
     await waitFor(() =>

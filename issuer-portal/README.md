@@ -113,9 +113,12 @@ src/
   auth/                    AuthProvider (session), RequireRole, returnTo checks, sessionStorage
   layout/                  RootLayout (session provider), ProtectedLayout (AppShell + redirect)
   pages/                   Login, Dashboard, holders/ (list, register, detail), credentials/
-                           (picker, issue flow, credential / success page, wallet offer QR
+                           (credentials table, issue flow with picker, credential page with
+                           timeline and actions / success page, reissue / renew, wallet offer QR
                            screen), ComingSoon,
                            Not permitted / 404 / error
+  credentials/             credentialActions() (THE status x role action rule), action items,
+                           RevokeDialog, status badge, 409 messages, query invalidation, list-params
   holders/                 form-model (form from the schema), validation, display, list-params
   issuance/                preview claim display, problems, HolderPicker (claims never built here)
   offers/                  useNow (1 s clock), offer screen settings

@@ -30,7 +30,8 @@ const rows = () =>
 
 async function openList(path = '/holders', as = ADMIN, waitFor = 'Lahiru Silva') {
   const view = renderApp(path, { signedInAs: as });
-  await screen.findByRole('link', { name: waitFor });
+  // 5 s: the file's first render is a cold start, slow under coverage with parallel files (Issue 36)
+  await screen.findByRole('link', { name: waitFor }, { timeout: 5000 });
   return view;
 }
 

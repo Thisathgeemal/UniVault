@@ -1015,6 +1015,18 @@ accountability), given that the credential row only holds its current state.
   a reason means a new migration as well as a code change.
 - A holder record that no longer passes its schema is reported the same way by issuance and
   reissue (`422 HOLDER_DATA_INVALID`), because both use one code path.
+- **Expired credentials (26 Nov 2026):** revoke and reissue check the **stored** status, and an
+  expired credential is stored `valid` (Decision 013). So an expired credential **can be
+  renewed by reissue** (the old one is superseded, the replacement is pending with a new expiry
+  from today; any reissue reason, usually `validity_extension`). An admin **can also revoke
+  it**: that hides nothing and records the issuer's intent, and the public status changes from
+  `expired` to `revoked`. This was already the code's behaviour; it is now tested
+  (`test/credentials-table.test.ts`) and documented (`docs/api/credentials-api.md` §6.5). The
+  portal calls the reissue "Renew" for an expired credential.
+- The reissue checks live in one function, `prepareReissue()`, shared by the reissue and its
+  no-write preview (`POST /credentials/:id/reissue/preview`), as `prepareIssuance()` is for
+  issuance (Decision 019). The one-active-credential check now runs before the supersede and
+  leaves out the credential being replaced, so the preview gives the same answer as the reissue.
 - **Temporary:** until Sprint 2 builds redemption, a development-only route
   (`POST /api/v1/dev/credentials/:id/simulate-redemption`, `DEV_SIMULATE_REDEMPTION=true`,
   refused in production, one warning logged at start-up when enabled) is the only way to make
@@ -1561,6 +1573,15 @@ domain>`, `is_active = false`, random password never stored in clear): demo cred
   (`signCredential()` is the real path), but its expired credential needs a replacement for
   `simulateExpiry()`: the injected clock (create and sign more than a year in the past) works
   without it.
+- **Demo-derived rows (26 Nov 2026):** `--reset` also removes credentials chained to a demo
+  credential through `replaces_credential_id`, followed transitively (for example the
+  replacement an officer made by reissuing a demo credential while taking screenshots), with
+  their offers and events. They exist only because of the demo data. Keeping them would either
+  block the reset (foreign key) or, with the link cleared, leave a credential whose history says
+  it replaced one that no longer exists. A staff member's action ON a demo credential (a revoke,
+  an offer) is part of that credential's history and goes with it. Credentials that do not
+  descend from a demo credential are never touched (`test/db/seed-demo.test.ts`). This refines
+  "only its own rows" above to "its own rows and what was derived from them".
 
 ## Decision 018: One shared claims-validation package; the portal precompiles the schemas at build time
 

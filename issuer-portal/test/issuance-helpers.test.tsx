@@ -201,7 +201,7 @@ describe('holder picker states', () => {
         HttpResponse.json({ holders: [], total: 0, limit: 10, offset: 0 }),
       ),
     );
-    renderApp('/credentials', { signedInAs: ADMIN });
+    renderApp('/credentials/new', { signedInAs: ADMIN });
     expect(await screen.findByText('No holders match “”.')).toBeInTheDocument();
   });
 
@@ -211,7 +211,7 @@ describe('holder picker states', () => {
         HttpResponse.json(errorBody('INTERNAL_ERROR', 'x'), { status: 500 }),
       ),
     );
-    renderApp('/credentials', { signedInAs: ADMIN });
+    renderApp('/credentials/new', { signedInAs: ADMIN });
     expect(await screen.findByRole('alert')).toHaveTextContent('The holders could not be loaded.');
   });
 });

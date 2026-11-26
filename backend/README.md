@@ -12,24 +12,25 @@ copy .env.example .env      # Windows (macOS/Linux: cp .env.example .env)
 npm run dev                 # http://localhost:4000/api/v1/health
 ```
 
-| Script                  | Purpose                                                                                                                                                                                             |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`           | Start with auto-restart on file changes (tsx)                                                                                                                                                       |
-| `npm run build`         | Compile TypeScript to `dist/`                                                                                                                                                                       |
-| `npm start`             | Run the compiled server (`dist/server.js`)                                                                                                                                                          |
-| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 498 tests, 21 files). Two projects: `fast` (parallel), then `heavy` (one file at a time)                                                     |
-| `npm run test:fast`     | Only the fast, in-process tests (parallel)                                                                                                                                                          |
-| `npm run test:heavy`    | Only the heavy tests: real processes and on-disk PGlite (one file at a time)                                                                                                                        |
-| `npm run test:coverage` | Tests with a coverage report; fails below 90 / 86 / 93 / 90 % (stmts / branches / funcs / lines)                                                                                                    |
-| `npm run typecheck`     | Type-check without emitting files                                                                                                                                                                   |
-| `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                                                                                                                                                    |
-| `npm run db:migrate`    | Apply new SQL migrations                                                                                                                                                                            |
-| `npm run db:seed`       | Migrate, then load the synthetic issuers, staff and holders                                                                                                                                         |
-| `npm run db:inspect`    | Show tables, row counts and sample rows                                                                                                                                                             |
-| `npm run db:reset`      | Delete the embedded development database, then migrate and seed again                                                                                                                               |
-| `npm run db:seed:demo`  | **Development only.** Dashboard demo credentials of every status for Serendib Trading (needs `db:seed`, `keys:init`); skips if present, `-- --reset` removes only the demo rows; prints counts only |
-| `npm run keys:init`     | Generate a signing key for every issuer without an active one                                                                                                                                       |
-| `npm run keys:bundle`   | Write the active encrypted keys to `keys/issuer-keys.bundle.b64` for `ISSUER_KEYS_BUNDLE` (`--force` to replace; prints ids and kids only)                                                          |
+| Script                  | Purpose                                                                                                                                                                                                                                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`           | Start with auto-restart on file changes (tsx)                                                                                                                                                                                                                                               |
+| `npm run build`         | Compile TypeScript to `dist/`                                                                                                                                                                                                                                                               |
+| `npm start`             | Run the compiled server (`dist/server.js`)                                                                                                                                                                                                                                                  |
+| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 571 tests, 23 files). Two projects: `fast` (parallel), then `heavy` (one file at a time)                                                                                                                                             |
+| `npm run test:fast`     | Only the fast, in-process tests (parallel)                                                                                                                                                                                                                                                  |
+| `npm run test:heavy`    | Only the heavy tests: real processes and on-disk PGlite (one file at a time)                                                                                                                                                                                                                |
+| `npm run test:coverage` | Tests with a coverage report; fails below 90 / 86 / 93 / 90 % (stmts / branches / funcs / lines)                                                                                                                                                                                            |
+| `npm run typecheck`     | Type-check without emitting files                                                                                                                                                                                                                                                           |
+| `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                                                                                                                                                                                                                                            |
+| `npm run db:migrate`    | Apply new SQL migrations                                                                                                                                                                                                                                                                    |
+| `npm run db:seed`       | Migrate, then load the synthetic issuers, staff and holders                                                                                                                                                                                                                                 |
+| `npm run db:inspect`    | Show tables, row counts and sample rows                                                                                                                                                                                                                                                     |
+| `npm run db:reset`      | Delete the embedded development database, then migrate and seed again                                                                                                                                                                                                                       |
+| `npm run db:seed:demo`  | **Development only.** Dashboard demo credentials of every status for Serendib Trading (needs `db:seed`, `keys:init`); skips if present, `-- --reset` removes only the demo rows and replacements made from them (also after staff reissued or revoked demo credentials); prints counts only |
+| `npm run db:holder:set` | **Development only.** `-- <ref> <claim> <value>`: change one existing text claim of a holder (not `employee_id` / `age_over_18`), re-validated against its schema; prints the claim name only. Run with the server stopped                                                                  |
+| `npm run keys:init`     | Generate a signing key for every issuer without an active one                                                                                                                                                                                                                               |
+| `npm run keys:bundle`   | Write the active encrypted keys to `keys/issuer-keys.bundle.b64` for `ISSUER_KEYS_BUNDLE` (`--force` to replace; prints ids and kids only)                                                                                                                                                  |
 
 `dev`, `build`, `typecheck`, `test`, `test:coverage`, `keys:init` and `db:seed:demo` run
 `build:deps` first (npm `pre` scripts), so crypto-core is always up to date.
@@ -59,7 +60,7 @@ src/
   routes/staff.routes.ts              staff list (admin)
   routes/issuers.routes.ts            issuers, JWKS, key generation
   routes/holders.routes.ts            holder records
-  routes/credentials.routes.ts        credential issuance (pending), preview, list, get, revoke, reissue, events
+  routes/credentials.routes.ts        credential issuance (pending), preview, list (q, sort, counts), get, revoke, reissue, reissue preview, events
   routes/credential-schemas.routes.ts the schemas this issuer may issue (GET /credential-schemas)
   routes/dev.routes.ts                DEV ONLY (temporary): simulated redemption and expiry
   routes/credential-offers.routes.ts  QR offers, status, cancel; wallet redemption planned (Sprint 2)
@@ -69,7 +70,7 @@ src/
   services/issuer-keys.service.ts  key generation, rotation, JWKS publication
   services/holders.service.ts      holder records (schema-validated, issuer-scoped)
   services/credentials.service.ts  pending credentials, expiry rules, signCredential (SD-JWT),
-                                   revoke, reissue (supersede), status history
+                                   revoke, reissue (supersede) + reissue preview (prepareReissue), status history
   services/credential-offers.service.ts  pre-authorised offers (hash only), status + reason, cancel, findOfferByCode
   services/credential-schemas.ts   loads docs/schemas and validates claims (rules and messages
                                    from @univault/claims-validation, shared with the portal)
@@ -80,7 +81,8 @@ src/
   db/migrate.ts          SQL migration runner
   db/seed.ts             loads seed-data/ (issuers, staff, holders)
   db/seed-demo.ts        DEV ONLY: dashboard demo credentials (db:seed:demo), --reset
-  db/cli.ts              db:*, db:seed:demo, keys:init and keys:bundle commands
+  db/dev-holder-update.ts  DEV ONLY: change one holder claim (db:holder:set)
+  db/cli.ts              db:*, db:seed:demo, db:holder:set, keys:init and keys:bundle commands
   keys/key-store.ts      the ONLY owner of private keys (file or env bundle, decrypt once)
   keys/startup-check.ts  start-up key check (strict in production)
 migrations/              versioned SQL migrations (source of truth for the schema)
@@ -93,38 +95,39 @@ JSON body (size-limited) → `/api/v1` routes → 404 → error handler.
 
 ## API routes (`/api/v1`)
 
-| Method | Path                                                 | Access           | Status                                                       |
-| ------ | ---------------------------------------------------- | ---------------- | ------------------------------------------------------------ |
-| GET    | `/health`                                            | Public           | ✅ Implemented                                               |
-| POST   | `/auth/login`                                        | Public           | ✅ Implemented (rate-limited)                                |
-| GET    | `/auth/me`                                           | Login            | ✅ Implemented                                               |
-| POST   | `/auth/logout`                                       | Login            | ✅ Implemented                                               |
-| GET    | `/staff`                                             | Admin            | ✅ Implemented                                               |
-| GET    | `/issuers`                                           | Public           | ✅ Implemented                                               |
-| GET    | `/issuers/:issuerId/keys`                            | Public           | ✅ Implemented                                               |
-| POST   | `/issuers/:issuerId/keys`                            | Admin (own)      | ✅ Implemented                                               |
-| GET    | `/holders`, `/holders/:holderId`                     | Login            | ✅ Implemented                                               |
-| POST   | `/holders`                                           | Login            | ✅ Implemented                                               |
-| POST   | `/credentials`                                       | Officer or admin | ✅ Implemented (creates **pending**; optional `validUntil`)  |
-| POST   | `/credentials/preview`                               | Officer or admin | ✅ Implemented (same path as issuance, writes nothing)       |
-| GET    | `/credential-schemas`                                | Officer or admin | ✅ Implemented (the issuer type's schema, from the files)    |
-| GET    | `/credentials`, `/credentials/:credentialId`         | Login            | ✅ Implemented (detail adds `activeOffer`: id + expiry only) |
-| POST   | `/credentials/:credentialId/revoke`                  | Admin            | ✅ Implemented (pending or valid)                            |
-| POST   | `/credentials/:credentialId/reissue`                 | Officer or admin | ✅ Implemented (supersedes, new pending)                     |
-| GET    | `/credentials/:credentialId/events`                  | Officer or admin | ✅ Implemented (status history)                              |
-| POST   | `/credential-offers`                                 | Officer or admin | ✅ Implemented (one-time QR offer)                           |
-| GET    | `/credential-offers/:offerId`                        | Login            | ✅ Implemented (status, reason, `serverTime`)                |
-| POST   | `/credential-offers/:offerId/cancel`                 | Officer or admin | ✅ Implemented (active only, else 409 `OFFER_NOT_ACTIVE`)    |
-| GET    | `/dashboard/summary`                                 | Officer or admin | ✅ Implemented (own issuer from the token, `no-store`)       |
-| POST   | `/credential-offers/token`                           | Public (code)    | 501 – Sprint 2 (wallet)                                      |
-| POST   | `/credential-offers/credential`                      | Public (code)    | 501 – Sprint 2 (wallet)                                      |
-| GET    | `/status/:credentialId`                              | Public           | ✅ Implemented (any origin, rate limited, `no-store`)        |
-| POST   | `/verifications`                                     | Public           | 501 – Sprint 3                                               |
-| GET    | `/verifications/:verificationId/request`             | Public           | 501 – Sprint 3                                               |
-| POST   | `/verifications/:verificationId/response`            | Public           | 501 – Sprint 3                                               |
-| GET    | `/verifications/:verificationId/result`              | Public           | 501 – Sprint 3                                               |
-| POST   | `/dev/credentials/:credentialId/simulate-redemption` | Admin (own)      | **Dev only**, mounted only if `DEV_SIMULATE_REDEMPTION=true` |
-| POST   | `/dev/credentials/:credentialId/simulate-expiry`     | Admin (own)      | **Dev only**, same flag (temporary, removed in Sprint 2)     |
+| Method | Path                                                 | Access           | Status                                                                                                          |
+| ------ | ---------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| GET    | `/health`                                            | Public           | ✅ Implemented                                                                                                  |
+| POST   | `/auth/login`                                        | Public           | ✅ Implemented (rate-limited)                                                                                   |
+| GET    | `/auth/me`                                           | Login            | ✅ Implemented                                                                                                  |
+| POST   | `/auth/logout`                                       | Login            | ✅ Implemented                                                                                                  |
+| GET    | `/staff`                                             | Admin            | ✅ Implemented                                                                                                  |
+| GET    | `/issuers`                                           | Public           | ✅ Implemented                                                                                                  |
+| GET    | `/issuers/:issuerId/keys`                            | Public           | ✅ Implemented                                                                                                  |
+| POST   | `/issuers/:issuerId/keys`                            | Admin (own)      | ✅ Implemented                                                                                                  |
+| GET    | `/holders`, `/holders/:holderId`                     | Login            | ✅ Implemented                                                                                                  |
+| POST   | `/holders`                                           | Login            | ✅ Implemented                                                                                                  |
+| POST   | `/credentials`                                       | Officer or admin | ✅ Implemented (creates **pending**; optional `validUntil`)                                                     |
+| POST   | `/credentials/preview`                               | Officer or admin | ✅ Implemented (same path as issuance, writes nothing)                                                          |
+| GET    | `/credential-schemas`                                | Officer or admin | ✅ Implemented (the issuer type's schema, from the files)                                                       |
+| GET    | `/credentials`, `/credentials/:credentialId`         | Login            | ✅ Implemented (list: `q`, `sort`, `hasActiveOffer`, tab `counts`; detail adds `activeOffer`: id + expiry only) |
+| POST   | `/credentials/:credentialId/revoke`                  | Admin            | ✅ Implemented (pending or valid, incl. expired)                                                                |
+| POST   | `/credentials/:credentialId/reissue`                 | Officer or admin | ✅ Implemented (supersedes, new pending; expired = renewal)                                                     |
+| POST   | `/credentials/:credentialId/reissue/preview`         | Officer or admin | ✅ Implemented (same checks as reissue, writes nothing)                                                         |
+| GET    | `/credentials/:credentialId/events`                  | Officer or admin | ✅ Implemented (status history)                                                                                 |
+| POST   | `/credential-offers`                                 | Officer or admin | ✅ Implemented (one-time QR offer)                                                                              |
+| GET    | `/credential-offers/:offerId`                        | Login            | ✅ Implemented (status, reason, `serverTime`)                                                                   |
+| POST   | `/credential-offers/:offerId/cancel`                 | Officer or admin | ✅ Implemented (active only, else 409 `OFFER_NOT_ACTIVE`)                                                       |
+| GET    | `/dashboard/summary`                                 | Officer or admin | ✅ Implemented (own issuer from the token, `no-store`)                                                          |
+| POST   | `/credential-offers/token`                           | Public (code)    | 501 – Sprint 2 (wallet)                                                                                         |
+| POST   | `/credential-offers/credential`                      | Public (code)    | 501 – Sprint 2 (wallet)                                                                                         |
+| GET    | `/status/:credentialId`                              | Public           | ✅ Implemented (any origin, rate limited, `no-store`)                                                           |
+| POST   | `/verifications`                                     | Public           | 501 – Sprint 3                                                                                                  |
+| GET    | `/verifications/:verificationId/request`             | Public           | 501 – Sprint 3                                                                                                  |
+| POST   | `/verifications/:verificationId/response`            | Public           | 501 – Sprint 3                                                                                                  |
+| GET    | `/verifications/:verificationId/result`              | Public           | 501 – Sprint 3                                                                                                  |
+| POST   | `/dev/credentials/:credentialId/simulate-redemption` | Admin (own)      | **Dev only**, mounted only if `DEV_SIMULATE_REDEMPTION=true`                                                    |
+| POST   | `/dev/credentials/:credentialId/simulate-expiry`     | Admin (own)      | **Dev only**, same flag (temporary, removed in Sprint 2)                                                        |
 
 Credentials are **signed when the wallet redeems its offer** (Sprint 2), by
 `signCredential()` in `services/credentials.service.ts`; `POST /credentials`
@@ -156,7 +159,9 @@ codes and staff names only, never notes or claims).
 **Demo data:** `npm run db:seed:demo` (development only) fills Serendib Trading with 8 active
 (3 expiring within 30 days), 3 pending with open offers, 1 revoked after signing, 1 revoked
 while pending, 1 superseded and 1 expired credential, through the real services. It is
-idempotent; `-- --reset` removes only those rows (Decision 017).
+idempotent; `-- --reset` removes only those rows, plus any credential chained to them through
+`replaces_credential_id` (a staff member's reissue of a demo credential) with its offers and
+events; nothing else (Decision 017).
 
 Planned routes already validate their input. Each returns `501 NOT_IMPLEMENTED`
 with the sprint it is planned for, until its handler is written.
