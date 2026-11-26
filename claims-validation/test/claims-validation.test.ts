@@ -13,6 +13,7 @@ import {
   checkExternalRef,
   CREDENTIAL_TYPES,
   CUSTOMER_REF_PATTERN,
+  dataUriKilobytes,
   toClaimIssues,
   type CredentialTypeName,
 } from '../src/index.js';
@@ -220,5 +221,40 @@ describe('runtime helpers', () => {
   it('give the Ajv string length and the ajv-formats implementations', () => {
     expect(ucs2length('😀a')).toBe(2);
     expect(Object.keys(formats)).toEqual(expect.arrayContaining(['date', 'email']));
+  });
+});
+
+describe('portrait size (Decision 020)', () => {
+  const ajv = createClaimsAjv();
+  const validate = ajv.compile(schemas.EmploymentCredential);
+  const limit = (schemas.EmploymentCredential.properties as Record<string, { maxLength: number }>)
+    .portrait!.maxLength;
+  const portrait = (base64Chars: number) => `data:image/jpeg;base64,${'A'.repeat(base64Chars)}`;
+
+  it('the schema allows 40 KB of image data: the limit is derived from maxLength', () => {
+    expect(limit).toBe(54639);
+    expect(dataUriKilobytes(limit)).toBe(40);
+    expect(dataUriKilobytes(0)).toBe(0);
+    // Exactly 40 KB (40 960 bytes = 54 616 base64 characters) is accepted
+    expect(validate({ ...employee, portrait: portrait(54616) })).toBe(true);
+  });
+
+  it('a larger photo gives one issue with the plain message', () => {
+    validate({ ...employee, portrait: portrait(54620) });
+    expect(toClaimIssues(validate.errors)).toEqual([
+      {
+        path: 'portrait',
+        code: 'photoTooLarge',
+        message: 'Photo must be under 40 KB – use a smaller image',
+        params: { limit: 54639, kilobytes: 40 },
+      },
+    ]);
+  });
+
+  it('the portrait is selectively disclosable in both schemas', () => {
+    for (const type of CREDENTIAL_TYPES) {
+      const meta = schemas[type]['x-univault'] as { selectivelyDisclosable: string[] };
+      expect(meta.selectivelyDisclosable, type).toContain('portrait');
+    }
   });
 });

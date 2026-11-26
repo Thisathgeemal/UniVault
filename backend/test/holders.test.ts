@@ -212,6 +212,26 @@ describe('POST /holders – invalid data is rejected', () => {
     });
   });
 
+  it('rejects a portrait over 40 KB with the plain message (Decision 020)', async () => {
+    const portrait = (chars: number) => `data:image/jpeg;base64,${'A'.repeat(chars)}`;
+    const big = await post(employerOfficer, {
+      claims: { ...employeeClaims('STC-90060'), portrait: portrait(54620) },
+    });
+    expect(big.status).toBe(400);
+    expect(big.body.error.details).toEqual([
+      {
+        path: 'claims.portrait',
+        code: 'photoTooLarge',
+        message: 'Photo must be under 40 KB – use a smaller image',
+      },
+    ]);
+    // Exactly 40 KB of image data is accepted
+    const fits = await post(employerOfficer, {
+      claims: { ...employeeClaims('STC-90061'), portrait: portrait(54616) },
+    });
+    expect(fits.status).toBe(201);
+  });
+
   it('gives every issue a stable code (the portal translates it)', async () => {
     const res = await post(employerOfficer, {
       claims: { employee_id: 'stc 1', full_name: 'A', date_of_joining: 'soon' },

@@ -46,7 +46,11 @@ import {
 } from '../db/schema.js';
 import type { KeyStore } from '../keys/key-store.js';
 import { AppError } from '../lib/errors.js';
-import type { CredentialSchemas, CredentialTypeName } from './credential-schemas.js';
+import type {
+  CredentialSchemas,
+  CredentialTypeName,
+  SchemaDescription,
+} from './credential-schemas.js';
 
 /** HOLDER_DATA_INVALID details: path + English message (no code; unchanged API). */
 interface HolderDataIssue {
@@ -127,6 +131,50 @@ export interface CredentialMetadata {
 export interface CreateCredentialInput {
   holderId: string;
   credentialType?: CredentialTypeName | undefined;
+  /** Optional earlier end (YYYY-MM-DD, 00:00 UTC): after today, no later than the capped expiry. */
+  validUntil?: string | undefined;
+}
+
+/** Why the expiry is earlier than the schema's default validity. */
+export type ExpiryCap = 'id_document_expiry' | '18th_birthday' | 'validUntil';
+
+/**
+ * What a credential would be if issued now (POST /credentials/preview). Computed by the SAME
+ * code as POST /credentials, without writing anything (docs/api/credentials-api.md §7).
+ */
+export interface CredentialPreview {
+  credentialType: CredentialTypeName;
+  vct: string;
+  schemaVersion: string;
+  issuer: { id: string; name: string };
+  holder: { id: string; externalRef: string; fullName: string };
+  /**
+   * The envelope claims the signer adds, always visible to verifiers. iat is PLANNED: the
+   * real iat is the signing time (when the wallet accepts the offer). exp is final. jti, cnf
+   * and status are null: the credential id is assigned on issue, the wallet key is bound at
+   * acceptance, and the status URI contains the id.
+   */
+  alwaysVisible: Record<string, unknown>;
+  /** Subject claims the holder chooses to share (x-univault.selectivelyDisclosable). */
+  disclosable: { name: string; value: unknown }[];
+  /** Claims calculated by the server (x-univault.derivedClaims), recalculated again at signing. */
+  derived: { name: string; value: unknown }[];
+  expiry: {
+    expiresAt: string;
+    /** Issuance time + the schema's defaultValidity (whole seconds). */
+    defaultExpiresAt: string;
+    cappedBy: ExpiryCap | null;
+    /** The dates validUntil may take: from min to max (inclusive). */
+    validUntilRange: { min: string; max: string };
+  };
+  /** Codes for the portal: 'holder_under_18' (age_over_18 false, ends on the 18th birthday). */
+  warnings: string[];
+}
+
+/** A schema this issuer may issue, with the always-visible claims (GET /credential-schemas). */
+export interface IssuableSchema extends SchemaDescription {
+  /** Envelope claims the signer adds plus x-univault.alwaysVisible: never selectively disclosable. */
+  alwaysVisible: string[];
 }
 
 export interface RevokeCredentialInput {
@@ -194,6 +242,10 @@ export interface SignedCredential {
 
 export interface CredentialsService {
   create(staff: StaffProfile, input: CreateCredentialInput): Promise<CredentialMetadata>;
+  /** The same checks and values as create(), without writing anything. */
+  preview(staff: StaffProfile, input: CreateCredentialInput): Promise<CredentialPreview>;
+  /** The schemas the staff member's issuer may issue (one per issuer type today). */
+  issuableSchemas(staff: StaffProfile): IssuableSchema[];
   list(
     staff: StaffProfile,
     query: ListCredentialsQuery,
@@ -282,16 +334,31 @@ export function computeExpiry(
   defaultValidity: string,
   claims: Record<string, unknown>,
 ): Date {
-  const candidates = [addIsoDuration(now, defaultValidity)];
+  return computeExpiryDetail(now, defaultValidity, claims).expiresAt;
+}
+
+/** computeExpiry with the default and the cap that won (null when the default applies). */
+export function computeExpiryDetail(
+  now: Date,
+  defaultValidity: string,
+  claims: Record<string, unknown>,
+): { expiresAt: Date; defaultExpiresAt: Date; cappedBy: Exclude<ExpiryCap, 'validUntil'> | null } {
+  const defaultExpiresAt = addIsoDuration(now, defaultValidity);
+  let expiresAt = defaultExpiresAt;
+  let cappedBy: Exclude<ExpiryCap, 'validUntil'> | null = null;
+  const cap = (date: Date | null, reason: Exclude<ExpiryCap, 'validUntil'>) => {
+    if (date && date.getTime() < expiresAt.getTime()) {
+      expiresAt = date;
+      cappedBy = reason;
+    }
+  };
   if (typeof claims.id_document_expiry === 'string') {
-    const documentExpiry = startOfDateUtc(claims.id_document_expiry);
-    if (documentExpiry) candidates.push(documentExpiry);
+    cap(startOfDateUtc(claims.id_document_expiry), 'id_document_expiry');
   }
   if (claims.age_over_18 === false && typeof claims.date_of_birth === 'string') {
-    const birthday = eighteenthBirthday(claims.date_of_birth);
-    if (birthday) candidates.push(birthday);
+    cap(eighteenthBirthday(claims.date_of_birth), '18th_birthday');
   }
-  return new Date(Math.min(...candidates.map((d) => d.getTime())));
+  return { expiresAt, defaultExpiresAt, cappedBy };
 }
 
 /** Copy of the claims with age_over_18 recalculated from date_of_birth on `on` (Decision 005). */
@@ -310,6 +377,67 @@ function withDerivedClaims(
 
 /** YYYY-MM-DD of a date in UTC. */
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Whole seconds (the SD-JWT NumericDate). */
+const wholeSeconds = (d: Date) => new Date(Math.floor(d.getTime() / 1000) * 1000);
+
+interface EnvelopeInput {
+  baseUrl: string;
+  issuerId: string;
+  issuerName: string;
+  credentialType: CredentialTypeName;
+  vct: string;
+  schemaVersion: string;
+  /** The credential id; null before it exists (preview). */
+  jti: string | null;
+  iat: Date;
+  exp: Date;
+  createdAt: Date;
+  /** The wallet key; null before the wallet accepts (preview). */
+  holderKey: HolderPublicJwk | null;
+}
+
+/**
+ * The envelope claims the signer adds: always visible to verifiers, never disclosures
+ * (credential-schemas.md §3). The ONE list: signCredential() signs it, the preview shows it,
+ * and GET /credential-schemas names its keys.
+ */
+function envelopeClaims(input: EnvelopeInput) {
+  return {
+    iss: `${input.baseUrl}/api/v1/issuers/${input.issuerId}`,
+    issuer_name: input.issuerName,
+    vct: input.vct,
+    schema_version: input.schemaVersion,
+    jti: input.jti,
+    iat: Math.floor(input.iat.getTime() / 1000),
+    exp: Math.floor(input.exp.getTime() / 1000),
+    cnf: input.holderKey ? { jwk: input.holderKey } : null,
+    status: input.jti ? { status_uri: `${input.baseUrl}/api/v1/status/${input.jti}` } : null,
+    ...(input.credentialType === 'KYCCredential'
+      ? { kyc_verification_date: isoDate(input.createdAt) }
+      : {}),
+  };
+}
+
+/** The names of the envelope claims of a credential type (from envelopeClaims itself). */
+export function envelopeClaimNames(type: CredentialTypeName): string[] {
+  const epoch = new Date(0);
+  return Object.keys(
+    envelopeClaims({
+      baseUrl: '',
+      issuerId: '',
+      issuerName: '',
+      credentialType: type,
+      vct: '',
+      schemaVersion: '',
+      jti: null,
+      iat: epoch,
+      exp: epoch,
+      createdAt: epoch,
+      holderKey: null,
+    }),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Holder public key (cnf.jwk)
@@ -403,13 +531,16 @@ export function createCredentialsService(
   const recordEvent = (executor: Executor, event: NewCredentialStatusEvent) =>
     executor.insert(credentialStatusEvents).values(event);
 
-  /** Locks the holder row (issuer-scoped), so issuance for one holder is serialised. */
-  const lockHolder = async (tx: Executor, staff: StaffProfile, holderId: string) => {
-    const [holder] = await tx
+  /**
+   * The holder row (issuer-scoped). With `lock` (the default) it is locked FOR UPDATE, so
+   * issuance for one holder is serialised; the preview reads it without a lock.
+   */
+  const lockHolder = async (tx: Executor, staff: StaffProfile, holderId: string, lock = true) => {
+    const query = tx
       .select()
       .from(holders)
-      .where(and(eq(holders.id, holderId), eq(holders.issuerId, staff.issuer.id)))
-      .for('update');
+      .where(and(eq(holders.id, holderId), eq(holders.issuerId, staff.issuer.id)));
+    const [holder] = lock ? await query.for('update') : await query;
     if (!holder) throw holderNotFound();
     return holder;
   };
@@ -466,7 +597,14 @@ export function createCredentialsService(
       );
     }
 
-    let expiresAt = computeExpiry(issuedOn, schema.defaultValidity, claims);
+    const detail = computeExpiryDetail(issuedOn, schema.defaultValidity, claims);
+    let expiresAt = detail.expiresAt;
+    let cappedBy: ExpiryCap | null = detail.cappedBy;
+    // validUntil may be any date whose midnight is after now and not after the capped expiry
+    const validUntilRange = {
+      min: isoDate(new Date(startOfDateUtc(isoDate(issuedOn))!.getTime() + 86_400_000)),
+      max: isoDate(expiresAt),
+    };
     if (rules.validUntil !== undefined) {
       const requested = startOfDateUtc(rules.validUntil);
       if (!requested || requested <= issuedOn || requested > expiresAt) {
@@ -477,12 +615,28 @@ export function createCredentialsService(
           },
         ]);
       }
+      if (requested.getTime() < expiresAt.getTime()) cappedBy = 'validUntil';
       expiresAt = requested;
     }
     // Whole seconds: the SD-JWT `exp` (seconds) then equals expires_at exactly, so the token
     // and the status endpoint agree on the expiry instant (the date caps are midnight already)
-    expiresAt = new Date(Math.floor(expiresAt.getTime() / 1000) * 1000);
-    return { schema, claims, expiresAt };
+    expiresAt = wholeSeconds(expiresAt);
+    const defaultExpiresAt = wholeSeconds(detail.defaultExpiresAt);
+    return { schema, claims, expiresAt, defaultExpiresAt, cappedBy, validUntilRange };
+  };
+
+  /** 400 when the issuer may not issue this type (the type follows the issuer type). */
+  const issuableType = (staff: StaffProfile, requested: CredentialTypeName | undefined) => {
+    const expectedType = ISSUER_RECORD_TYPES[staff.issuer.type].credentialType;
+    if (requested !== undefined && requested !== expectedType) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Wrong credential type for this issuer', [
+        {
+          path: 'credentialType',
+          message: `must be ${expectedType} for a${staff.issuer.type === 'employer' ? 'n' : ''} ${staff.issuer.type}`,
+        },
+      ]);
+    }
+    return expectedType;
   };
 
   /** Rejects a second pending or valid credential of the same type for one holder. */
@@ -588,29 +742,101 @@ export function createCredentialsService(
     }
   };
 
+  /**
+   * The ONE issuance path, shared by create() and preview() (Decision 019). In order: the type
+   * the issuer may issue (400), the holder of this issuer, locked (404), the holder record
+   * against the schema with age_over_18 and the expiry caps (422 / 400 validUntil), one active
+   * credential per holder and type (409, with the existing id), an active signing key (409).
+   * Nothing is written here; inside a transaction pass its `tx`.
+   *
+   * `lock` (default true, issuance): the holder row is locked FOR UPDATE, so the "one active
+   * credential" check cannot be raced before the insert. The preview passes `lock: false`: it
+   * writes nothing, so it needs no lock and never blocks an issuance (the issuance repeats
+   * every check under the lock anyway).
+   */
+  const prepareIssuance = async (
+    executor: Executor,
+    staff: StaffProfile,
+    input: CreateCredentialInput,
+    issuedOn: Date,
+    { lock = true }: { lock?: boolean } = {},
+  ) => {
+    const type = issuableType(staff, input.credentialType);
+    const holder = await lockHolder(executor, staff, input.holderId, lock);
+    const prepared = prepareClaims(type, holder, issuedOn, { validUntil: input.validUntil });
+    await assertNoActiveCredential(executor, holder.id, type);
+    if (!(await activeKey(staff.issuer.id, executor))) throw issuerKeyMissing();
+    return { holder, type, prepared };
+  };
+
   return {
     async create(staff, input) {
-      const expectedType = ISSUER_RECORD_TYPES[staff.issuer.type].credentialType;
-      if (input.credentialType !== undefined && input.credentialType !== expectedType) {
-        throw new AppError(400, 'VALIDATION_ERROR', 'Wrong credential type for this issuer', [
-          {
-            path: 'credentialType',
-            message: `must be ${expectedType} for a${staff.issuer.type === 'employer' ? 'n' : ''} ${staff.issuer.type}`,
-          },
-        ]);
-      }
       const issuedOn = now();
-
       const id = await db.transaction(async (tx) => {
-        // Holder row locked: the "one active credential" check below cannot be raced
-        const holder = await lockHolder(tx, staff, input.holderId);
-        const prepared = prepareClaims(expectedType, holder, issuedOn);
-        await assertNoActiveCredential(tx, holder.id, expectedType);
-        if (!(await activeKey(staff.issuer.id, tx))) throw issuerKeyMissing();
-        return insertPending(tx, staff, holder, expectedType, prepared, issuedOn);
+        const { holder, type, prepared } = await prepareIssuance(tx, staff, input, issuedOn);
+        return insertPending(tx, staff, holder, type, prepared, issuedOn);
       });
-
       return (await loadMetadata(eq(credentialRecords.id, id)))!;
+    },
+
+    async preview(staff, input) {
+      const issuedOn = now();
+      // Same checks as create(), without a lock and without a transaction: nothing is written
+      const { holder, type, prepared } = await prepareIssuance(db, staff, input, issuedOn, {
+        lock: false,
+      });
+      const meta = prepared.schema;
+      const derivedNames = new Set(Object.keys(meta.derivedClaims ?? {}));
+      const present = (name: string) => Object.hasOwn(prepared.claims, name);
+      const envelope = envelopeClaims({
+        baseUrl,
+        issuerId: staff.issuer.id,
+        issuerName: staff.issuer.name,
+        credentialType: type,
+        vct: meta.vct,
+        schemaVersion: meta.schemaVersion,
+        jti: null,
+        iat: issuedOn,
+        exp: prepared.expiresAt,
+        createdAt: issuedOn,
+        holderKey: null,
+      });
+      return {
+        credentialType: type,
+        vct: meta.vct,
+        schemaVersion: meta.schemaVersion,
+        issuer: { id: staff.issuer.id, name: staff.issuer.name },
+        holder: { id: holder.id, externalRef: holder.externalRef, fullName: holder.fullName },
+        alwaysVisible: {
+          ...envelope,
+          iat: wholeSeconds(issuedOn).toISOString(), // planned: the real iat is set at signing
+          exp: prepared.expiresAt.toISOString(),
+        },
+        disclosable: meta.selectivelyDisclosable
+          .filter((name) => present(name) && !derivedNames.has(name))
+          .map((name) => ({ name, value: prepared.claims[name] })),
+        derived: [...derivedNames]
+          .filter(present)
+          .map((name) => ({ name, value: prepared.claims[name] })),
+        expiry: {
+          expiresAt: prepared.expiresAt.toISOString(),
+          defaultExpiresAt: prepared.defaultExpiresAt.toISOString(),
+          cappedBy: prepared.cappedBy,
+          validUntilRange: prepared.validUntilRange,
+        },
+        warnings: prepared.claims.age_over_18 === false ? ['holder_under_18'] : [],
+      };
+    },
+
+    issuableSchemas(staff) {
+      const type = ISSUER_RECORD_TYPES[staff.issuer.type].credentialType;
+      const description = schemas.describe(type);
+      return [
+        {
+          ...description,
+          alwaysVisible: [...envelopeClaimNames(type), ...description.alwaysVisibleClaims],
+        },
+      ];
     },
 
     async list(staff, query) {
@@ -845,20 +1071,19 @@ export function createCredentialsService(
       const disclosable = schemas
         .metadata(record.credentialType)
         .selectivelyDisclosable.filter((name) => Object.hasOwn(subject, name));
-      const envelope = {
-        iss: `${baseUrl}/api/v1/issuers/${record.issuerId}`,
-        issuer_name: record.issuerName,
+      const envelope = envelopeClaims({
+        baseUrl,
+        issuerId: record.issuerId,
+        issuerName: record.issuerName,
+        credentialType: record.credentialType,
         vct: record.vct,
-        schema_version: record.schemaVersion,
+        schemaVersion: record.schemaVersion,
         jti: record.id,
-        iat: Math.floor(signedAt.getTime() / 1000),
-        exp: Math.floor(record.expiresAt.getTime() / 1000),
-        cnf: { jwk: holderKey },
-        status: { status_uri: `${baseUrl}/api/v1/status/${record.id}` },
-        ...(record.credentialType === 'KYCCredential'
-          ? { kyc_verification_date: isoDate(record.createdAt) }
-          : {}),
-      };
+        iat: signedAt,
+        exp: record.expiresAt,
+        createdAt: record.createdAt,
+        holderKey,
+      });
       // Envelope last, so a subject claim can never overwrite an envelope claim
       const sdJwt = await createSdJwt({ ...subject, ...envelope }, disclosable, {
         kid: key.kid,

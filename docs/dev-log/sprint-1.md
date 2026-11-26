@@ -413,6 +413,93 @@ ISSUER_KEY_UNAVAILABLE` with a generic message; the code goes to the log with is
   `backend/test/auth.test.ts`; screenshots per
   [evidence/s1-holders-guide.md](evidence/s1-holders-guide.md) (to be taken).
 
+### Thu 26 Nov (issuer portal: Employment and KYC credential issuance)
+
+- **Done:** Credential issuance in the issuer portal, with small backend additions (FR-ISS-01,
+  FR-ISS-02, FR-WAL-06; Decision 019, draft). Docs: `docs/api/credentials-api.md`
+  (`POST /credentials/preview`), `docs/api/credential-schemas-api.md` (new),
+  `docs/frontend/issuer-portal.md` §10.
+  - **Backend:**
+    - `GET /credential-schemas`: the issuer type's one schema, with fields flagged from the
+      schema file (`required`, `selectivelyDisclosable`, `derived`) and the always-visible
+      envelope claims.
+    - `POST /credentials/preview`: `create()` and `preview()` now share `prepareIssuance()`.
+      The preview writes nothing (`no-store`) and returns the envelope (`iat` planned), the
+      disclosable and derived claims, and the expiry with `cappedBy` and the `validUntil`
+      range.
+    - `POST /credentials` accepts `validUntil`. The 400 for another schema type and the 409
+      with the existing credential id already existed and were already tested.
+    - The signer's envelope moved into one builder (`envelopeClaims()`) that the preview and the
+      schemas endpoint reuse.
+  - **Portal:**
+    - `/credentials/new`, four steps: holder and type → read-only details from the preview,
+      with "Valid until" and the cap explained → a wallet-style card ("Always shown to
+      verifiers" / "Holder chooses what to share", badges, tooltip, "Calculated by UniVault")
+      → confirmation.
+    - The success page `/credentials/:id?issued=1`: Awaiting wallet, plus the wallet-offer
+      placeholder.
+    - `/credentials` has a holder picker, and the holder page's "Issue credential" is enabled.
+    - Errors explained: existing credential (link), invalid holder record (link), key
+      unavailable, network (retry).
+    - State is in the URL (Back / forward), with a leave prompt after step 1.
+  - **portal-ui:** `Stepper`, `CredentialCardPreview`.
+  - **Field check** (Jira vs schemas, no schema change): recorded in
+    `docs/schemas/credential-schemas.md` §11.
+    - "Employer" is the envelope's `iss` / `issuer_name` (Decision 004);
+    - "Photo reference" is an embedded `portrait` data URI; no document says why;
+    - "NIC number" is generalised to ID document type + number;
+    - "Address" is a structured object;
+    - extra schema fields are all listed in Decision 004.
+  - **Numbering:** the task asked for "Decision 017". 017 and 018 exist and decisions are never
+    renumbered, so this is **Decision 019**.
+  - **Tests:**
+    - backend 522 (+17, `credential-preview.test.ts`): coverage 90.34 / 86.90 / 93.82 / 91.00;
+    - issuer portal 299 (+32): 97.54 / 91.77 / 98.37 / 98.47;
+    - portal-ui 56 (+4): 100 / 97.94 / 100 / 100;
+    - Playwright 6 (+2): Employment end to end with the dashboard +1 and the 409; KYC preview.
+    - All thresholds kept. Two rules were mutation-checked (badges from the schemas response,
+      the required confirmation): both caught.
+- **Next:** Native-speaker review of the `issuance` Sinhala strings ("selectively disclosable" =
+  තෝරා හෙළිදරව් කළ හැකි). Screenshots per
+  [evidence/s1-issuance-guide.md](evidence/s1-issuance-guide.md). Supervisor review of Decision 019. Wallet offer (QR code) from the success page; the credential list on `/credentials`.
+- **Blockers:** None.
+- **Evidence:** `backend/test/credential-preview.test.ts`, `issuer-portal/test/issuance*.test.tsx`,
+  `issuer-portal/e2e/issuance.spec.ts`, `portal-ui/test/credential-widgets.test.tsx`.
+
+### Thu 26 Nov (follow-up: portrait limit, lock-free preview, Sinhala wording)
+
+- **Done:**
+  - **Portrait (Decision 020, draft):**
+    - The v1 schemas already limited `portrait` (`maxLength` 70 000, about 51 KB of image
+      data), but the reason for embedding it and the limit were not recorded. The limit is
+      now **40 KB of image data** in both v1 schemas (`maxLength` 54 639 = 23 + base64 of
+      40 960 bytes). It was tightened in v1, not in a v2: no stored data has a portrait (seed
+      data, fixtures and the generator have none; the portal form has no photo field), so
+      nothing breaks.
+    - The shared validation gives `photoTooLarge`, "Photo must be under 40 KB – use a smaller
+      image" (the KB derived from `maxLength`). `POST /holders` returns it, and the portal
+      shows the same words. Portrait confirmed selectively disclosable in both schemas.
+    - `credential-schemas.md` §4, §5 and §11 updated.
+  - **Preview without a lock:** `prepareIssuance(…, { lock })`, default `true` for issuance.
+    `preview()` runs with `lock: false` and without a transaction. The test that the preview
+    equals the issuance still passes.
+  - **Sinhala:** "Valid until" → "වලංගු අවසන් දිනය (විකල්ප)", "Wallet offer" →
+    "පසුම්බියට එක් කිරීමේ QR කේතය – ඊළඟ පියවර". No other string used either term.
+  - **Tests:**
+    - backend 523 (+1): 90.34 / 86.99 / 93.80 / 91.00;
+    - issuer portal 302 (+3);
+    - claims-validation 23 (+3);
+    - portal-ui 56, Playwright 6 (unchanged).
+    - The new tests: the oversized portrait is rejected by the portal validator and the
+      backend with the same issue, and the portal's English text equals the backend message;
+      exactly 40 KB is accepted.
+- **Next:** Portrait upload in the holder form (backlog). Native-speaker review of the new
+  Sinhala strings.
+- **Blockers:** None.
+- **Evidence:** `claims-validation/test/claims-validation.test.ts`,
+  `issuer-portal/test/holders-validation.test.ts`, `backend/test/holders.test.ts`,
+  `backend/test/credential-preview.test.ts`.
+
 ## Backlog
 
 - **Holder update endpoint and edit form** (needed for reissue with reason `details_changed`):
@@ -420,8 +507,12 @@ ISSUER_KEY_UNAVAILABLE` with a generic message; the code goes to the log with is
   is no way yet to change a holder record. Needs `PATCH /holders/:holderId` (same schema
   validation and shared rules, audit of who changed what without logging claims) and an edit
   form reusing the registration form (`src/holders/form-model.ts`).
-- **Portrait upload** (optional `portrait` claim, JPEG data URI ≤ ~50 KB) is not in the
+- **Portrait upload** (optional `portrait` claim, JPEG data URI ≤ 40 KB, Decision 020) is not in the
   registration form yet (`OMITTED_CLAIMS`).
+- **Credential list** on `/credentials` (today a holder picker only) and the **wallet offer
+  (QR code)** step from the issuance success page.
+- **Jira field list** for the issuance story: update it to the schema field names
+  (`docs/schemas/credential-schemas.md` §11).
 
 ## Testing evidence
 
@@ -807,3 +898,41 @@ Record the tests that show the sprint goal is met, with links to output in `evid
     (500, never 409), and a duplicate whose row cannot be found is a 409 without an id.
 - **Lesson:** As Issue 19: a quick mutation of the rule a test protects shows the test can
   fail.
+
+### Issue 25: A refused "Valid until" in the URL left the issuing page on a skeleton (26 Nov 2026)
+
+- **Task:** Issuance step 2 (validity)
+- **Symptom:** A test opened `/credentials/new?…&step=2&validUntil=<date the server refuses>`.
+  The page never left its loading skeleton.
+- **Cause:** The date field needs the preview's `validUntilRange`. With a refused date the only
+  preview request failed (400), and there was no earlier preview to keep showing, so step 2
+  was never drawn. In real use this happens when the allowed range shrinks between a
+  bookmark or Back and now (e.g. the passport date was changed).
+- **Resolution:** A preview refused on `validUntil` drops the date from the URL (replaced, not
+  pushed) and sets `validUntilRejected`. The default preview loads, and the date field shows
+  "Choose a date from … to …".
+- **Lesson:** State kept in the URL can be stale; every value read from the URL needs a way
+  back to a working page.
+
+### Issue 26: Stepper status text ran into the step label (26 Nov 2026)
+
+- **Task:** portal-ui `Stepper`
+- **Symptom:** The hidden status words were read as "Holder(completed)".
+- **Resolution:** The screen-reader text now starts with a space (" (completed)"). In the test,
+  the computed accessible name still did not equal "Holder (completed)" exactly; the cause
+  was not investigated further, and the test accepts either spacing. Check with a real screen
+  reader when the evidence screenshots are taken.
+- **Lesson:** Visually hidden text is part of the accessible name: spacing matters.
+
+### Issue 27: The envelope claims existed only inside `signCredential()` (26 Nov 2026)
+
+- **Task:** `GET /credential-schemas` (always-visible claims) and the preview's envelope
+- **Symptom:** Showing "what verifiers always see" needed the envelope claim names, which only
+  existed as an object literal in the signer. A second list would have drifted (for example
+  KYC's `kyc_verification_date`).
+- **Resolution:** `envelopeClaims()` builds the envelope. `signCredential()` signs it, the
+  preview shows it (with `jti`, `cnf`, `status` null), and `envelopeClaimNames()` gives
+  `GET /credential-schemas` its keys. The existing signing tests pass unchanged.
+- **Note:** The task named the cap `passport_expiry`. The rule caps at **any** ID document
+  expiry (passport or driving licence), so the API says `id_document_expiry`; the portal names
+  the document ("Limited to the passport's / driving licence's expiry date").

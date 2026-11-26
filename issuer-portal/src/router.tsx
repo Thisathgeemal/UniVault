@@ -6,6 +6,8 @@
  *     APP_ROUTES            each wrapped in RequireRole with the route's roles
  *     /holders/new          register a holder (the Holders route's roles)
  *     /holders/:holderId    one holder (the Holders route's roles)
+ *     /credentials/new      issue a credential (the Credentials route's roles)
+ *     /credentials/:id      one credential; the success page after issuing (?issued=1)
  *     *                     404
  */
 import type { ReactNode } from 'react';
@@ -14,6 +16,9 @@ import { RequireRole } from './auth/RequireRole.js';
 import { ProtectedLayout } from './layout/ProtectedLayout.js';
 import { RootLayout } from './layout/RootLayout.js';
 import { ComingSoonPage } from './pages/ComingSoonPage.js';
+import { CredentialPage } from './pages/credentials/CredentialPage.js';
+import { CredentialsPage } from './pages/credentials/CredentialsPage.js';
+import { IssueCredentialPage } from './pages/credentials/IssueCredentialPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { HolderDetailPage } from './pages/holders/HolderDetailPage.js';
 import { HolderRegisterPage } from './pages/holders/HolderRegisterPage.js';
@@ -26,6 +31,7 @@ import { APP_ROUTES, type AppRoute } from './routes/app-routes.js';
 const PAGES: Partial<Record<string, ReactNode>> = {
   dashboard: <DashboardPage />,
   holders: <HoldersListPage />,
+  credentials: <CredentialsPage />,
 };
 
 function pageFor(route: AppRoute) {
@@ -33,6 +39,7 @@ function pageFor(route: AppRoute) {
 }
 
 const HOLDERS = APP_ROUTES.find((route) => route.id === 'holders')!;
+const CREDENTIALS = APP_ROUTES.find((route) => route.id === 'credentials')!;
 
 export function createRoutes(): RouteObject[] {
   return [
@@ -63,6 +70,24 @@ export function createRoutes(): RouteObject[] {
               element: (
                 <RequireRole roles={HOLDERS.roles}>
                   <HolderDetailPage />
+                </RequireRole>
+              ),
+              errorElement: <RouteErrorPage />,
+            },
+            {
+              path: '/credentials/new',
+              element: (
+                <RequireRole roles={CREDENTIALS.roles}>
+                  <IssueCredentialPage />
+                </RequireRole>
+              ),
+              errorElement: <RouteErrorPage />,
+            },
+            {
+              path: '/credentials/:credentialId',
+              element: (
+                <RequireRole roles={CREDENTIALS.roles}>
+                  <CredentialPage />
                 </RequireRole>
               ),
               errorElement: <RouteErrorPage />,

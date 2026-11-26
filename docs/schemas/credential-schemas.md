@@ -68,7 +68,7 @@ Validity is shown by these claims and by the status check, not by subject fields
 | `work_location`   | string, ≤ 80 chars                                     | No       | Selective  | A: Branch / Location                          |
 | `work_email`      | email                                                  | No       | Selective  | B: Email Address (if available)               |
 | `work_phone`      | E.164, `^\+94[0-9]{9}$`                                | No       | Selective  | B: Contact Information                        |
-| `portrait`        | JPEG data URI, ≤ ~50 KB                                | No       | Selective  | B: Employee Photograph                        |
+| `portrait`        | JPEG data URI, ≤ 40 KB of image data (Decision 020)    | No       | Selective  | B: Employee Photograph                        |
 
 **Left out on purpose (data minimisation, PDPA No. 9 of 2022):**
 
@@ -104,7 +104,7 @@ These stay in the employer's own HR records.
 | `occupation`           | string, ≤ 80 chars                                                                               | No                             | Selective  | (1)(a1)(vii)                 |
 | `employer_name`        | string, ≤ 120 chars                                                                              | No                             | Selective  | (1)(a1)(vii)                 |
 | `public_position`      | string, ≤ 120 chars                                                                              | No                             | Selective  | (1)(a1)(vii)                 |
-| `portrait`             | JPEG data URI, ≤ ~50 KB                                                                          | No                             | Selective  | (1)(a1)(ii) photo-bearing ID |
+| `portrait`             | JPEG data URI, ≤ 40 KB of image data (Decision 020)                                              | No                             | Selective  | (1)(a1)(ii) photo-bearing ID |
 
 **ID document number formats**
 
@@ -186,3 +186,41 @@ These templates use the schemas above. The verifier asks only for what it needs 
 2. Are the excluded fields (sections 4 and 5) and their reasons acceptable?
 3. Should the KYC credential stay limited to resident individual customers?
 4. Are 1-year (Employment) and 2-year (KYC) expiry periods reasonable?
+
+## 11. Field check against the Jira story (26 Nov 2026)
+
+The issuance story lists the fields below. The schemas were **not** changed; this records every
+difference and whether Decision 004 (data minimisation) explains it.
+
+**Employment credential**
+
+| Jira field      | Schema                                                               | Difference                                                                                                      | Explained by Decision 004?                                                                                                                                                                                         |
+| --------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Name            | `full_name` (required)                                               | Name only                                                                                                       | –                                                                                                                                                                                                                  |
+| Employee ID     | `employee_id` (required)                                             | –                                                                                                               | –                                                                                                                                                                                                                  |
+| Designation     | `designation` (required)                                             | –                                                                                                               | –                                                                                                                                                                                                                  |
+| Department      | `department` (required)                                              | –                                                                                                               | –                                                                                                                                                                                                                  |
+| Employer        | **not a subject claim**                                              | The employer is the envelope's `iss` and `issuer_name` (always visible)                                         | **Yes**: "The employer is identified by the envelope claims `iss` and `issuer_name`, not by a subject claim"                                                                                                       |
+| Joining date    | `date_of_joining` (required)                                         | Name only                                                                                                       | –                                                                                                                                                                                                                  |
+| Photo reference | `portrait` (optional)                                                | An embedded JPEG data URI (≤ 40 KB of image data), not a reference (URL or file id) to a photo stored elsewhere | **No**, but **Decision 020** now records it: embedded for offline verification and no issuer call-home, size-limited to 40 KB (v1 `maxLength` tightened from 70 000 to 54 639 characters), selectively disclosable |
+| –               | `employment_type` (required)                                         | In the schema, not in Jira                                                                                      | **Yes**: listed as included (Employer A "Employment Status", Employer B "Employment Category")                                                                                                                     |
+| –               | `nic_number`, `work_location`, `work_email`, `work_phone` (optional) | In the schema, not in Jira                                                                                      | **Yes**: listed as included (optional fields from the employer letters, §4)                                                                                                                                        |
+
+**KYC credential**
+
+| Jira field    | Schema                                                                                           | Difference                                                                                                             | Explained by Decision 004?                                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full name     | `full_name` (required)                                                                           | –                                                                                                                      | –                                                                                                                                                  |
+| NIC number    | `id_document_type` + `id_document_number` (required), `id_document_expiry`                       | Generalised: NIC, **passport or driving licence**, with a format per type and an expiry for passport / licence         | **Partly**: Decision 004 lists the fields; the reason is the CDD Schedule (1)(a1)(ii) ("photo identification document", §5), not data minimisation |
+| Date of birth | `date_of_birth` (required)                                                                       | –                                                                                                                      | –                                                                                                                                                  |
+| Address       | `permanent_address` (required object), `residential_address` + `residence_proof_type` (optional) | One structured address object (line1, city, district, postal code, country `LK`), plus a different residential address | **Partly**: Decision 004 lists them; the structure and the P.O. Box rule come from the Schedule (1)(a1)(iii)                                       |
+| Nationality   | `nationality` (required)                                                                         | –                                                                                                                      | –                                                                                                                                                  |
+| age_over_18   | `age_over_18` (required, **derived**)                                                            | Calculated by the server, never entered                                                                                | Decision **005** (not 004)                                                                                                                         |
+| –             | `mobile_number` (required)                                                                       | In the schema, not in Jira                                                                                             | **Yes**: listed as included (Schedule (1)(a1)(iv))                                                                                                 |
+| –             | `email`, `occupation`, `employer_name`, `public_position`, `portrait` (optional)                 | In the schema, not in Jira                                                                                             | **Yes**: listed as included ("if available" items of the Schedule)                                                                                 |
+
+Nothing that Decision 004 excludes (fax, purpose of account, turnover, mode of transactions,
+reference, risk rating, gender; residential address, supervisor and emergency contact in the
+Employment credential) appears in the Jira list. **Suggested follow-up:** update the Jira story to
+the schema field names. Do not change the schemas: they are reviewed (Sprint 1 review) and
+validated end to end.

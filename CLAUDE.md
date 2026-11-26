@@ -81,13 +81,18 @@ issuer-portal/    React 19 + Vite 8 + TS: staff sign-in, session, role-based lay
   src/holders/               form-model (form from the schema + FORM_UI), validation (portal
                              validator, server issues, messages), display, list-params
   src/pages/holders/         HoldersListPage, HolderRegisterPage, HolderDetailPage
+  src/pages/credentials/     CredentialsPage (holder picker), IssueCredentialPage (4 steps),
+                             CredentialPage (metadata; success page with ?issued=1)
+  src/issuance/              claim-display (groups/formats PREVIEW values only), problems,
+                             IssuanceProblemAlert, HolderPicker
   src/i18n/locales/          en.ts, si.ts (Sinhala: needs native-speaker review)
   test/                      Vitest + React Testing Library + MSW (mock-backend.ts)
   e2e/                       Playwright spec + start-backend.mjs (throwaway backend)
 portal-ui/        @univault/portal-ui: shared, app-agnostic layout (AppShell, Sidebar, Header,
                   PageHeader, ComingSoon, ErrorBoundary, FullPageSpinner, StatCard,
                   StackedBar, Skeleton, DataTable, Pagination, SearchInput, FormField,
-                  ErrorSummary, StatusBadge, Toast, ConfirmDialog, Tooltip, Select,
+                  ErrorSummary, StatusBadge, Toast, ConfirmDialog, Tooltip, Select, Stepper,
+                  CredentialCardPreview,
                   shadcn-style primitives, theme.css tokens). Built with tsc to dist; the verifier portal
                   will use it in Sprint 3
 verifier-portal/  React (Vite) – Sprint 3
@@ -154,13 +159,13 @@ migrations by hand.
 
 ```
 cd crypto-core && npm test                  # crypto-core tests (158) + coverage: npm run test:coverage
-cd claims-validation && npm test | test:coverage | build | typecheck   # shared claim validation (20 tests)
-cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (52 tests)
+cd claims-validation && npm test | test:coverage | build | typecheck   # shared claim validation (23 tests)
+cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (56 tests)
 cd issuer-portal && npm run dev             # http://localhost:5173 (backend: npm run dev in backend/)
-cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 267 tests
-cd issuer-portal && npm run test:e2e        # Playwright (4 tests), Chromium; own backend on :4100 + portal on :5180
+cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 302 tests
+cd issuer-portal && npm run test:e2e        # Playwright (6 tests), Chromium; own backend on :4100 + portal on :5180
                                             # (first time: npx playwright install chromium)
-cd backend && npm test                      # backend tests (505; rebuilds crypto-core and claims-validation first)
+cd backend && npm test                      # backend tests (523; rebuilds crypto-core and claims-validation first)
 cd backend && npm run test:fast             # only the fast (parallel) project; test:heavy = only the heavy one
 cd backend && npm run test:coverage         # fails below thresholds: 90 / 86 / 93 / 90 (stmts/branches/funcs/lines)
 cd backend && npm run typecheck             # tsc --noEmit (also rebuilds crypto-core first)
@@ -259,6 +264,9 @@ of `D:/...`. See Sprint 1, Issue 6.
   - The selectively disclosable fields, `vct`, `schemaVersion` and
     `defaultValidity` come from each schema's `x-univault` block.
   - `age_over_18` is always calculated by the server (Decision 005).
+  - `portrait` (both schemas) is an embedded JPEG data URI of at most 40 KB of image data
+    (`maxLength` 54639), selectively disclosable; an oversized one is `photoTooLarge` "Photo
+    must be under 40 KB – use a smaller image", the KB derived from `maxLength` (Decision 020).
 - **Environment variables:** an empty value means not set. Use `||`, not `??`,
   when reading `process.env` directly. `loadConfig()` already handles this.
 - **Database changes:** add a new file `migrations/NNNN_description.sql`.
@@ -358,6 +366,18 @@ key rotation when `ISSUER_KEY_SOURCE=env`); `KEY_PASSPHRASE_NOT_CONFIGURED`
 holder's wallet key (`cnf`), which is only known when the wallet redeems the QR
 offer (Sprint 2). Signing therefore happens at redemption. Never sign without
 a holder key (Decision 010, draft).
+
+**Issuance preview (Decision 019): claims are never assembled or edited in the portal;
+preview and issuance share one backend path.** `POST /credentials/preview` and `POST
+/credentials` both run `prepareIssuance()` (type for the issuer type → holder, locked for
+issuance, `{ lock: false }` for the preview →
+`prepareClaims()` → one active credential → active key); the preview writes nothing
+(`no-store`, ids-only debug log) and returns `alwaysVisible` (from `envelopeClaims()`, the
+signer's builder; `iat` planned, `jti`/`cnf`/`status` null), `disclosable`, `derived`, `expiry
+{ expiresAt, defaultExpiresAt, cappedBy, validUntilRange }`. `POST /credentials` accepts
+`validUntil`. `GET /credential-schemas` returns the ONE schema of the issuer type, its fields
+flagged from the schema file (`required`, `selectivelyDisclosable`, `derived`) and the
+always-visible claim names; never keep a field list in code. Another type → 400.
 
 **Signing already exists:** `signCredential(credentialId, holderPublicJwk)` in
 `backend/src/services/credentials.service.ts` is built and tested. The Sprint 2
@@ -537,21 +557,23 @@ secrets or personal data may appear in responses or logs.
   | 016 | Staff token in memory + sessionStorage, never localStorage            | Draft – review |
   | 017 | Dashboard demo data via real services; dev-only append-only reset     | Draft – review |
   | 018 | Shared claims-validation package; portal precompiles the schemas      | Draft – review |
+  | 019 | Issuance form read-only, previewed server-side; schema by issuer type | Draft – review |
+  | 020 | Portrait embedded, size-limited (40 KB), selectively disclosable      | Draft – review |
 
 - **Evidence screenshots:** `docs/dev-log/evidence/s<sprint>-<YYYY-MM-DD>-<feature>-<what>.png`.
 - **Commits:** include the Jira key, e.g. `SCRUM-XX: <summary>`.
 
 ## Done so far (Sprint 1)
 
-Test totals (26 Nov 2026, holder management): **crypto-core 158 tests** (6 files; 97.63%
+Test totals (26 Nov 2026, issuance follow-up): **crypto-core 158 tests** (6 files; 97.63%
 statements, 93.89% branches, 100% functions, 99.14% lines), **backend
-505 tests** (21 files in two Vitest projects; 90.04% statements, 86.82% branches, 93.44% functions,
-90.70% lines; thresholds 90 / 86 / 93 / 90), **issuer-portal 267 tests** (12
-files; 97.55% statements, 91.95% branches, 98.67% functions, 98.77% lines;
-thresholds 96 / 91 / 97 / 98) plus **4 Playwright e2e tests**, **portal-ui 52
-tests** (4 files; 100% statements, 97.63% branches, 100% functions, 100% lines;
-thresholds 99 / 94 / 99 / 99) and **claims-validation 20 tests** (1 file; 98.48%
-statements, 89.83% branches, 100% functions, 98.41% lines; thresholds 98 / 89 / 100 / 98),
+523 tests** (22 files in two Vitest projects; 90.34% statements, 86.99% branches, 93.80% functions,
+91.00% lines; thresholds 90 / 86 / 93 / 90), **issuer-portal 302 tests** (14
+files; 97.54% statements, 91.77% branches, 98.37% functions, 98.47% lines;
+thresholds 96 / 91 / 97 / 98) plus **6 Playwright e2e tests**, **portal-ui 56
+tests** (5 files; 100% statements, 97.94% branches, 100% functions, 100% lines;
+thresholds 99 / 94 / 99 / 99) and **claims-validation 23 tests** (1 file; 98.63%
+statements, 90.47% branches, 100% functions, 98.57% lines; thresholds 98 / 89 / 100 / 98),
 all passing.
 
 - **crypto-core:** keys, `createSdJwt`, `verifySdJwt`, `decodeDisclosures`,
@@ -630,5 +652,13 @@ replaces }`.
   credential"). Backend: holder `VALIDATION_ERROR` details gain `code`, `409` gains
   `details.holderId`, the list gains `idNumberLast4` and sorts `oldest`, `name_desc`, `ref`,
   `ref_desc`. New package `@univault/claims-validation`; new portal-ui components.
+- **Credential issuance in the issuer portal** (26 Nov, `docs/frontend/issuer-portal.md` §10,
+  `docs/api/credentials-api.md`, `docs/api/credential-schemas-api.md`, Decision 019):
+  `GET /credential-schemas`, `POST /credentials/preview` (same path as issuance, no writes,
+  `cappedBy`), `validUntil` on `POST /credentials`; `/credentials/new` (holder and type →
+  read-only details from the preview with "Valid until" → wallet-style card with always
+  shown / selectively disclosable / calculated by UniVault → confirmation → pending
+  credential), `/credentials` holder picker, `/credentials/:id` (success page), holder page
+  "Issue credential" enabled. portal-ui `Stepper`, `CredentialCardPreview`.
 - **Planned routes (return `501` until built):** wallet redemption
   (`/credential-offers/token`, `/credential`), verifications.

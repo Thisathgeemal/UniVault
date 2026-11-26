@@ -13,9 +13,13 @@ import { credentialIdParams, credentialTypeSchema } from './schemas.js';
 
 // No issuerId: the issuer always comes from the logged-in staff member's token.
 // credentialType is optional – it is derived from the issuer type and, if sent, must match.
+// The same body for POST / and POST /preview (one issuance path in the service).
 export const issueCredentialBody = z.object({
   holderId: z.uuid('must be a UUID'),
   credentialType: credentialTypeSchema.optional(),
+  // Optional earlier end: checked against the expiry rules by the service (after today, not
+  // later than the capped expiry); 00:00 UTC on that date
+  validUntil: z.iso.date('must be a date (YYYY-MM-DD)').optional(),
 });
 
 export const listCredentialsQuery = z.object({
@@ -63,6 +67,7 @@ export const reissueCredentialBody = z
 /**
  * /api/v1/credentials – issue, list, revoke and reissue (FR-ISS-01, FR-ISS-03). Requires login.
  *   POST /                         officer/admin – create a PENDING credential from a holder record
+ *   POST /preview                  officer/admin – what POST / would create, without writing anything
  *   GET  /                         list (status, effectiveStatus, holderId, paging) – metadata only
  *   GET  /:credentialId            one credential's metadata
  *   POST /:credentialId/revoke     admin – pending or valid → revoked; open offers invalidated
@@ -100,6 +105,22 @@ export function credentialsRouter(auth: AuthMiddleware, credentials?: Credential
         'Pending credential created',
       );
       res.status(201).location(`${req.baseUrl}/${credential.id}`).json(credential);
+    },
+  );
+
+  router.post(
+    '/preview',
+    auth.requireRole('officer', 'admin'),
+    validate({ body: issueCredentialBody }),
+    async (req, res) => {
+      const { body } = getValidated<{ body: z.infer<typeof issueCredentialBody> }>(res);
+      const preview = await service().preview(req.auth!, body);
+      // The response holds the holder's claims: never cached, never logged (IDs only, at debug)
+      req.log?.debug(
+        { holderId: preview.holder.id, issuerId: preview.issuer.id, staffId: req.auth?.id },
+        'Credential previewed',
+      );
+      res.set('Cache-Control', 'no-store').json(preview);
     },
   );
 

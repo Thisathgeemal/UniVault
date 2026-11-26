@@ -1,13 +1,16 @@
 /**
  * MSW handlers that behave like the backend's /auth endpoints (backend/src/routes/auth.routes.ts)
  * GET /dashboard/summary, /holders (list with search / sort / paging, detail, create with the
- * 409 duplicate rule) and GET /credentials?holderId for the seeded demo staff. Tokens are fake JWT-shaped strings (unsigned): the portal never
+ * 409 duplicate rule), GET /credentials?holderId and the issuance endpoints (GET
+ * /credential-schemas, POST /credentials/preview, POST /credentials, GET /credentials/:id) for
+ * the seeded demo staff. Tokens are fake JWT-shaped strings (unsigned): the portal never
  * verifies them, it only reads `exp` for timing.
  */
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { Staff } from '../src/api/auth.js';
-import type { CredentialItem } from '../src/api/credentials.js';
+import { schemas as schemaFiles } from 'virtual:claims-validators';
+import type { CredentialItem, CredentialMetadata } from '../src/api/credentials.js';
 import type { DashboardSummary } from '../src/api/dashboard.js';
 import type { HolderDetail } from '../src/api/holders.js';
 import { DEFAULT_API_BASE_URL } from '../src/config.js';
@@ -409,10 +412,232 @@ export const holderHandlers = [
   }),
 ];
 
-export const server = setupServer(...handlers, ...holderHandlers);
+// ---------------------------------------------------------------------------
+// Issuance: GET /credential-schemas, POST /credentials/preview, POST /credentials,
+// GET /credentials/:id. Field flags come from the same schema files the backend reads.
+
+/** The mock backend's clock for issuance (fixed: previews and results are predictable). */
+export const MOCK_NOW = '2026-11-26T04:30:00.000Z';
+const TYPE_OF_ISSUER = { employer: 'EmploymentCredential', bank: 'KYCCredential' } as const;
+const ENVELOPE = [
+  'iss',
+  'issuer_name',
+  'vct',
+  'schema_version',
+  'jti',
+  'iat',
+  'exp',
+  'cnf',
+  'status',
+];
+
+interface SchemaFile {
+  title: string;
+  required: string[];
+  properties: Record<string, unknown>;
+  'x-univault': {
+    vct: string;
+    schemaVersion: string;
+    selectivelyDisclosable: string[];
+    alwaysVisible: string[];
+    defaultValidity: string;
+    derivedClaims?: Record<string, string>;
+  };
+}
+export function mockSchemaResponse(type: 'EmploymentCredential' | 'KYCCredential') {
+  const file = schemaFiles[type] as unknown as SchemaFile;
+  const meta = file['x-univault'];
+  return {
+    credentialType: type,
+    vct: meta.vct,
+    title: file.title,
+    schemaVersion: meta.schemaVersion,
+    defaultValidity: meta.defaultValidity,
+    fields: Object.keys(file.properties).map((name) => ({
+      name,
+      required: file.required.includes(name),
+      selectivelyDisclosable: meta.selectivelyDisclosable.includes(name),
+      derived: Object.keys(meta.derivedClaims ?? {}).includes(name),
+    })),
+    alwaysVisible: [
+      ...ENVELOPE,
+      ...(type === 'KYCCredential' ? ['kyc_verification_date'] : []),
+      ...meta.alwaysVisible,
+    ],
+    alwaysVisibleClaims: meta.alwaysVisible,
+  };
+}
+
+/** Credentials created through POST /credentials in this test (id -> metadata). */
+export const issuedStore = new Map<string, CredentialMetadata>();
+const activeCredentialOf = (holderId: string) =>
+  (credentialStore.get(holderId) ?? []).find((c) =>
+    ['pending', 'valid'].includes(c.effectiveStatus),
+  )?.id ??
+  [...issuedStore.values()].find((c) => c.holder.id === holderId && c.status === 'pending')?.id;
+
+const addYears = (iso: string, years: number) => {
+  const d = new Date(iso);
+  d.setUTCFullYear(d.getUTCFullYear() + years);
+  return d.toISOString();
+};
+
+/** What the backend's preview gives for a holder of this mock (same shape and rules). */
+export function mockPreview(holder: HolderDetail, staff: Staff, validUntil?: string) {
+  const type = TYPE_OF_ISSUER[staff.issuer.type];
+  const file = schemaFiles[type] as unknown as SchemaFile;
+  const meta = file['x-univault'];
+  const derived = Object.keys(meta.derivedClaims ?? {});
+  const defaultExpiresAt = addYears(MOCK_NOW, meta.defaultValidity === 'P2Y' ? 2 : 1);
+  let expiresAt = defaultExpiresAt;
+  let cappedBy: string | null = null;
+  const documentExpiry = holder.claims.id_document_expiry;
+  if (typeof documentExpiry === 'string' && `${documentExpiry}T00:00:00.000Z` < expiresAt) {
+    expiresAt = `${documentExpiry}T00:00:00.000Z`;
+    cappedBy = 'id_document_expiry';
+  }
+  const range = { min: '2026-11-27', max: expiresAt.slice(0, 10) };
+  if (validUntil) {
+    if (validUntil < range.min || validUntil > range.max) return null;
+    expiresAt = `${validUntil}T00:00:00.000Z`;
+    cappedBy = 'validUntil';
+  }
+  return {
+    credentialType: type,
+    vct: meta.vct,
+    schemaVersion: meta.schemaVersion,
+    issuer: { id: staff.issuer.id, name: staff.issuer.name },
+    holder: { id: holder.id, externalRef: holder.externalRef, fullName: holder.fullName },
+    alwaysVisible: {
+      iss: `http://localhost:4000/api/v1/issuers/${staff.issuer.id}`,
+      issuer_name: staff.issuer.name,
+      vct: meta.vct,
+      schema_version: meta.schemaVersion,
+      jti: null,
+      iat: MOCK_NOW,
+      exp: expiresAt,
+      cnf: null,
+      status: null,
+    },
+    disclosable: meta.selectivelyDisclosable
+      .filter((name) => name in holder.claims && !derived.includes(name))
+      .map((name) => ({ name, value: holder.claims[name] })),
+    derived: derived
+      .filter((name) => name in holder.claims)
+      .map((name) => ({ name, value: holder.claims[name] })),
+    expiry: { expiresAt, defaultExpiresAt, cappedBy, validUntilRange: range },
+    warnings: holder.claims.age_over_18 === false ? ['holder_under_18'] : [],
+  };
+}
+
+const notFoundHolder = () =>
+  HttpResponse.json(errorBody('HOLDER_NOT_FOUND', 'Holder record not found'), { status: 404 });
+
+/** The shared checks of preview and issue (one issuance path, like the backend). */
+async function issuanceCheck(request: Request) {
+  const staff = staffFor(request);
+  if (!staff) return { response: unauthenticated() };
+  const body = (await request.json()) as {
+    holderId: string;
+    credentialType?: string;
+    validUntil?: string;
+  };
+  const type = TYPE_OF_ISSUER[staff.issuer.type];
+  if (body.credentialType && body.credentialType !== type) {
+    return {
+      body,
+      response: HttpResponse.json(
+        errorBody('VALIDATION_ERROR', 'Wrong credential type for this issuer', [
+          { path: 'credentialType', message: `must be ${type}` },
+        ]),
+        { status: 400 },
+      ),
+    };
+  }
+  const holder = holderStore.find((h) => h.id === body.holderId);
+  if (!holder || holder.issuerId !== staff.issuer.id) return { body, response: notFoundHolder() };
+  const existing = activeCredentialOf(holder.id);
+  if (existing) {
+    return {
+      body,
+      response: HttpResponse.json(
+        errorBody(
+          'ACTIVE_CREDENTIAL_EXISTS',
+          'This holder already has a pending or valid credential',
+          {
+            credentialId: existing,
+          },
+        ),
+        { status: 409 },
+      ),
+    };
+  }
+  const preview = mockPreview(holder, staff, body.validUntil);
+  if (!preview) {
+    return {
+      body,
+      response: HttpResponse.json(
+        errorBody('VALIDATION_ERROR', 'Invalid validUntil', [
+          { path: 'validUntil', message: 'out of range' },
+        ]),
+        { status: 400 },
+      ),
+    };
+  }
+  return { body, staff, holder, preview };
+}
+
+export const issuanceHandlers = [
+  http.get(`${API}/credential-schemas`, ({ request }) => {
+    record(request, '/credential-schemas');
+    const staff = staffFor(request);
+    if (!staff) return unauthenticated();
+    return HttpResponse.json({ schemas: [mockSchemaResponse(TYPE_OF_ISSUER[staff.issuer.type])] });
+  }),
+  http.post(`${API}/credentials/preview`, async ({ request }) => {
+    const check = await issuanceCheck(request.clone());
+    record(request, '/credentials/preview', check.body ?? null);
+    if (check.response) return check.response;
+    return HttpResponse.json(check.preview, { headers: { 'Cache-Control': 'no-store' } });
+  }),
+  http.post(`${API}/credentials`, async ({ request }) => {
+    const check = await issuanceCheck(request.clone());
+    record(request, '/credentials', check.body ?? null);
+    if (check.response) return check.response;
+    const id = `d0000000-0000-4000-8000-${String(issuedStore.size + 1).padStart(12, '0')}`;
+    const credential: CredentialMetadata = {
+      id,
+      holder: check.preview.holder,
+      credentialType: check.preview.credentialType,
+      status: 'pending',
+      effectiveStatus: 'pending',
+      issuedAt: null,
+      expiresAt: check.preview.expiry.expiresAt,
+      createdAt: MOCK_NOW,
+    };
+    issuedStore.set(id, credential);
+    return HttpResponse.json(credential, { status: 201 });
+  }),
+  http.get(`${API}/credentials/:credentialId`, ({ request, params }) => {
+    record(request, `/credentials/${String(params.credentialId)}`);
+    const staff = staffFor(request);
+    if (!staff) return unauthenticated();
+    const known = issuedStore.get(String(params.credentialId));
+    const holder = known && holderStore.find((h) => h.id === known.holder.id);
+    if (!known || !holder || holder.issuerId !== staff.issuer.id) {
+      return HttpResponse.json(errorBody('CREDENTIAL_NOT_FOUND', 'Credential not found'), {
+        status: 404,
+      });
+    }
+    return HttpResponse.json(known);
+  }),
+];
+
+export const server = setupServer(...handlers, ...holderHandlers, ...issuanceHandlers);
 
 export function resetMockBackend() {
   tokens.clear();
   requests.length = 0;
   holderStore.splice(0, holderStore.length, ...seedHolders());
+  issuedStore.clear();
 }

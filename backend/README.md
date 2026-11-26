@@ -59,7 +59,8 @@ src/
   routes/staff.routes.ts              staff list (admin)
   routes/issuers.routes.ts            issuers, JWKS, key generation
   routes/holders.routes.ts            holder records
-  routes/credentials.routes.ts        credential issuance (pending), list, get, revoke, reissue, events
+  routes/credentials.routes.ts        credential issuance (pending), preview, list, get, revoke, reissue, events
+  routes/credential-schemas.routes.ts the schemas this issuer may issue (GET /credential-schemas)
   routes/dev.routes.ts                DEV ONLY (temporary): simulated redemption and expiry
   routes/credential-offers.routes.ts  QR offers and status; wallet redemption planned (Sprint 2)
   routes/dashboard.routes.ts          issuer dashboard summary (officer/admin, own issuer, no-store)
@@ -104,7 +105,9 @@ JSON body (size-limited) → `/api/v1` routes → 404 → error handler.
 | POST   | `/issuers/:issuerId/keys`                            | Admin (own)      | ✅ Implemented                                               |
 | GET    | `/holders`, `/holders/:holderId`                     | Login            | ✅ Implemented                                               |
 | POST   | `/holders`                                           | Login            | ✅ Implemented                                               |
-| POST   | `/credentials`                                       | Officer or admin | ✅ Implemented (creates **pending**)                         |
+| POST   | `/credentials`                                       | Officer or admin | ✅ Implemented (creates **pending**; optional `validUntil`)  |
+| POST   | `/credentials/preview`                               | Officer or admin | ✅ Implemented (same path as issuance, writes nothing)       |
+| GET    | `/credential-schemas`                                | Officer or admin | ✅ Implemented (the issuer type's schema, from the files)    |
 | GET    | `/credentials`, `/credentials/:credentialId`         | Login            | ✅ Implemented                                               |
 | POST   | `/credentials/:credentialId/revoke`                  | Admin            | ✅ Implemented (pending or valid)                            |
 | POST   | `/credentials/:credentialId/reissue`                 | Officer or admin | ✅ Implemented (supersedes, new pending)                     |

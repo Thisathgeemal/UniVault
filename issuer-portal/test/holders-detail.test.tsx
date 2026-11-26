@@ -76,13 +76,13 @@ describe('holder detail', () => {
     ).toBeInTheDocument();
   });
 
-  it('"Issue credential" is shown disabled, with "Available in the next update"', async () => {
+  it('"Issue credential" starts the issuing flow for this holder', async () => {
     const { user, location } = renderApp(`/holders/${HOLDER_IDS.nimesha}`, { signedInAs: ADMIN });
-    const button = await screen.findByRole('button', { name: 'Issue credential' });
-    expect(button).toHaveAttribute('aria-disabled', 'true');
-    expect(button).toHaveAccessibleDescription('Available in the next update');
-    await user.click(button);
-    expect(location()).toBe(`/holders/${HOLDER_IDS.nimesha}`);
+    await user.click(await screen.findByRole('link', { name: 'Issue credential' }));
+    expect(location()).toBe(`/credentials/new?holderId=${HOLDER_IDS.nimesha}`);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Issue a credential' }),
+    ).toBeInTheDocument();
   });
 
   it('another issuer’s holder (backend 404) shows the not-found page', async () => {

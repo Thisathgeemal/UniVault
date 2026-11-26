@@ -43,7 +43,6 @@ export const APP_ROUTES: readonly AppRoute[] = [
     labelKey: 'nav.credentials',
     icon: FileBadge,
     roles: EVERYONE,
-    comingInSprint: 2,
   },
   {
     id: 'credential-offers',

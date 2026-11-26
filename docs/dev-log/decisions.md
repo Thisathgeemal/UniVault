@@ -32,6 +32,8 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 | [016](#decision-016-staff-token-in-memory--sessionstorage-never-localstorage-httponly-cookie-as-future-work)                                            | Staff token in memory + sessionStorage, never localStorage; httpOnly cookie as future work                                           | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
 | [017](#decision-017-dashboard-demo-data-via-the-real-services-marked-by-an-inactive-staff-account-reset-lifts-the-append-only-guard-in-one-transaction) | Dashboard demo data via the real services, marked by an inactive staff account; reset lifts the append-only guard in one transaction | Wed 25 Nov 2026 | S2                       | Draft – review | FR-ISS-01, FR-ISS-03, NFR-08                                  |
 | [018](#decision-018-one-shared-claims-validation-package-the-portal-precompiles-the-schemas-at-build-time)                                              | One shared claims-validation package; the portal precompiles the schemas at build time                                               | Thu 26 Nov 2026 | S2                       | Draft – review | FR-ISS-01, NFR-02, NFR-05, NFR-08                             |
+| [019](#decision-019-issuance-form-is-read-only-and-previewed-server-side)                                                                               | Issuance form is read-only and previewed server-side; schema limited by issuer type                                                  | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-01, FR-ISS-02, FR-WAL-06                               |
+| [020](#decision-020-portrait-embedded-in-the-credential-size-limited-and-selectively-disclosable)                                                       | Portrait embedded in the credential, size-limited (40 KB) and selectively disclosable                                                | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-03, NFR-06, NFR-08, FR-WAL-06                             |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -1630,3 +1632,181 @@ Two constraints:
   swaps it for an import and refuses to emit code that still contains `require()`.
 - The Vite dev server needs `optimizeDeps.include` for the package's two CommonJS helpers
   (it is linked through `file:`, so not pre-bundled automatically).
+
+## Decision 019: Issuance form is read-only and previewed server-side
+
+- **Date:** Thu 26 Nov 2026
+- **Sprint:** S2 (Sprint 1 carry-over)
+- **Status:** Draft – review
+- **Requirements:** FR-ISS-01, FR-ISS-02, FR-WAL-06
+- **Related:** [credentials-api.md](../api/credentials-api.md) (`POST /credentials/preview`),
+  [credential-schemas-api.md](../api/credential-schemas-api.md),
+  [issuer-portal.md](../frontend/issuer-portal.md) §10, Decisions 003, 004, 005, 010, 018
+- **Evidence:** `backend/test/credential-preview.test.ts`, `issuer-portal/test/issuance.test.tsx`,
+  `issuer-portal/e2e/issuance.spec.ts`
+
+(The task asked for this as "Decision 017"; 017 and 018 were already taken, and existing
+decisions are never renumbered, so it is 019.)
+
+### Context
+
+Staff issue an Employment or KYC credential from a holder record. Before they confirm, they
+must see exactly what the holder's wallet will receive:
+
+- the claims;
+- what verifiers always see and what the holder may withhold;
+- the expiry, with its caps (ID document, 18th birthday);
+- the server-calculated `age_over_18`.
+
+The credential is signed later, at wallet redemption (Decision 010), from the `claims_snapshot`
+stored when it is created.
+
+Two questions:
+
+1. **Who decides the claims:** may staff edit claim values in the issuance form, or do the
+   claims always come from the holder record?
+2. **Who builds the preview:** the portal, from the holder record and the schema, or the
+   backend?
+
+### Options considered
+
+**Claims**
+
+1. **Editable in the portal:** quick fixes at issuance. But the credential then differs from
+   the issuer's record of the person. Every rule (schema, `age_over_18`, the caps) would run on
+   values nobody stored. And a reissue for `details_changed` (built from the current record,
+   Decision 012) would undo the edit.
+2. **Read-only, from the holder record:** a wrong detail is fixed in the record (one place,
+   audited), then issued. The credential always matches the record.
+
+**Preview**
+
+1. **Client-side:** the portal assembles the claims from `GET /holders/:id` and the schema, and
+   computes the expiry. It would be a second copy of the issuance rules (caps, whole seconds,
+   derived claims, envelope), certain to drift. It could also show something the server then
+   refuses (409, 422, key missing).
+2. **Server-side, the same code path:** `POST /credentials/preview` runs the function
+   `POST /credentials` runs (`prepareIssuance()`), without writing. What is shown is what would
+   be created now, and the same errors appear before the confirm step.
+
+### Decision
+
+- **Claims: option 2.** The portal never assembles or edits claims. The issuance request
+  carries only `holderId`, `credentialType` and an optional `validUntil` (an earlier end, the
+  only choice staff make). "Wrong details? Update the holder record" links to the holder page.
+  The edit form is on the backlog.
+- **Preview: option 2.** `create()` and `preview()` share `prepareIssuance()`. It runs the
+  type check, the locked holder, `prepareClaims()` (schema, `age_over_18`, expiry caps,
+  `validUntil`), the one-active-credential check and the active-key check. The preview's
+  transaction writes nothing and releases the lock before it returns (follow-up, 26 Nov: the
+  preview now takes **no lock** at all, `prepareIssuance(…, { lock: false })`). The envelope claims come
+  from the signer's own builder (`envelopeClaims()`), so the preview, `GET /credential-schemas`
+  and `signCredential()` share one list.
+- **Planned vs final values:** `exp` is final. `iat` is planned (the real `iat` is the signing
+  time), and `age_over_18` is recalculated at signing. The response documents both, and the
+  portal says "Set when the holder accepts it".
+- **Schema choice is limited by the issuer type:** an employer holds employee records and a
+  bank holds customer records (`ISSUER_RECORD_TYPES`). Each record type is validated against
+  exactly one schema. Issuing the other type would mean issuing claims about a relationship the
+  organisation does not have, from a record that was never checked against that schema.
+  `GET /credential-schemas` therefore returns one schema. Another type in a request is `400
+VALIDATION_ERROR` on `credentialType`: the request is wrong; the role is not, so no 403.
+
+### Reason
+
+- One source of truth for what a credential contains: the holder record plus the backend's
+  rules. The preview cannot lie about the result, and a test proves preview = issuance for the
+  same input and clock.
+- Errors (409 with the existing credential, 422, missing key) appear while previewing, not
+  after the confirm step.
+- An edit at issuance would bypass the holder record's audit trail and reissue
+  (FR-ISS-03 / Decision 012).
+
+### Consequences
+
+- One extra request per preview, repeated when "Valid until" changes (debounced 400 ms). The
+  preview reads the holder row without a lock, so it never blocks an issuance; the issuance
+  repeats every check under the lock.
+- Fixing a detail needs a holder update endpoint and form: backlog item from 26 Nov.
+- If a new issuer type could issue several schemas, `GET /credential-schemas` and the schema
+  selector already handle a list. Only `ISSUER_RECORD_TYPES` would change.
+
+## Decision 020: Portrait embedded in the credential, size-limited and selectively disclosable
+
+- **Date:** Thu 26 Nov 2026
+- **Sprint:** S2 (Sprint 1 carry-over)
+- **Status:** Draft – review
+- **Requirements:** NFR-03, NFR-06, NFR-08, FR-WAL-06
+- **Related:** [credential-schemas.md](../schemas/credential-schemas.md) §4, §5 and §11,
+  Decision 003 (SD-JWT VC, every subject claim selectively disclosable), Decision 004 (data
+  minimisation), Decision 018 (shared validation)
+- **Evidence:** `claims-validation/test/claims-validation.test.ts` ("portrait size"),
+  `issuer-portal/test/holders-validation.test.ts` (same message on both sides),
+  `backend/test/holders.test.ts` (`POST /holders` rejects a portrait over 40 KB)
+
+### Context
+
+Both credential schemas have an optional `portrait`: Employer B's "Employee Photograph" in the
+Employment credential, and the photo of the identification document in the KYC credential
+(CDD Schedule (1)(a1)(ii) requires a photo-bearing document). Interviewees said visual
+identification is still needed at the point of verification. The field check of 26 Nov
+(credential-schemas.md §11) found that no document recorded **why** the portrait is embedded
+as a JPEG data URI rather than referenced. The v1 limit (`maxLength` 70 000 characters, about
+51 KB of image data) was not explained either, and no friendly message existed for it.
+
+### Options considered
+
+1. **Embedded data URI** (`data:image/jpeg;base64,…`) inside the credential, signed with the
+   other claims.
+2. **Reference URL + hash:** the credential carries a link to the issuer's copy of the image and
+   its SHA-256 digest; the verifier downloads and compares.
+3. **No portrait:** verifiers compare the person with a physical ID instead.
+
+### Decision
+
+**Option 1**, with a size limit and selective disclosure:
+
+- **Embedded:** `portrait` stays a JPEG data URI subject claim, signed like every other claim.
+- **Size-limited to 40 KB of image data** in both v1 schemas: `maxLength` 54 639 = 23 (the
+  data-URI prefix) + 54 616 (base64 of 40 960 bytes). The v1 limit was **tightened in place**,
+  not moved to a v2 schema. No existing data has a portrait (seed data, test fixtures and the
+  synthetic data generator produce none, and the portal's registration form has no photo
+  field yet), so nothing stored breaks. A v2 would only have been needed if stored portraits
+  between 40 and 51 KB could exist.
+- **One message:** an oversized portrait is `{ path: "portrait", code: "photoTooLarge", message:
+"Photo must be under 40 KB – use a smaller image" }` from `@univault/claims-validation`. The
+  kilobytes are computed from the schema's `maxLength`, so the limit is stated once.
+  `POST /holders` returns it; the portal shows the same words (en) or their translation (si).
+- **Selectively disclosable:** `portrait` is in `x-univault.selectivelyDisclosable` of both
+  schemas (checked by a test), so a verifier sees it only when the holder chooses to show it.
+
+### Reason
+
+- **Offline verification (NFR-03):** a verifier can check the portrait with the rest of the
+  credential without reaching the issuer. Option 2 needs the issuer's server online at
+  verification time.
+- **No issuer call-home or tracking (NFR-06):** with option 2, every verification would fetch
+  the image from the issuer, telling the issuer when and where the holder used the credential.
+  An embedded portrait reveals nothing to anyone but the verifier the holder chose.
+- **Consistency with ISO/IEC 18013-5 (mobile driving licence):** the mDL carries the portrait
+  as an issuer-signed data element inside the credential (image bytes, not a link), released
+  to a verifier only when requested and agreed.
+- **Integrity for free:** an embedded portrait is covered by the issuer's signature through its
+  disclosure digest; option 2 needs a separate hash check and a second failure mode (link
+  gone, image changed).
+- Option 3 drops a need the interviews confirmed.
+
+### Consequences
+
+- **Larger credential:** up to about 73 KB more per credential: the disclosure is the
+  base64url encoding of a JSON array holding the 54 639-character data URI (×4/3). It is held in
+  the wallet and sent in each presentation that includes the portrait. 40 KB is enough for a
+  passport-style JPEG photo at a moderate quality.
+- **Sensitive personal data (PDPA, NFR-08):** a facial image is biometric-type personal data.
+  It is minimised by selective disclosure (shown only when the holder chooses), by being
+  optional, and by the size limit. It is never logged; like all claims it lives in the holder
+  record and the credential snapshot, never in logs.
+- **Portal:** the registration form still has no photo upload (backlog). When it is added, the
+  limit and the message already exist in the shared validation.
+- **Changing the limit later** is a schema change: `maxLength` in both files. The message
+  follows automatically.

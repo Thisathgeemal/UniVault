@@ -78,6 +78,7 @@ below (`NOT VALID`: free-text reasons stored before 0005/0006 are kept).
 | Method | Path                                        | Access           | Purpose                                                  |
 | ------ | ------------------------------------------- | ---------------- | -------------------------------------------------------- |
 | POST   | `/api/v1/credentials`                       | Officer or admin | Create a pending credential from a holder record         |
+| POST   | `/api/v1/credentials/preview`               | Officer or admin | What POST would create, without writing anything         |
 | GET    | `/api/v1/credentials`                       | Officer or admin | List the issuer's credentials (filter, paging)           |
 | GET    | `/api/v1/credentials/:credentialId`         | Officer or admin | One credential's metadata                                |
 | POST   | `/api/v1/credentials/:credentialId/revoke`  | **Admin only**   | Pending or valid → revoked (section 6.1)                 |
@@ -91,13 +92,14 @@ paths have no `:issuerId`.)
 ### POST `/api/v1/credentials`
 
 ```json
-{ "holderId": "8d1c…-uuid", "credentialType": "EmploymentCredential" }
+{ "holderId": "8d1c…-uuid", "credentialType": "EmploymentCredential", "validUntil": "2027-06-30" }
 ```
 
 | Field            | Required | Rule                                                                                                             |
 | ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
 | `holderId`       | Yes      | UUID of a holder record **of the logged-in issuer**                                                              |
 | `credentialType` | No       | Derived from the issuer type (employer → `EmploymentCredential`, bank → `KYCCredential`). If sent, it must match |
+| `validUntil`     | No       | `YYYY-MM-DD` (00:00 UTC): an earlier end, after today and no later than the capped expiry (added 26 Nov 2026)    |
 
 The issuer always comes from the login token. An `issuerId` in the body is ignored.
 
@@ -174,6 +176,90 @@ belonging to another issuer gives an empty list.
 ### GET `/api/v1/credentials/:credentialId`
 
 Returns the same metadata object. Another issuer's credential returns `404`.
+
+### POST `/api/v1/credentials/preview` (officer or admin)
+
+What `POST /credentials` would create **now**, without writing anything (Decision 019). The
+issuer portal shows it before staff confirm the issuance.
+
+**Body:** the same as `POST /credentials`:
+`{ "holderId": "…", "credentialType"?: "…", "validUntil"?: "YYYY-MM-DD" }`.
+
+**One code path.** `create()` and `preview()` both run `prepareIssuance()` in
+`services/credentials.service.ts`. It does five things, in order:
+
+1. checks the type the issuer may issue;
+2. reads the holder row of this issuer: **locked** `FOR UPDATE` for issuance, **not locked**
+   for the preview (`prepareIssuance(…, { lock: false })`);
+3. runs `prepareClaims()`: schema validation, `age_over_18` and the expiry caps;
+4. checks that the holder has no other active credential of this type;
+5. checks that the issuer has an active key.
+
+`create()` runs it in a transaction, then inserts the pending row and its event. `preview()`
+runs it without a transaction or lock and writes nothing: no credential, no status event, no
+log of claims. A preview therefore never blocks an issuance; the issuance repeats every check
+under the lock, so a preview that raced another issuance cannot create a second credential.
+
+**Response:** `200`, `Cache-Control: no-store` (it contains the holder's claims):
+
+```json
+{
+  "credentialType": "KYCCredential",
+  "vct": "urn:univault:vct:KYCCredential:1",
+  "schemaVersion": "1.0",
+  "issuer": { "id": "bank-a", "name": "UniVault Demo Bank" },
+  "holder": { "id": "…", "externalRef": "KYC-REC-0001", "fullName": "Lahiru Silva" },
+  "alwaysVisible": {
+    "iss": "http://localhost:4000/api/v1/issuers/bank-a",
+    "issuer_name": "UniVault Demo Bank",
+    "vct": "urn:univault:vct:KYCCredential:1",
+    "schema_version": "1.0",
+    "jti": null,
+    "iat": "2026-11-26T04:30:00.000Z",
+    "exp": "2028-11-26T04:30:00.000Z",
+    "cnf": null,
+    "status": null,
+    "kyc_verification_date": "2026-11-26"
+  },
+  "disclosable": [{ "name": "full_name", "value": "Lahiru Silva" }, "…"],
+  "derived": [{ "name": "age_over_18", "value": true }],
+  "expiry": {
+    "expiresAt": "2028-11-26T04:30:00.000Z",
+    "defaultExpiresAt": "2028-11-26T04:30:00.000Z",
+    "cappedBy": null,
+    "validUntilRange": { "min": "2026-11-27", "max": "2028-11-26" }
+  },
+  "warnings": []
+}
+```
+
+| Field                     | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alwaysVisible`           | The envelope claims the signer adds (the same builder, `envelopeClaims()`), always visible to verifiers. **`iat` is planned:** the signed `iat` is the signing time, when the wallet accepts the offer. **`exp` is final** (`expires_at` is fixed when the credential is created). `jti`, `cnf` and `status` are `null`: the id is assigned on issue, the wallet key is bound at acceptance, and the status URI contains the id. ISO strings here; NumericDate in the SD-JWT |
+| `disclosable`             | The subject claims in `x-univault.selectivelyDisclosable` order that the record has (minus derived ones): each becomes a disclosure the holder may withhold                                                                                                                                                                                                                                                                                                                  |
+| `derived`                 | Claims the server calculates (`x-univault.derivedClaims`, today `age_over_18`). **Recalculated again at signing**, so a holder who turns 18 before accepting gets `true`                                                                                                                                                                                                                                                                                                     |
+| `expiry.expiresAt`        | The expiry the credential would get (whole seconds)                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `expiry.defaultExpiresAt` | Now + the schema's `defaultValidity` (P1Y Employment, P2Y KYC)                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `expiry.cappedBy`         | `null` (the default applies), `id_document_expiry` (passport or driving licence expiry), `18th_birthday` (`age_over_18` false) or `validUntil` (an earlier date chosen by staff)                                                                                                                                                                                                                                                                                             |
+| `expiry.validUntilRange`  | The dates `validUntil` may take, inclusive: from tomorrow to the capped expiry date                                                                                                                                                                                                                                                                                                                                                                                          |
+| `warnings`                | Codes: `holder_under_18` (the credential ends on the 18th birthday)                                                                                                                                                                                                                                                                                                                                                                                                          |
+
+**Errors:** exactly those of `POST /credentials` (same code). They are `400 VALIDATION_ERROR`
+(body, wrong `credentialType` for the issuer type, `validUntil` out of range), `404
+HOLDER_NOT_FOUND` (also another issuer's holder), `422 HOLDER_DATA_INVALID`, `409
+ACTIVE_CREDENTIAL_EXISTS` (`details.credentialId`) and `409 ISSUER_KEY_MISSING`.
+`503 ISSUER_KEY_UNAVAILABLE` cannot come from a preview or an issuance: neither decrypts a
+key (signing does, at redemption). The portal still explains it like the missing key.
+
+**Logging:** `Credential previewed` at **debug**, with holder, issuer and staff ids only.
+
+**Tests:** `backend/test/credential-preview.test.ts`. They cover:
+
+- preview equals a real issuance (claims snapshot and expiry) for the same input and clock;
+- row counts unchanged and no lock held;
+- every cap;
+- every error;
+- isolation.
 
 ## 4. Signing: `signCredential(credentialId, holderPublicJwk)`
 
@@ -430,23 +516,23 @@ reason must stay valid.
 
 ## 7. Errors
 
-| Situation                                                                                                               | Status | Code                                                                     |
-| ----------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------ |
-| Not logged in                                                                                                           | 401    | `UNAUTHENTICATED`                                                        |
-| Invalid request body, ID or query (e.g. `holderId` not a UUID)                                                          | 400    | `VALIDATION_ERROR`                                                       |
-| `credentialType` doesn't match the issuer type                                                                          | 400    | `VALIDATION_ERROR` (`details[].path = credentialType`)                   |
-| Issue or reissue: the stored holder record no longer passes the schema, or its ID document expired                      | 422    | `HOLDER_DATA_INVALID` (`details[].path` such as `claims.designation`)    |
-| Unknown holder, or another issuer's holder                                                                              | 404    | `HOLDER_NOT_FOUND`                                                       |
-| Unknown credential, or another issuer's credential                                                                      | 404    | `CREDENTIAL_NOT_FOUND`                                                   |
-| Holder already has a pending or valid credential of this type                                                           | 409    | `ACTIVE_CREDENTIAL_EXISTS` (`details.credentialId`)                      |
-| Issuer has no active signing key (issue or reissue)                                                                     | 409    | `ISSUER_KEY_MISSING` (run `npm run keys:init`)                           |
-| Revoke or reissue: missing/unknown `reason`, `note` missing for `other` or over 500 characters, bad `validUntil` format | 400    | `VALIDATION_ERROR` (`details[].path` = `reason`, `note` or `validUntil`) |
-| Reissue: `validUntil` not after today, or later than the issuance cap                                                   | 400    | `VALIDATION_ERROR` (`details[].path = validUntil`)                       |
-| Revoke by an officer                                                                                                    | 403    | `FORBIDDEN`                                                              |
-| Revoke or reissue a revoked credential                                                                                  | 409    | `CREDENTIAL_ALREADY_REVOKED`                                             |
-| Revoke or reissue a superseded credential                                                                               | 409    | `CREDENTIAL_SUPERSEDED` (`details.replacedBy` = replacement id)          |
-| Reissue a pending credential                                                                                            | 409    | `CREDENTIAL_NOT_REISSUABLE` (revoke it and issue a new one)              |
-| Dev only: simulate expiry of a credential that is not effectively `valid`                                               | 409    | `CREDENTIAL_NOT_VALID` (`details.effectiveStatus`)                       |
+| Situation                                                                                                               | Status | Code                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Not logged in                                                                                                           | 401    | `UNAUTHENTICATED`                                                                                                                               |
+| Invalid request body, ID or query (e.g. `holderId` not a UUID)                                                          | 400    | `VALIDATION_ERROR`                                                                                                                              |
+| `credentialType` doesn't match the issuer type                                                                          | 400    | `VALIDATION_ERROR` (`details[].path = credentialType`)                                                                                          |
+| Issue or reissue: the stored holder record no longer passes the schema, or its ID document expired                      | 422    | `HOLDER_DATA_INVALID` (`details[].path` such as `claims.designation`; a portrait over 40 KB: "Photo must be under 40 KB – use a smaller image") |
+| Unknown holder, or another issuer's holder                                                                              | 404    | `HOLDER_NOT_FOUND`                                                                                                                              |
+| Unknown credential, or another issuer's credential                                                                      | 404    | `CREDENTIAL_NOT_FOUND`                                                                                                                          |
+| Holder already has a pending or valid credential of this type                                                           | 409    | `ACTIVE_CREDENTIAL_EXISTS` (`details.credentialId`)                                                                                             |
+| Issuer has no active signing key (issue or reissue)                                                                     | 409    | `ISSUER_KEY_MISSING` (run `npm run keys:init`)                                                                                                  |
+| Revoke or reissue: missing/unknown `reason`, `note` missing for `other` or over 500 characters, bad `validUntil` format | 400    | `VALIDATION_ERROR` (`details[].path` = `reason`, `note` or `validUntil`)                                                                        |
+| Issue, preview or reissue: `validUntil` not after today, or later than the issuance cap                                 | 400    | `VALIDATION_ERROR` (`details[].path = validUntil`)                                                                                              |
+| Revoke by an officer                                                                                                    | 403    | `FORBIDDEN`                                                                                                                                     |
+| Revoke or reissue a revoked credential                                                                                  | 409    | `CREDENTIAL_ALREADY_REVOKED`                                                                                                                    |
+| Revoke or reissue a superseded credential                                                                               | 409    | `CREDENTIAL_SUPERSEDED` (`details.replacedBy` = replacement id)                                                                                 |
+| Reissue a pending credential                                                                                            | 409    | `CREDENTIAL_NOT_REISSUABLE` (revoke it and issue a new one)                                                                                     |
+| Dev only: simulate expiry of a credential that is not effectively `valid`                                               | 409    | `CREDENTIAL_NOT_VALID` (`details.effectiveStatus`)                                                                                              |
 
 Signing errors are listed in section 4.
 

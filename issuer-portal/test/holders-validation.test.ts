@@ -59,6 +59,9 @@ const employee = employees[0]!;
 const customer = customers[0]!;
 const address = customer.permanent_address as Record<string, unknown>;
 
+/** A JPEG data URI with a little more than 40 KB of image data (Decision 020). */
+const bigPortrait = `data:image/jpeg;base64,${'A'.repeat(54620)}`;
+
 const INVALID: [CredentialTypeName, string, unknown][] = [
   ['EmploymentCredential', 'empty object', {}],
   ['EmploymentCredential', 'not an object', 'claims'],
@@ -124,6 +127,8 @@ const INVALID: [CredentialTypeName, string, unknown][] = [
   ['KYCCredential', 'landline as mobile', { ...customer, mobile_number: '+94112345678' }],
   ['KYCCredential', 'missing age_over_18', (({ age_over_18: _a, ...rest }) => rest)(customer)],
   ['KYCCredential', 'extra field', { ...customer, gender: 'F' }],
+  ['EmploymentCredential', 'portrait over 40 KB', { ...employee, portrait: bigPortrait }],
+  ['KYCCredential', 'portrait over 40 KB', { ...customer, portrait: bigPortrait }],
 ];
 
 describe('browser and backend validators agree', () => {
@@ -287,6 +292,28 @@ describe('form generated from the schema', () => {
     ]);
     // Employees never send a separate reference
     expect(validateHolderForm('EmploymentCredential', employee, 'IGNORED')).toEqual([]);
+  });
+});
+
+describe('portrait size: the same message in the portal and from the backend', () => {
+  it('rejects an oversized portrait on both sides with "Photo must be under 40 KB"', () => {
+    const t = i18n.t.bind(i18n);
+    const exists = (key: string) => i18n.exists(key);
+    for (const [type, claims] of [
+      ['EmploymentCredential', { ...employee, portrait: bigPortrait }],
+      ['KYCCredential', { ...customer, portrait: bigPortrait }],
+    ] as const) {
+      const [portal] = validateClaims(type, claims);
+      const [server] = backend.validate(type, claims);
+      expect(portal).toEqual(server);
+      expect(server).toMatchObject({
+        path: 'portrait',
+        code: 'photoTooLarge',
+        message: 'Photo must be under 40 KB – use a smaller image',
+      });
+      // What the portal shows (English) is the backend's message, word for word
+      expect(issueMessage(t, portal!, {}, exists)).toBe(server!.message);
+    }
   });
 });
 

@@ -77,3 +77,10 @@ export {
 export { ConfirmDialog, type ConfirmDialogProps } from './ConfirmDialog.js';
 export { Tooltip, type TooltipProps } from './Tooltip.js';
 export { Select } from './ui/select.js';
+export { Stepper, type StepperProps, type StepperStep } from './Stepper.js';
+export {
+  CredentialCardPreview,
+  type CredentialCardItem,
+  type CredentialCardPreviewProps,
+  type CredentialCardSection,
+} from './CredentialCardPreview.js';

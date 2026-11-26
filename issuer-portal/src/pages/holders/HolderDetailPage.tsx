@@ -17,7 +17,6 @@ import {
   PageHeader,
   Skeleton,
   StatusBadge,
-  Tooltip,
 } from '@univault/portal-ui';
 import { ArrowLeft, FilePlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -138,19 +137,13 @@ function HolderDetailView({ holder }: { holder: HolderDetail }) {
         title={holder.fullName}
         description={t('holders.detail.reference', { ref: holder.externalRef })}
         actions={
-          <Tooltip content={t('holders.detail.issueCredentialSoon')}>
-            {(trigger) => (
-              <Button
-                {...trigger}
-                aria-disabled="true"
-                className="cursor-not-allowed opacity-60"
-                onClick={(e) => e.preventDefault()}
-              >
-                <FilePlus aria-hidden="true" className="h-4 w-4" />
-                {t('holders.detail.issueCredential')}
-              </Button>
-            )}
-          </Tooltip>
+          <Link
+            to={`/credentials/new?holderId=${encodeURIComponent(holder.id)}`}
+            className={buttonVariants({ variant: 'default' })}
+          >
+            <FilePlus aria-hidden="true" className="h-4 w-4" />
+            {t('holders.detail.issueCredential')}
+          </Link>
         }
       />
 

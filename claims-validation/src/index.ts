@@ -56,6 +56,7 @@ export type ClaimIssueCode =
   | 'const'
   | 'type'
   | 'mismatch'
+  | 'photoTooLarge'
   | 'invalid';
 
 export interface ClaimIssue {
@@ -78,9 +79,32 @@ const KEYWORD_CODES: Partial<Record<string, ClaimIssueCode>> = {
   type: 'type',
 };
 
+/** The data-URI prefix of an embedded JPEG (the schemas' portrait pattern). */
+export const JPEG_DATA_URI_PREFIX = 'data:image/jpeg;base64,';
+
+/**
+ * Whole kilobytes (1 KB = 1024 bytes) of image data that a JPEG data URI of `limit`
+ * characters can hold: base64 carries 3 bytes in every 4 characters. Derived from the schema's
+ * maxLength, so the limit is stated in one place only (Decision 020).
+ */
+export function dataUriKilobytes(limit: number): number {
+  const base64Chars = Math.max(0, limit - JPEG_DATA_URI_PREFIX.length);
+  return Math.floor((Math.floor(base64Chars / 4) * 3) / 1024);
+}
+
 /** One Ajv error as an issue, with the backend's friendly messages. */
 export function toClaimIssue(error: ErrorObject): ClaimIssue {
   const base = error.instancePath.replace(/^\//, '').replace(/\//g, '.');
+  if (error.keyword === 'maxLength' && base === 'portrait') {
+    const limit = (error.params as { limit: number }).limit;
+    const kilobytes = dataUriKilobytes(limit);
+    return {
+      path: base,
+      code: 'photoTooLarge',
+      message: `Photo must be under ${kilobytes} KB – use a smaller image`,
+      params: { limit, kilobytes },
+    };
+  }
   if (error.keyword === 'required') {
     const missing = (error.params as { missingProperty: string }).missingProperty;
     return {

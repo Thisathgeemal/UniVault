@@ -11,6 +11,7 @@ import type { HoldersService } from '../services/holders.service.js';
 import type { IssuerKeysService } from '../services/issuer-keys.service.js';
 import { authRouter } from './auth.routes.js';
 import { credentialOffersRouter } from './credential-offers.routes.js';
+import { credentialSchemasRouter } from './credential-schemas.routes.js';
 import { credentialsRouter } from './credentials.routes.js';
 import { dashboardRouter } from './dashboard.routes.js';
 import { devRouter } from './dev.routes.js';
@@ -59,6 +60,7 @@ export function apiRouter(deps: ApiRouterDeps): Router {
   router.use('/issuers', issuersRouter(deps.auth, deps.issuerKeys));
   router.use('/holders', holdersRouter(deps.auth, deps.holders));
   router.use('/credentials', credentialsRouter(deps.auth, deps.credentials));
+  router.use('/credential-schemas', credentialSchemasRouter(deps.auth, deps.credentials));
   router.use('/dashboard', dashboardRouter(deps.auth, deps.dashboard));
   router.use('/credential-offers', credentialOffersRouter(deps.auth, deps.credentialOffers));
   if (deps.devSimulateRedemption && deps.credentials) {

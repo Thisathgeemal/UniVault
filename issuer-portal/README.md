@@ -11,7 +11,8 @@ digital credentials. It is built with React, Vite and TypeScript, using:
 The layout comes from the shared [`@univault/portal-ui`](../portal-ui/README.md) package.
 
 **Status (26 Nov 2026):** sign-in, session, role-based layout, dashboard, holder management
-(list, registration form generated from the credential schema, detail) and placeholder pages.
+(list, registration form generated from the credential schema, detail), credential issuance
+(four steps previewed by the server, Decision 019) and placeholder pages.
 Design and flows: [docs/frontend/issuer-portal.md](../docs/frontend/issuer-portal.md)
 (Decisions 015, 016 and 018).
 
@@ -110,9 +111,11 @@ src/
                            holders, credentials
   auth/                    AuthProvider (session), RequireRole, returnTo checks, sessionStorage
   layout/                  RootLayout (session provider), ProtectedLayout (AppShell + redirect)
-  pages/                   Login, Dashboard, holders/ (list, register, detail), ComingSoon,
+  pages/                   Login, Dashboard, holders/ (list, register, detail), credentials/
+                           (picker, issue flow, credential / success page), ComingSoon,
                            Not permitted / 404 / error
   holders/                 form-model (form from the schema), validation, display, list-params
+  issuance/                preview claim display, problems, HolderPicker (claims never built here)
   i18n/                    react-i18next set-up; locales/en.ts, locales/si.ts
   lib/                     sign-in messages, Asia/Colombo time formatting
 csp.ts                     production Content-Security-Policy

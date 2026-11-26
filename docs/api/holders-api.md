@@ -137,7 +137,9 @@ Each problem in a `VALIDATION_ERROR` from `POST /holders` is
 - `path`: `claims.<claim>` (dotted inside objects) or `externalRef`;
 - `code` (added 26 Nov 2026): a stable reason the issuer portal translates: `required`,
   `notAllowed`, `poBox`, `notAccepted`, `pattern`, `format`, `minLength`, `maxLength`,
-  `enum`, `const`, `type`, `mismatch` (employee `externalRef` ≠ `employee_id`) or `invalid`;
+  `enum`, `const`, `type`, `mismatch` (employee `externalRef` ≠ `employee_id`), `photoTooLarge`
+  (`portrait` over 40 KB of image data: message "Photo must be under 40 KB – use a smaller
+  image", `params.kilobytes` = 40, Decision 020) or `invalid`;
 - `message`: English text, as before.
 
 The issues come from `@univault/claims-validation` (Decision 018), the same code the issuer
