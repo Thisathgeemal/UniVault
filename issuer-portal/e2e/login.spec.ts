@@ -1,7 +1,8 @@
 /**
- * Staff sign-in against the real backend (throwaway database with the synthetic seed data):
- * protected-route redirect, wrong password, admin sign-in back to the requested page, admin
- * menu, sign-out, officer sign-in without admin items.
+ * Staff sign-in against the real backend (throwaway database with the synthetic seed data and
+ * the dashboard demo data): protected-route redirect, wrong password, admin sign-in back to the
+ * requested page, admin menu, dashboard numbers equal to the backend summary, sign-out, officer
+ * sign-in without admin items.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -10,6 +11,9 @@ const ADMIN = 'admin@serendib-trading.example';
 const OFFICER = 'officer@serendib-trading.example';
 const ADMIN_ITEMS = ['Issuer keys', 'Staff'];
 const SHARED_ITEMS = ['Dashboard', 'Holders', 'Credentials', 'Credential offers'];
+/** The e2e backend (playwright.config.ts starts it on port 4100). */
+const API = process.env.E2E_API_BASE_URL ?? 'http://localhost:4100/api/v1';
+const ORG = 'Serendib Trading Company (Demo)';
 
 async function signIn(page: Page, email: string, password: string) {
   await page.getByLabel('Email address').fill(email);
@@ -19,7 +23,7 @@ async function signIn(page: Page, email: string, password: string) {
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Main navigation' });
 
-test('staff sign-in, role-based menu and sign-out', async ({ page }) => {
+test('staff sign-in, role-based menu, dashboard numbers and sign-out', async ({ page }) => {
   expect(PASSWORD, 'playwright.config.ts sets UNIVAULT_E2E_PASSWORD').not.toBe('');
 
   // A protected page sends a signed-out visitor to the login page, remembering the page
@@ -40,6 +44,39 @@ test('staff sign-in, role-based menu and sign-out', async ({ page }) => {
     await expect(nav(page).getByRole('link', { name })).toBeVisible();
   }
 
+  // Dashboard: every card shows the number the backend's summary gives for this session
+  await nav(page).getByRole('link', { name: 'Dashboard' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { level: 1, name: ORG })).toBeVisible();
+  const token = await page.evaluate(() => sessionStorage.getItem('univault.issuer-portal.token'));
+  const response = await page.request.get(`${API}/dashboard/summary`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(response.status()).toBe(200);
+  const summary = (await response.json()) as {
+    counts: Record<string, number>;
+    expiringSoonDays: number;
+  };
+  expect(summary.counts.issued, 'db:seed:demo ran').toBeGreaterThan(0);
+  const format = (n: number) => new Intl.NumberFormat('en-LK').format(n);
+  const cards: [string, string][] = [
+    ['Issued', 'issued'],
+    ['Active', 'active'],
+    ['Revoked', 'revoked'],
+    ['Awaiting wallet', 'awaitingWallet'],
+    ['Superseded', 'superseded'],
+    ['Expired', 'expired'],
+    [`Expiring in ${summary.expiringSoonDays} days`, 'expiringSoon'],
+    ['Holders', 'holders'],
+  ];
+  for (const [label, key] of cards) {
+    await expect(
+      page.getByRole('link', { name: `${label} ${format(summary.counts[key]!)}`, exact: true }),
+    ).toBeVisible();
+  }
+  await expect(page.getByRole('figure', { name: 'Status of issued credentials' })).toBeVisible();
+  await expect(page.getByTestId('recent-activity').getByRole('listitem')).toHaveCount(10);
+
   // The token is in sessionStorage only, never in localStorage
   const storage = await page.evaluate(() => ({
     session: Object.keys(sessionStorage),
@@ -56,7 +93,7 @@ test('staff sign-in, role-based menu and sign-out', async ({ page }) => {
   // Officer: the shared items only
   await signIn(page, OFFICER, PASSWORD);
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('heading', { level: 1, name: /^Welcome, / })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: ORG })).toBeVisible();
   for (const name of SHARED_ITEMS) {
     await expect(nav(page).getByRole('link', { name })).toBeVisible();
   }

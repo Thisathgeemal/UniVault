@@ -12,25 +12,26 @@ copy .env.example .env      # Windows (macOS/Linux: cp .env.example .env)
 npm run dev                 # http://localhost:4000/api/v1/health
 ```
 
-| Script                  | Purpose                                                                                                                                         |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`           | Start with auto-restart on file changes (tsx)                                                                                                   |
-| `npm run build`         | Compile TypeScript to `dist/`                                                                                                                   |
-| `npm start`             | Run the compiled server (`dist/server.js`)                                                                                                      |
-| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 471 tests, 19 files). Two projects: `fast` (parallel), then `heavy` (one file at a time) |
-| `npm run test:fast`     | Only the fast, in-process tests (parallel)                                                                                                      |
-| `npm run test:heavy`    | Only the heavy tests: real processes and on-disk PGlite (one file at a time)                                                                    |
-| `npm run test:coverage` | Tests with a coverage report; fails below 88 / 85 / 93 / 89 % (stmts / branches / funcs / lines)                                                |
-| `npm run typecheck`     | Type-check without emitting files                                                                                                               |
-| `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                                                                                                |
-| `npm run db:migrate`    | Apply new SQL migrations                                                                                                                        |
-| `npm run db:seed`       | Migrate, then load the synthetic issuers, staff and holders                                                                                     |
-| `npm run db:inspect`    | Show tables, row counts and sample rows                                                                                                         |
-| `npm run db:reset`      | Delete the embedded development database, then migrate and seed again                                                                           |
-| `npm run keys:init`     | Generate a signing key for every issuer without an active one                                                                                   |
-| `npm run keys:bundle`   | Write the active encrypted keys to `keys/issuer-keys.bundle.b64` for `ISSUER_KEYS_BUNDLE` (`--force` to replace; prints ids and kids only)      |
+| Script                  | Purpose                                                                                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`           | Start with auto-restart on file changes (tsx)                                                                                                                                                       |
+| `npm run build`         | Compile TypeScript to `dist/`                                                                                                                                                                       |
+| `npm start`             | Run the compiled server (`dist/server.js`)                                                                                                                                                          |
+| `npm test`              | Unit, HTTP, database and server-process tests (Vitest; 498 tests, 21 files). Two projects: `fast` (parallel), then `heavy` (one file at a time)                                                     |
+| `npm run test:fast`     | Only the fast, in-process tests (parallel)                                                                                                                                                          |
+| `npm run test:heavy`    | Only the heavy tests: real processes and on-disk PGlite (one file at a time)                                                                                                                        |
+| `npm run test:coverage` | Tests with a coverage report; fails below 90 / 86 / 93 / 90 % (stmts / branches / funcs / lines)                                                                                                    |
+| `npm run typecheck`     | Type-check without emitting files                                                                                                                                                                   |
+| `npm run build:deps`    | Build `@univault/crypto-core` (`../crypto-core`)                                                                                                                                                    |
+| `npm run db:migrate`    | Apply new SQL migrations                                                                                                                                                                            |
+| `npm run db:seed`       | Migrate, then load the synthetic issuers, staff and holders                                                                                                                                         |
+| `npm run db:inspect`    | Show tables, row counts and sample rows                                                                                                                                                             |
+| `npm run db:reset`      | Delete the embedded development database, then migrate and seed again                                                                                                                               |
+| `npm run db:seed:demo`  | **Development only.** Dashboard demo credentials of every status for Serendib Trading (needs `db:seed`, `keys:init`); skips if present, `-- --reset` removes only the demo rows; prints counts only |
+| `npm run keys:init`     | Generate a signing key for every issuer without an active one                                                                                                                                       |
+| `npm run keys:bundle`   | Write the active encrypted keys to `keys/issuer-keys.bundle.b64` for `ISSUER_KEYS_BUNDLE` (`--force` to replace; prints ids and kids only)                                                          |
 
-`dev`, `build`, `typecheck`, `test`, `test:coverage` and `keys:init` run
+`dev`, `build`, `typecheck`, `test`, `test:coverage`, `keys:init` and `db:seed:demo` run
 `build:deps` first (npm `pre` scripts), so crypto-core is always up to date.
 
 **Run the tests from PowerShell** (or cmd), not Git Bash: under Git Bash,
@@ -61,6 +62,7 @@ src/
   routes/credentials.routes.ts        credential issuance (pending), list, get, revoke, reissue, events
   routes/dev.routes.ts                DEV ONLY (temporary): simulated redemption and expiry
   routes/credential-offers.routes.ts  QR offers and status; wallet redemption planned (Sprint 2)
+  routes/dashboard.routes.ts          issuer dashboard summary (officer/admin, own issuer, no-store)
   routes/status.routes.ts             PUBLIC credential status (open CORS, rate limit, no-store)
   routes/verifications.routes.ts      verification sessions (planned)
   services/issuer-keys.service.ts  key generation, rotation, JWKS publication
@@ -69,12 +71,14 @@ src/
                                    revoke, reissue (supersede), status history
   services/credential-offers.service.ts  pre-authorised offers (hash only), status, findOfferByCode
   services/credential-schemas.ts   loads docs/schemas and validates claims
-  services/credential-status.ts    effectiveStatus() (shared status rule) and the public lookup
+  services/credential-status.ts    effectiveStatus() + its SQL twin effectiveStatusCondition(), public lookup
+  services/dashboard.service.ts    dashboard counts (one aggregate query) and recent activity
   db/schema.ts           Drizzle table definitions and relations
   db/client.ts           database connection (embedded PGlite or PostgreSQL server)
   db/migrate.ts          SQL migration runner
   db/seed.ts             loads seed-data/ (issuers, staff, holders)
-  db/cli.ts              db:*, keys:init and keys:bundle commands
+  db/seed-demo.ts        DEV ONLY: dashboard demo credentials (db:seed:demo), --reset
+  db/cli.ts              db:*, db:seed:demo, keys:init and keys:bundle commands
   keys/key-store.ts      the ONLY owner of private keys (file or env bundle, decrypt once)
   keys/startup-check.ts  start-up key check (strict in production)
 migrations/              versioned SQL migrations (source of truth for the schema)
@@ -106,6 +110,7 @@ JSON body (size-limited) → `/api/v1` routes → 404 → error handler.
 | GET    | `/credentials/:credentialId/events`                  | Officer or admin | ✅ Implemented (status history)                              |
 | POST   | `/credential-offers`                                 | Officer or admin | ✅ Implemented (one-time QR offer)                           |
 | GET    | `/credential-offers/:offerId`                        | Login            | ✅ Implemented (status polling)                              |
+| GET    | `/dashboard/summary`                                 | Officer or admin | ✅ Implemented (own issuer from the token, `no-store`)       |
 | POST   | `/credential-offers/token`                           | Public (code)    | 501 – Sprint 2 (wallet)                                      |
 | POST   | `/credential-offers/credential`                      | Public (code)    | 501 – Sprint 2 (wallet)                                      |
 | GET    | `/status/:credentialId`                              | Public           | ✅ Implemented (any origin, rate limited, `no-store`)        |
@@ -124,6 +129,29 @@ change is recorded in `credential_status_events` (Decision 012). Verifiers check
 credential with the public `GET /status/:credentialId` (Decision 013). See
 `docs/api/credentials-api.md`, `docs/api/credential-offers-api.md` and
 `docs/api/status-api.md`.
+
+**Dashboard** (`GET /dashboard/summary`, `docs/api/dashboard-api.md`): counts for the token's
+issuer from one aggregate query, with the same expiry rule as `effectiveStatus()`:
+
+| Count            | Definition                                                  |
+| ---------------- | ----------------------------------------------------------- |
+| `issued`         | signed (`issued_at IS NOT NULL`)                            |
+| `active`         | issued and effective status `valid` (`now < expires_at`)    |
+| `revoked`        | issued and status `revoked`                                 |
+| `superseded`     | issued and status `superseded`                              |
+| `expired`        | issued and effective status `expired` (`expires_at <= now`) |
+| `awaitingWallet` | status `pending`                                            |
+| `expiringSoon`   | active and `expires_at < now + 30 days`                     |
+| `holders`        | holder records of the issuer                                |
+
+A credential revoked while pending is in none of the issued counts. Invariant:
+`issued = active + revoked + superseded + expired`. Plus the last 10 status events (reason
+codes and staff names only, never notes or claims).
+
+**Demo data:** `npm run db:seed:demo` (development only) fills Serendib Trading with 8 active
+(3 expiring within 30 days), 3 pending with open offers, 1 revoked after signing, 1 revoked
+while pending, 1 superseded and 1 expired credential, through the real services. It is
+idempotent; `-- --reset` removes only those rows (Decision 017).
 
 Planned routes already validate their input. Each returns `501 NOT_IMPLEMENTED`
 with the sprint it is planned for, until its handler is written.

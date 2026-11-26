@@ -26,6 +26,8 @@
     "test:heavy": "vitest run --project heavy",
     "db:migrate": "tsx src/db/cli.ts migrate",
     "db:seed": "tsx src/db/cli.ts seed",
+    "predb:seed:demo": "npm run build:deps",
+    "db:seed:demo": "tsx src/db/cli.ts seed-demo",
     "db:inspect": "tsx src/db/cli.ts inspect",
     "db:reset": "tsx src/db/cli.ts reset",
     "prekeys:init": "npm run build:deps",

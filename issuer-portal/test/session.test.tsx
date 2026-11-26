@@ -57,7 +57,7 @@ describe('protected routes and returnTo', () => {
   ])('rejects returnTo=%s and goes to the dashboard instead', async (returnTo) => {
     const { user, location } = renderApp(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     await signIn(user, ADMIN.email);
-    await screen.findByRole('heading', { level: 1, name: /Welcome/ });
+    await screen.findByRole('heading', { level: 1, name: ADMIN.issuer.name });
     expect(location()).toBe('/');
   });
 
@@ -115,7 +115,9 @@ describe('session restore', () => {
     ).toBeInTheDocument();
     expect(window.sessionStorage.getItem(SESSION_TOKEN_KEY)).toBe(token);
     await user.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByRole('heading', { level: 1, name: /Welcome/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: ADMIN.issuer.name }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -196,14 +198,14 @@ describe('token storage', () => {
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
     const { user, unmount } = renderApp('/login');
     await signIn(user, ADMIN.email);
-    await screen.findByRole('heading', { level: 1, name: /Welcome/ });
+    await screen.findByRole('heading', { level: 1, name: ADMIN.issuer.name });
     const token = window.sessionStorage.getItem(SESSION_TOKEN_KEY);
     expect(token).toBeTruthy();
     unmount();
 
     // Refresh: restore from sessionStorage, then sign out
     const again = renderApp('/');
-    await screen.findByRole('heading', { level: 1, name: /Welcome/ });
+    await screen.findByRole('heading', { level: 1, name: ADMIN.issuer.name });
     await again.user.click(screen.getByRole('button', { name: 'Sign out' }));
     await screen.findByRole('heading', { name: 'Sign in' });
 

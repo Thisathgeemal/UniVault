@@ -13,9 +13,9 @@ export default defineConfig({
       exclude: ['src/index.ts'],
       reporter: ['text', 'html', 'json-summary'],
       reportsDirectory: 'coverage',
-      // Just below the figures on 24 Nov 2026 (100 / 94 / 100 / 100), rounded down.
+      // Just below the figures on 25 Nov 2026 (100 / 94.66 / 100 / 100), rounded down.
       // Raise them when coverage improves; never lower them to make a change pass.
-      thresholds: { statements: 99, branches: 93, functions: 99, lines: 99 },
+      thresholds: { statements: 99, branches: 94, functions: 99, lines: 99 },
     },
   },
 });

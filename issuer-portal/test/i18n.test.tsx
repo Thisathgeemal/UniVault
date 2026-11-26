@@ -40,7 +40,7 @@ describe('language switch', () => {
     const nav = await screen.findByRole('navigation', { name: si.nav.label });
     expect(within(nav).getByRole('link', { name: si.nav.holders })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: si.header.signOut })).toBeInTheDocument();
-    expect(screen.getAllByText(si.roles.admin)).toHaveLength(2); // header badge and dashboard
+    expect(screen.getAllByText(si.roles.admin)).toHaveLength(1); // header badge
 
     await user.selectOptions(screen.getByLabelText(si.language.label), 'en');
     expect(await screen.findByRole('button', { name: 'Sign out' })).toBeInTheDocument();
@@ -61,7 +61,8 @@ describe('language switch', () => {
 describe('resource files', () => {
   it('Sinhala has exactly the English keys, every value in Sinhala script (except names)', () => {
     expect(keys(si).sort()).toEqual(keys(en).sort());
-    const latinAllowed = new Set(['language.en']);
+    // language.en is a name; breakdown.value is only numbers and punctuation: "{{count}} ({{percent}})"
+    const latinAllowed = new Set(['language.en', 'dashboard.breakdown.value']);
     for (const key of keys(si)) {
       if (latinAllowed.has(key)) continue;
       expect(leaf(si, key), key).toMatch(SINHALA);

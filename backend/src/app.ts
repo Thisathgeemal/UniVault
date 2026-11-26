@@ -26,6 +26,7 @@ import { loadCredentialSchemas } from './services/credential-schemas.js';
 import { createCredentialOffersService } from './services/credential-offers.service.js';
 import { createCredentialStatusService } from './services/credential-status.js';
 import { createCredentialsService } from './services/credentials.service.js';
+import { createDashboardService } from './services/dashboard.service.js';
 import { createHoldersService } from './services/holders.service.js';
 import { createIssuerKeysService } from './services/issuer-keys.service.js';
 
@@ -163,6 +164,7 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
   const credentialStatus = deps.database
     ? createCredentialStatusService(deps.database.db, { now })
     : undefined;
+  const dashboard = deps.database ? createDashboardService(deps.database.db, { now }) : undefined;
   const credentialOffers = deps.database
     ? createCredentialOffersService(deps.database.db, {
         ttlSeconds: config.CREDENTIAL_OFFER_TTL_SECONDS,
@@ -202,6 +204,7 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
       ...(credentials ? { credentials } : {}),
       ...(credentialOffers ? { credentialOffers } : {}),
       ...(credentialStatus ? { credentialStatus } : {}),
+      ...(dashboard ? { dashboard } : {}),
       statusRateLimit: {
         max: config.STATUS_RATE_LIMIT_MAX,
         windowMinutes: config.STATUS_RATE_LIMIT_WINDOW_MINUTES,

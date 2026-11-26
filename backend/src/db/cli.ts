@@ -7,6 +7,8 @@
  *   npm run keys:init    generate a signing key for every issuer without one
  *   npm run keys:bundle  write the active encrypted keys as ISSUER_KEYS_BUNDLE to
  *                        <ISSUER_KEYS_DIR>/issuer-keys.bundle.b64 (add --force to replace it)
+ *   npm run db:seed:demo dashboard demo credentials for Serendib Trading only (development;
+ *                        skips if present; add --reset to remove only the demo rows)
  */
 import 'dotenv/config';
 import { rm } from 'node:fs/promises';
@@ -18,7 +20,9 @@ import { runMigrations } from './migrate.js';
 import * as schema from './schema.js';
 import { KEY_BUNDLE_FILE_NAME, keyStoreFromConfig } from '../keys/key-store.js';
 import { createIssuerKeysService } from '../services/issuer-keys.service.js';
+import { loadCredentialSchemas } from '../services/credential-schemas.js';
 import { DEFAULT_SEED_PASSWORD, seedDatabase } from './seed.js';
+import { demoCountsTable, removeDemoData, seedDemoData } from './seed-demo.js';
 
 const TABLES = [
   ['issuers', schema.issuers],
@@ -88,6 +92,9 @@ async function inspect(database: Database): Promise<void> {
 async function main(): Promise<void> {
   const command = process.argv[2];
   const config = loadConfig();
+  if (command === 'seed-demo' && config.NODE_ENV === 'production') {
+    throw new Error('db:seed:demo is disabled in production');
+  }
   if (command === 'reset') {
     if (config.NODE_ENV === 'production') throw new Error('db:reset is disabled in production');
     if (!config.DATABASE_URL.startsWith(PGLITE_PREFIX)) {
@@ -162,8 +169,32 @@ async function main(): Promise<void> {
         );
         break;
       }
+      case 'seed-demo': {
+        await migrate(database);
+        if (process.argv.includes('--reset')) {
+          const removed = await removeDemoData(database.db, config.NODE_ENV);
+          console.log(`  removed   ${removed.credentials} demo credentials (other data untouched)`);
+          break;
+        }
+        const result = await seedDemoData(database.db, {
+          keyStore: keyStoreFromConfig(database.db, config),
+          schemas: loadCredentialSchemas(config.CREDENTIAL_SCHEMAS_DIR),
+          publicBaseUrl: config.PUBLIC_BASE_URL,
+          offerTtlSeconds: config.CREDENTIAL_OFFER_TTL_SECONDS,
+          nodeEnv: config.NODE_ENV,
+        });
+        console.log(
+          result.outcome === 'created'
+            ? '  created   demo credentials:'
+            : '  skipped   demo data already exists (npm run db:seed:demo -- --reset removes it):',
+        );
+        console.table(demoCountsTable(result.counts)); // counts only
+        break;
+      }
       default:
-        console.log('Usage: tsx src/db/cli.ts <migrate | seed | inspect | reset | keys | bundle>');
+        console.log(
+          'Usage: tsx src/db/cli.ts <migrate | seed | inspect | reset | keys | bundle | seed-demo>',
+        );
         process.exitCode = 1;
     }
   } finally {

@@ -29,7 +29,7 @@
  */
 import { createPublicKey } from 'node:crypto';
 import { computeEcJwkThumbprint, createSdJwt } from '@univault/crypto-core/node';
-import { and, asc, count, desc, eq, gt, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import type { StaffProfile } from '../auth/auth-service.js';
 import type { Db } from '../db/client.js';
@@ -49,6 +49,7 @@ import { AppError } from '../lib/errors.js';
 import type { ClaimIssue, CredentialSchemas, CredentialTypeName } from './credential-schemas.js';
 import {
   effectiveStatus,
+  effectiveStatusCondition,
   type CredentialStatus,
   type EffectiveStatus,
 } from './credential-status.js';
@@ -362,7 +363,7 @@ const ACTIVE_STATUSES: CredentialStatus[] = ['pending', 'valid'];
 type Executor = Pick<Db, 'select' | 'insert' | 'update'>;
 
 /** Tie-break for events written at the same instant: creation, then signing, then the rest. */
-const EVENT_ORDER = sql`case ${credentialStatusEvents.toStatus} when 'pending' then 0 when 'valid' then 1 else 2 end`;
+export const EVENT_ORDER = sql`case ${credentialStatusEvents.toStatus} when 'pending' then 0 when 'valid' then 1 else 2 end`;
 
 export function createCredentialsService(
   db: Db,
@@ -608,17 +609,11 @@ export function createCredentialsService(
 
     async list(staff, query) {
       const at = now();
-      /** SQL twin of effectiveStatus() at `at` (same precedence and inclusive boundary). */
-      const effectiveStatusCondition = (status: EffectiveStatus): SQL => {
-        const valid = eq(credentialRecords.status, 'valid');
-        if (status === 'expired') return and(valid, lte(credentialRecords.expiresAt, at))!;
-        if (status === 'valid') return and(valid, gt(credentialRecords.expiresAt, at))!;
-        return eq(credentialRecords.status, status);
-      };
       const conditions = [eq(credentialRecords.issuerId, staff.issuer.id)]; // issuer scope
       if (query.status) conditions.push(eq(credentialRecords.status, query.status));
       if (query.holderId) conditions.push(eq(credentialRecords.holderId, query.holderId));
-      if (query.effectiveStatus) conditions.push(effectiveStatusCondition(query.effectiveStatus));
+      if (query.effectiveStatus)
+        conditions.push(effectiveStatusCondition(query.effectiveStatus, at));
       const where = and(...conditions);
 
       const [rows, totals] = await Promise.all([

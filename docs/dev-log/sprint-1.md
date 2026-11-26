@@ -290,6 +290,72 @@ ISSUER_KEY_UNAVAILABLE` with a generic message; the code goes to the log with is
   `issuer-portal/e2e/login.spec.ts`; screenshots per
   [evidence/s1-portal-login-guide.md](evidence/s1-portal-login-guide.md) (to be taken).
 
+### Wed 25 Nov (issuer dashboard and credential statistics)
+
+- **Done:** Issuer dashboard, backend and portal (FR-ISS-01, FR-ISS-03, NFR-02, NFR-08;
+  Decision 017, draft). Docs: `docs/api/dashboard-api.md`, `docs/frontend/issuer-portal.md` §8.
+  - **`GET /api/v1/dashboard/summary`** (officer/admin, issuer from the token only,
+    `no-store`): issued, active, revoked, superseded, expired, awaiting wallet, expiring within
+    30 days and holders, from **one** aggregate query (`COUNT(*) FILTER`) with the injected
+    clock; plus the last 10 status events (reason codes and staff names only).
+    - "Issued" = signed (`issued_at`); a credential revoked while pending is in no issued
+      count. Invariant `issued = active + revoked + superseded + expired`, guaranteed by the
+      signing CHECKs.
+    - The SQL twin of `effectiveStatus()` moved out of the credential list into
+      `effectiveStatusCondition()` (credential-status.ts), now shared by the list filter and
+      the dashboard.
+    - No migration: `credential_records_issuer_status_idx (issuer_id, status)` already exists.
+  - **`npm run db:seed:demo`** (dev only): every status for Serendib Trading through the real
+    services; idempotent; `--reset` removes only the demo rows (Decision 017). Output: active 8
+    (3 expiring within 30 days), pending 3 (3 open offers), revoked after signing 1, revoked
+    while pending 1, superseded 1, expired 1.
+  - **Portal dashboard** (replaces the placeholder): organisation header with "Last updated"
+    (Asia/Colombo) and Refresh; 3 primary and 5 secondary StatCards linking to the filtered
+    credential list; an accessible SVG stacked bar with a text legend; recent activity in plain
+    words; loading skeletons, error + Try again (shared `lib/api-errors.ts`, also used by the
+    sign-in messages now), empty state with a link to Holders; staleTime 30 s, refetch on
+    focus; English and Sinhala.
+  - **portal-ui:** `StatCard`, `StackedBar`, `Skeleton` (for the verifier portal too).
+  - **Tests:**
+    - backend 498 (+27: `dashboard.test.ts` 18, `db/seed-demo.test.ts` 9): coverage
+      90.08 / 86.26 / 93.79 / 90.65, thresholds raised to 90 / 86 / 93 / 90;
+    - issuer portal 81 (+21, `dashboard.test.tsx`): 96.86 / 91.84 / 97.80 / 98.80, thresholds
+      raised to 96 / 91 / 97 / 98;
+    - portal-ui 31 (+9): 100 / 94.66 / 100 / 100, branch threshold raised to 94;
+    - the Playwright e2e backend now runs `keys:init` and `db:seed:demo`, and the test checks
+      every dashboard card against the backend summary after admin sign-in.
+- **Next:** Native-speaker review of the new Sinhala strings (`si.ts` dashboard block). Take
+  the screenshots in `evidence/s1-dashboard-guide.md`. Supervisor review of Decision 017. The
+  credentials page (Sprint 2) should read `?effectiveStatus=` so the card links land on a
+  filtered list.
+- **Blockers:** None. Note: the local `backend/.env` has `JWT_EXPIRES_IN_SECONDS=120`, which is
+  below the config minimum (300), so every backend command that loads the config fails with
+  it; set it back to 3600 (as in `.env.example`) before `npm run dev` or `db:seed:demo`.
+- **Evidence:** `backend/test/dashboard.test.ts`, `backend/test/db/seed-demo.test.ts`,
+  `issuer-portal/test/dashboard.test.tsx`, `portal-ui/test/dashboard-widgets.test.tsx`,
+  `issuer-portal/e2e/login.spec.ts`; screenshots per
+  [evidence/s1-dashboard-guide.md](evidence/s1-dashboard-guide.md) (to be taken).
+
+### Thu 26 Nov (fix: date-dependent test – time bomb)
+
+- **Done:** Fixed a backend test that passed on 25 Nov and failed on 26 Nov (Issue 20).
+  - `db/seed-demo.test.ts`: the idempotency test now uses the same injected clock as the
+    first run. A new test checks that a skipped run counts at its own clock: open offers
+    drop to 0 once their TTL has passed.
+  - `seed-demo.ts`: documented that the result's `counts` (created **and** skipped) are
+    taken at `options.now()` (default: the real time). 'Skipped' keeps its counts.
+  - Searched the backend, portal-ui and issuer-portal tests for other tests that mix an
+    injected or fixed clock with the real time, or compare a fixed date with the real clock.
+    No others found (details in Issue 20).
+  - Proof: the seed-demo tests passed (10/10) with the system date faked to
+    2027-11-26 (temporary `vi.useFakeTimers({ toFake: ['Date'] })` setup, removed afterwards).
+  - New testing rule in `CLAUDE.md`: never mix an injected clock with the real time in one
+    test; never compare fixed dates with the real clock.
+  - Tests: backend 499 (+1); coverage 90.02 / 86.12 / 93.46 / 90.65 (thresholds 90 / 86 / 93 / 90).
+- **Next:** As 25 Nov.
+- **Blockers:** None.
+- **Evidence:** `backend/test/db/seed-demo.test.ts`.
+
 ## Testing evidence
 
 Record the tests that show the sprint goal is met, with links to output in `evidence/`.
@@ -557,3 +623,63 @@ Record the tests that show the sprint goal is met, with links to output in `evid
   no test was talking to anything unmocked.
 - **Lesson:** Type-check the test set-up too. A misspelt option in a plain object is silently
   ignored at runtime.
+
+### Issue 18: The demo-data reset could not delete status history (25 Nov 2026)
+
+- **Task:** `npm run db:seed:demo -- --reset`
+- **Symptom:** The reset test failed with `credential_status_events is append-only`.
+- **Cause:** Migration 0005's trigger rejects every `DELETE` on the history table (by design,
+  Decision 012), and the foreign key from events to credentials blocks deleting the demo
+  credentials while their events remain.
+- **Resolution:** The reset disables only that trigger inside its one transaction, deletes
+  the demo credentials' events, and re-enables it before commit (DDL is transactional, so a
+  failure also leaves it enabled). Development only; a test checks the guard is back on
+  afterwards. Recorded as Decision 017.
+- **Lesson:** Tooling that cleans up its own data must respect the same database rules as the
+  application, or document the one exception explicitly.
+
+### Issue 19: The dashboard tests passed first time, so they were mutation-checked (25 Nov 2026)
+
+- **Task:** Dashboard counts
+- **Symptom:** All 17 dashboard tests passed on the first run, which says little on its own.
+- **Resolution:** Changed `expires_at < now + 30 days` to `<=` temporarily: the boundary test
+  and the "SQL equals effectiveStatus() at every expiry boundary" test both failed, so they do
+  catch an off-by-one. The change was reverted.
+- **Lesson:** A quick mutation of the rule a test is meant to protect is cheap evidence that
+  the test can fail.
+
+### Issue 20: Date-dependent test – time bomb (26 Nov 2026)
+
+- **Task:** Backend test suite (`npm test`)
+- **Symptom:** 497/498 passed. `db/seed-demo.test.ts` › "is idempotent: a second run skips
+  and creates nothing" expected `openOffers` 3 and got 0; every other count matched. It passed
+  on 25 Nov and failed on 26 Nov with no code change.
+- **Cause:** The first seeding run used the injected test clock (`NOW` =
+  2026-11-25T06:00Z). The second run dropped `now`, so `seedDemoData` counted the rows at the
+  **real** time. The demo offers expire `offerTtlSeconds` (600 s) after `NOW`, so on any later
+  day they were already expired when the second run counted them. The "expiring within 30
+  days" credentials (6–23 days after `NOW`) would have started failing from 1 Dec as well.
+- **Resolution:**
+  - Both runs now use the same injected clock.
+  - A new test checks that a skipped run counts at its own clock (open offers 0 after the
+    TTL).
+  - `seedDemoData` keeps reporting the counts it finds for 'skipped', taken at the clock it was
+    given (default: the real time), and its doc comment says so. Reasoning: the CLI prints them
+    so a re-run shows what is there now, which is more useful than a bare `{ outcome:
+'skipped' }`. Open offers dropping to 0 after `CREDENTIAL_OFFER_TTL_SECONDS` is the expected
+    behaviour.
+  - Searched for other time-dependent tests in backend, portal-ui and issuer-portal:
+    - Fixed dates only feed pure functions with a fixed reference: `offerStatus`,
+      `effectiveStatus`, `addIsoDuration` / `computeExpiry`, `ageOn`, and
+      `formatRelativeTime` measured from `generatedAt`.
+    - `dashboard.test.ts` uses only its injected clock. The login lockout test only formats
+      a fixed instant.
+    - Tests that use the real time stay relative to it throughout (`Date.now() ± n`).
+    - The test fixture holders are adults with no ID-document expiry. The demo seeder's
+      employment records carry no expiry or birth-date cap.
+    - No other offenders.
+  - Verified by running the seed-demo tests with the system date faked to 2027-11-26
+    (10/10 passed; the temporary setup was removed).
+- **Lesson:** A test that sets up data with an injected clock and then checks it against the
+  real time is a time bomb. It passes on the day it is written. Use one clock per test, and
+  never compare fixed dates with the real clock.

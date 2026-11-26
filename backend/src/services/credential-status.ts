@@ -9,7 +9,7 @@
  * 'expired' is computed, never stored: the database keeps the stored status ('valid') and
  * expires_at, and nothing writes 'expired'.
  */
-import { eq } from 'drizzle-orm';
+import { and, eq, gt, lte, type SQL } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { credentialRecords } from '../db/schema.js';
 import { AppError } from '../lib/errors.js';
@@ -37,6 +37,19 @@ export function effectiveStatus(
   if (record.status === 'revoked' || record.status === 'superseded') return record.status;
   if (record.status === 'pending') return 'pending';
   return now.getTime() >= record.expiresAt.getTime() ? 'expired' : 'valid';
+}
+
+/**
+ * SQL twin of effectiveStatus() at `now`: the same precedence and the same inclusive boundary
+ * (expired when expires_at <= now). Used by the credential list filter
+ * (GET /credentials?effectiveStatus=…) and the dashboard counts, so the three can never
+ * disagree. revoked / superseded / pending are stored statuses and match themselves.
+ */
+export function effectiveStatusCondition(status: EffectiveStatus, now: Date): SQL {
+  const valid = eq(credentialRecords.status, 'valid');
+  if (status === 'expired') return and(valid, lte(credentialRecords.expiresAt, now))!;
+  if (status === 'valid') return and(valid, gt(credentialRecords.expiresAt, now))!;
+  return eq(credentialRecords.status, status);
 }
 
 /** The public status response. Exactly these four keys; nothing else is ever returned. */

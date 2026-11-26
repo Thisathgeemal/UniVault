@@ -21,6 +21,13 @@ export {
   type SidebarProps,
 } from './Sidebar.js';
 export { PageHeader, type PageHeaderProps } from './PageHeader.js';
+export { StatCard, type StatCardLinkProps, type StatCardProps } from './StatCard.js';
+export {
+  StackedBar,
+  type StackedBarProps,
+  type StackedBarSegment,
+  type StackedBarTone,
+} from './StackedBar.js';
 export {
   ComingSoon,
   EmptyState,
@@ -40,3 +47,4 @@ export { Button, buttonVariants, type ButtonProps } from './ui/button.js';
 export { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card.js';
 export { Input } from './ui/input.js';
 export { Label } from './ui/label.js';
+export { Skeleton } from './ui/skeleton.js';

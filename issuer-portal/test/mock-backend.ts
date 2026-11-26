@@ -1,11 +1,12 @@
 /**
  * MSW handlers that behave like the backend's /auth endpoints (backend/src/routes/auth.routes.ts)
- * for the seeded demo staff. Tokens are fake JWT-shaped strings (unsigned): the portal never
+ * and GET /dashboard/summary for the seeded demo staff. Tokens are fake JWT-shaped strings (unsigned): the portal never
  * verifies them, it only reads `exp` for timing.
  */
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { Staff } from '../src/api/auth.js';
+import type { DashboardSummary } from '../src/api/dashboard.js';
 import { DEFAULT_API_BASE_URL } from '../src/config.js';
 
 export const API = DEFAULT_API_BASE_URL;
@@ -64,6 +65,66 @@ export const errorBody = (code: string, message: string, details?: unknown) => (
   },
 });
 
+/** The demo issuer's dashboard (the shape of backend GET /dashboard/summary). */
+export const DEMO_SUMMARY: DashboardSummary = {
+  issuer: { id: 'employer-a', name: 'Serendib Trading Company (Demo)' },
+  counts: {
+    issued: 12345,
+    active: 11000,
+    revoked: 845,
+    superseded: 300,
+    expired: 200,
+    awaitingWallet: 3,
+    expiringSoon: 4,
+    holders: 25,
+  },
+  expiringSoonDays: 30,
+  recentActivity: [
+    {
+      credentialId: '3f2a9c1b-0000-4000-8000-000000000001',
+      credentialType: 'EmploymentCredential',
+      fromStatus: 'valid',
+      toStatus: 'revoked',
+      reason: 'employment_ended',
+      staffName: 'Serendib Trading Company (Demo) Admin',
+      at: '2026-11-25T03:30:00.000Z',
+    },
+    {
+      credentialId: '7b1e0d4c-0000-4000-8000-000000000002',
+      credentialType: 'EmploymentCredential',
+      fromStatus: 'pending',
+      toStatus: 'valid',
+      reason: null,
+      staffName: null,
+      at: '2026-11-25T01:00:00.000Z',
+    },
+    {
+      credentialId: '9c8d7e6f-0000-4000-8000-000000000003',
+      credentialType: 'KYCCredential',
+      fromStatus: 'valid',
+      toStatus: 'superseded',
+      reason: 'details_changed',
+      staffName: 'Serendib Trading Company (Demo) Officer',
+      at: '2026-11-24T04:30:00.000Z',
+    },
+    {
+      credentialId: 'a1b2c3d4-0000-4000-8000-000000000004',
+      credentialType: 'EmploymentCredential',
+      fromStatus: null,
+      toStatus: 'pending',
+      reason: null,
+      staffName: 'Serendib Trading Company (Demo) Officer',
+      at: '2026-11-20T04:30:00.000Z',
+    },
+  ],
+  // 11:30 in Sri Lanka (UTC+05:30)
+  generatedAt: '2026-11-25T06:00:00.000Z',
+};
+
+/** The staff member a request's Bearer token belongs to (null if none or unknown). */
+const staffFor = (request: Request) =>
+  tokens.get(request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? '') ?? null;
+
 export const handlers = [
   http.post(`${API}/auth/login`, async ({ request }) => {
     const body = (await request.json()) as { email?: string; password?: string };
@@ -95,6 +156,19 @@ export const handlers = [
         status: 401,
       });
     return HttpResponse.json({ staff });
+  }),
+  http.get(`${API}/dashboard/summary`, ({ request }) => {
+    requests.push({
+      method: 'GET',
+      path: '/dashboard/summary',
+      authorization: request.headers.get('Authorization'),
+      body: null,
+    });
+    if (!staffFor(request))
+      return HttpResponse.json(errorBody('INVALID_TOKEN', 'Invalid authentication token'), {
+        status: 401,
+      });
+    return HttpResponse.json(DEMO_SUMMARY);
   }),
   http.post(`${API}/auth/logout`, ({ request }) => {
     requests.push({

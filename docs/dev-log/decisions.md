@@ -12,24 +12,25 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 
 ## Decision index
 
-| #                                                                                                                                         | Decision                                                                                                                       | Date            | Sprint                   | Status         | Related requirements                                          |
-| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------- | ------------------------ | -------------- | ------------------------------------------------------------- |
-| [001](#decision-001-typescript-for-all-javascript-components)                                                                             | TypeScript for all JavaScript components                                                                                       | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
-| [002](#decision-002-root-level-eslint-9-and-prettier-ruff-for-ai-service)                                                                 | Root-level ESLint 9 and Prettier; Ruff for ai-service                                                                          | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
-| [003](#decision-003-sd-jwt-vc-flat-claim-layout-instead-of-json-ld)                                                                       | SD-JWT VC flat claim layout (W3C VC model); subject claims selectively disclosable                                             | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-02, FR-VER-01, FR-VER-03, FR-BAK-01, NFR-01 |
-| [004](#decision-004-data-minimisation-in-credential-schemas)                                                                              | Data minimisation in the credential schemas                                                                                    | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-VER-03, NFR-08                                  |
-| [005](#decision-005-derived-age_over_18-claim-and-under-18-handling)                                                                      | Derived `age_over_18` claim and under-18 handling                                                                              | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-03, FR-VER-03, NFR-08                       |
-| [006](#decision-006-sd-jwt-library-selection-sd-jwtcore)                                                                                  | SD-JWT library: `@sd-jwt/core` pinned to 0.25.0                                                                                | Thu 19 Nov 2026 | S1                       | Accepted       | FR-ISS-02, FR-VER-02, FR-WAL-06, NFR-01                       |
-| [007](#decision-007-es256-for-holder-key-binding)                                                                                         | ES256 for holder key binding; issuer signatures stay RS256                                                                     | Thu 19 Nov 2026 | S1                       | Proposed       | NFR-01, FR-WAL-06, FR-VER-02                                  |
-| [008](#decision-008-postgresql-with-embedded-pglite-for-development-and-hand-written-migrations)                                          | PostgreSQL, with embedded PGlite for development and hand-written migrations                                                   | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08 |
-| [009](#decision-009-issuer-staff-authentication-jwt-database-re-check-and-lockout)                                                        | Issuer staff authentication (JWT, database re-check and lockout)                                                               | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
-| [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)                                                      | Credential signing deferred to wallet redemption (holder binding)                                                              | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
-| [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                                                          | OpenID4VCI pre-authorised code offer format                                                                                    | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
-| [012](#decision-012-reissue-supersedes-immediately-status-changes-recorded-as-append-only-events)                                         | Reissue supersedes immediately; status changes recorded as append-only events                                                  | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-03, FR-BAK-01, NFR-06, NFR-08                          |
-| [013](#decision-013-per-credential-status-endpoint-ietf-token-status-list-as-future-work)                                                 | Per-credential status endpoint; IETF Token Status List as future work                                                          | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06, NFR-08    |
-| [014](#decision-014-encrypted-key-file-or-encrypted-env-bundle-decrypted-once-in-a-central-key-store-kmshsm-as-future-work)               | Encrypted key file or encrypted env bundle, decrypted once in a central key store; KMS/HSM as future work                      | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-01, FR-ISS-02, NFR-08                                     |
-| [015](#decision-015-frontend-stack-react--vite--ts-react-router-tanstack-query-tailwind--shadcnui-react-i18next-shared-portal-ui-package) | Frontend stack: React + Vite + TS, React Router, TanStack Query, Tailwind + shadcn/ui, react-i18next, shared portal-ui package | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
-| [016](#decision-016-staff-token-in-memory--sessionstorage-never-localstorage-httponly-cookie-as-future-work)                              | Staff token in memory + sessionStorage, never localStorage; httpOnly cookie as future work                                     | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
+| #                                                                                                                                                       | Decision                                                                                                                             | Date            | Sprint                   | Status         | Related requirements                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------- | ------------------------ | -------------- | ------------------------------------------------------------- |
+| [001](#decision-001-typescript-for-all-javascript-components)                                                                                           | TypeScript for all JavaScript components                                                                                             | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
+| [002](#decision-002-root-level-eslint-9-and-prettier-ruff-for-ai-service)                                                                               | Root-level ESLint 9 and Prettier; Ruff for ai-service                                                                                | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
+| [003](#decision-003-sd-jwt-vc-flat-claim-layout-instead-of-json-ld)                                                                                     | SD-JWT VC flat claim layout (W3C VC model); subject claims selectively disclosable                                                   | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-02, FR-VER-01, FR-VER-03, FR-BAK-01, NFR-01 |
+| [004](#decision-004-data-minimisation-in-credential-schemas)                                                                                            | Data minimisation in the credential schemas                                                                                          | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-VER-03, NFR-08                                  |
+| [005](#decision-005-derived-age_over_18-claim-and-under-18-handling)                                                                                    | Derived `age_over_18` claim and under-18 handling                                                                                    | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-03, FR-VER-03, NFR-08                       |
+| [006](#decision-006-sd-jwt-library-selection-sd-jwtcore)                                                                                                | SD-JWT library: `@sd-jwt/core` pinned to 0.25.0                                                                                      | Thu 19 Nov 2026 | S1                       | Accepted       | FR-ISS-02, FR-VER-02, FR-WAL-06, NFR-01                       |
+| [007](#decision-007-es256-for-holder-key-binding)                                                                                                       | ES256 for holder key binding; issuer signatures stay RS256                                                                           | Thu 19 Nov 2026 | S1                       | Proposed       | NFR-01, FR-WAL-06, FR-VER-02                                  |
+| [008](#decision-008-postgresql-with-embedded-pglite-for-development-and-hand-written-migrations)                                                        | PostgreSQL, with embedded PGlite for development and hand-written migrations                                                         | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08 |
+| [009](#decision-009-issuer-staff-authentication-jwt-database-re-check-and-lockout)                                                                      | Issuer staff authentication (JWT, database re-check and lockout)                                                                     | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
+| [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)                                                                    | Credential signing deferred to wallet redemption (holder binding)                                                                    | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
+| [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                                                                        | OpenID4VCI pre-authorised code offer format                                                                                          | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
+| [012](#decision-012-reissue-supersedes-immediately-status-changes-recorded-as-append-only-events)                                                       | Reissue supersedes immediately; status changes recorded as append-only events                                                        | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-03, FR-BAK-01, NFR-06, NFR-08                          |
+| [013](#decision-013-per-credential-status-endpoint-ietf-token-status-list-as-future-work)                                                               | Per-credential status endpoint; IETF Token Status List as future work                                                                | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06, NFR-08    |
+| [014](#decision-014-encrypted-key-file-or-encrypted-env-bundle-decrypted-once-in-a-central-key-store-kmshsm-as-future-work)                             | Encrypted key file or encrypted env bundle, decrypted once in a central key store; KMS/HSM as future work                            | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-01, FR-ISS-02, NFR-08                                     |
+| [015](#decision-015-frontend-stack-react--vite--ts-react-router-tanstack-query-tailwind--shadcnui-react-i18next-shared-portal-ui-package)               | Frontend stack: React + Vite + TS, React Router, TanStack Query, Tailwind + shadcn/ui, react-i18next, shared portal-ui package       | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
+| [016](#decision-016-staff-token-in-memory--sessionstorage-never-localstorage-httponly-cookie-as-future-work)                                            | Staff token in memory + sessionStorage, never localStorage; httpOnly cookie as future work                                           | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
+| [017](#decision-017-dashboard-demo-data-via-the-real-services-marked-by-an-inactive-staff-account-reset-lifts-the-append-only-guard-in-one-transaction) | Dashboard demo data via the real services, marked by an inactive staff account; reset lifts the append-only guard in one transaction | Wed 25 Nov 2026 | S2                       | Draft – review | FR-ISS-01, FR-ISS-03, NFR-08                                  |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -1455,3 +1456,95 @@ JavaScript can read.
   - backend changes: login sets the cookie, `requireAuth` reads it, CSRF protection, CORS with
     credentials;
   - the API client to send `credentials: 'include'` instead of the Authorization header.
+
+## Decision 017: Dashboard demo data via the real services, marked by an inactive staff account; reset lifts the append-only guard in one transaction
+
+- **Date:** Wed 25 Nov 2026
+- **Sprint:** S2
+- **Status:** Draft – review
+- **Requirements:** FR-ISS-01, FR-ISS-03, NFR-08
+- **Related:** [dashboard-api.md](../api/dashboard-api.md) (section 8), Decision 012
+  (append-only status events), Decision 013 (computed expiry), Decision 010 (signing at
+  redemption)
+- **Evidence:** `backend/test/db/seed-demo.test.ts`, `backend/src/db/seed-demo.ts`,
+  `issuer-portal/e2e/login.spec.ts` (the e2e backend runs the seeder)
+
+### Context
+
+The issuer dashboard needs data of every status (active, expiring soon, pending with an offer,
+revoked after signing, revoked while pending, superseded, expired) for development, the demo
+and the screenshots. Until wallet redemption ships (Sprint 2), nothing creates that data except
+manual API calls. The seeder (`npm run db:seed:demo`) must:
+
+- produce data exactly like real use (the real signing path, the real reissue, real events);
+- be idempotent, and offer `--reset` that removes **only** its own rows, never data a developer
+  created by hand;
+- leave every other issuer empty.
+
+Two design problems came up:
+
+1. **Telling demo rows apart.** No column marks a credential as demo data, and claims are
+   validated against the schemas, so no extra claim can be added.
+2. **Removing history rows.** `credential_status_events` is append-only: a trigger
+   (migration 0005) rejects every `UPDATE` and `DELETE`. A reset that keeps the history would
+   leave orphaned or foreign-key-blocked rows.
+
+### Options considered
+
+**Marker**
+
+1. **A new column or table (`is_demo`):** explicit, but a schema change for development
+   tooling, carried into production.
+2. **"All credentials of the demo issuer":** simple, but `--reset` would also delete
+   credentials a developer created by hand for that issuer.
+3. **A dedicated, inactive staff account performs every demo action** (`demo-data@<issuer
+domain>`, `is_active = false`, random password never stored in clear): demo credentials are
+   exactly those with `created_by_staff_id` = that account (reissue replacements included,
+   because the same account reissues them).
+
+**Reset of history rows**
+
+1. **No reset** (only `db:reset`, which deletes the whole development database).
+2. **Leave history rows:** impossible, because the foreign key from events to credentials
+   blocks deleting the credentials.
+3. **Disable the trigger inside the reset transaction**, delete only the demo credentials'
+   events, re-enable it before commit.
+
+### Decision
+
+- **Marker: option 3.** The account can never sign in (inactive; requireAuth rejects it even
+  with a token) and shows as "Demo data (development)" in the activity list, so demo actions
+  are visibly not a real person's.
+- **Reset: option 3.** `removeDemoData()` runs one transaction:
+  `ALTER TABLE credential_status_events DISABLE TRIGGER credential_status_events_no_change` →
+  delete the demo credentials' offers and events → `ENABLE TRIGGER` → delete the demo
+  credentials (one statement, so reissue links between them are checked at its end) → delete
+  the demo account. PostgreSQL DDL is transactional: on any failure the rollback leaves the
+  trigger enabled, and after commit it is enabled again (a test deletes a non-demo event
+  afterwards and expects the rejection).
+- **Guards:** seeding and reset refuse `NODE_ENV=production` (the CLI checks before opening the
+  database, the functions check again).
+- **Realistic timeline:** past steps run with an injected clock, as the tests do, so
+  "expiring within 30 days" comes from the real default validity (P1Y) rather than from editing
+  `expires_at`; expiry uses the existing dev `simulateExpiry()`.
+
+### Reason
+
+- No schema change for development tooling, and nothing hand-made is ever deleted.
+- The append-only guarantee stays intact for all real use: the bypass exists only in a
+  development-only command, for one transaction, for rows the seeder itself created.
+- Data produced through the real services keeps the dashboard numbers honest: the demo shows
+  exactly what Sprint 2 redemption will produce.
+
+### Consequences
+
+- **Append-only is a database rule with one documented, development-only exception.** Any
+  other code that wants to change history needs a new decision.
+- The table owner must run the reset (true for PGlite and a developer's own PostgreSQL).
+- The demo account stays in `issuer_staff` while demo data exists; it appears nowhere a staff
+  list is shown in Sprint 1 (the staff page is a placeholder). The Sprint 4 staff page should
+  hide or label inactive accounts.
+- When wallet redemption replaces the dev routes (Sprint 2), the seeder keeps working
+  (`signCredential()` is the real path), but its expired credential needs a replacement for
+  `simulateExpiry()`: the injected clock (create and sign more than a year in the past) works
+  without it.

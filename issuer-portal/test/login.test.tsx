@@ -19,15 +19,16 @@ const loginFails = (status: number, body?: unknown) =>
   );
 
 describe('login page', () => {
-  it('signs in and lands on the dashboard with organisation, name and role', async () => {
+  it('signs in and lands on the dashboard with the organisation and role', async () => {
     const { user, location } = renderApp('/login');
     await signIn(user, ADMIN.email);
     expect(
-      await screen.findByRole('heading', { level: 1, name: `Welcome, ${ADMIN.displayName}` }),
+      await screen.findByRole('heading', { level: 1, name: ADMIN.issuer.name }),
     ).toBeInTheDocument();
     expect(location()).toBe('/');
     expect(screen.getByTestId('header-org')).toHaveTextContent(ADMIN.issuer.name);
-    expect(screen.getByTestId('dashboard-role')).toHaveTextContent('Administrator');
+    expect(screen.getByTestId('header-user')).toHaveTextContent(ADMIN.displayName);
+    expect(screen.getByText('Administrator')).toBeInTheDocument(); // header role badge
     expect(window.sessionStorage.getItem(SESSION_TOKEN_KEY)).toMatch(/^[\w-]+\.[\w-]+\.[\w-]+$/);
     // Login sends no token; the email was sent exactly as validated
     expect(requests[0]).toMatchObject({
@@ -200,7 +201,7 @@ describe('login page', () => {
 
   it('redirects a signed-in user away from /login to the dashboard', async () => {
     const { location } = renderApp('/login', { signedInAs: ADMIN });
-    await screen.findByRole('heading', { level: 1, name: /Welcome/ });
+    await screen.findByRole('heading', { level: 1, name: ADMIN.issuer.name });
     await waitFor(() => expect(location()).toBe('/'));
   });
 });

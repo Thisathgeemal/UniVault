@@ -50,6 +50,7 @@ export const en = {
   errors: {
     network: 'Cannot reach the UniVault server. Check your connection and try again.',
     generic: 'Something went wrong. Please try again.',
+    rateLimited: 'Too many requests. Wait a minute, then try again.',
     restoreFailed: {
       title: 'We could not load your session',
       message: 'The UniVault server did not respond. Check your connection and try again.',
@@ -92,11 +93,86 @@ export const en = {
     bank: 'Bank',
   },
   dashboard: {
-    welcome: 'Welcome, {{name}}',
-    description: 'Issue and manage verifiable credentials for your organisation.',
-    organisation: 'Organisation',
-    role: 'Your role',
-    signedInAs: 'Signed in as {{email}}',
+    lastUpdated: 'Last updated {{time}} (Sri Lanka time)',
+    refresh: 'Refresh',
+    refreshing: 'Refreshing…',
+    loading: 'Loading the dashboard…',
+    loadFailed: 'The dashboard could not be loaded.',
+    primaryLabel: 'Credential totals',
+    secondaryLabel: 'More figures',
+    cards: {
+      issued: {
+        label: 'Issued',
+        description: "Credentials signed into holders' wallets so far",
+      },
+      active: {
+        label: 'Active',
+        description: "Credentials currently valid in holders' wallets",
+      },
+      revoked: {
+        label: 'Revoked',
+        description: 'Credentials withdrawn after they were issued',
+      },
+      awaitingWallet: {
+        label: 'Awaiting wallet',
+        description: 'Created, waiting for the holder to scan the QR code',
+      },
+      superseded: {
+        label: 'Superseded',
+        description: 'Replaced by a newer credential',
+      },
+      expired: {
+        label: 'Expired',
+        description: 'Past their expiry date',
+      },
+      expiringSoon: {
+        label: 'Expiring in {{days}} days',
+        description: 'Active credentials that expire soon',
+      },
+      holders: {
+        label: 'Holders',
+        description: 'Holder records in your organisation',
+      },
+    },
+    breakdown: {
+      title: 'Status of issued credentials',
+      noneIssued: 'No credential has been signed into a wallet yet.',
+      value: '{{count}} ({{percent}})',
+    },
+    activity: {
+      title: 'Recent activity',
+      empty: 'No activity yet.',
+      byWallet: "Holder's wallet",
+      credential: 'Credential {{id}}',
+      actions: {
+        created: 'Created – waiting for the wallet',
+        signed: 'Signed into wallet',
+        superseded: 'Replaced by a new credential',
+        revoked: 'Revoked – {{reason}}',
+        expirySimulated: 'Expiry simulated (development)',
+        other: 'Status changed',
+      },
+      reasons: {
+        details_changed: 'details changed',
+        employment_ended: 'employment ended',
+        relationship_ended: 'relationship ended',
+        wallet_lost_or_compromised: 'wallet lost or compromised',
+        issued_in_error: 'issued in error',
+        validity_extension: 'validity extended',
+        other: 'other reason',
+        unknown: 'no reason given',
+      },
+    },
+    empty: {
+      title: 'No credentials issued yet',
+      description:
+        'Start by adding a holder record. Then create a credential and show its QR code to the holder, who scans it with the UniVault wallet.',
+      action: 'Go to Holders',
+    },
+  },
+  credentialTypes: {
+    EmploymentCredential: 'Employment credential',
+    KYCCredential: 'KYC credential',
   },
   comingSoon: {
     badge: 'Coming soon',

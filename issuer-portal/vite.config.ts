@@ -66,9 +66,9 @@ export default defineConfig(({ mode }) => {
         exclude: ['src/main.tsx', 'src/vite-env.d.ts'],
         reporter: ['text', 'html', 'json-summary'],
         reportsDirectory: 'coverage',
-        // Just below the figures on 24 Nov 2026 (96.05 / 90.42 / 97.22 / 98.50), rounded down.
+        // Just below the figures on 25 Nov 2026 (96.86 / 91.84 / 97.80 / 98.80), rounded down.
         // Raise them when coverage improves; never lower them to make a change pass.
-        thresholds: { statements: 95, branches: 89, functions: 96, lines: 97 },
+        thresholds: { statements: 96, branches: 91, functions: 97, lines: 98 },
       },
     },
   };

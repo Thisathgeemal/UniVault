@@ -13,6 +13,8 @@ The issuer portal now has:
 
 - staff sign-in;
 - a restorable session;
+- the **dashboard** (section 8): credential totals, a status breakdown and recent activity
+  from `GET /dashboard/summary`;
 - the protected application frame (header, role-filtered sidebar, content);
 - placeholder pages for the features of the next sprints;
 - English and Sinhala.
@@ -25,7 +27,7 @@ will reuse in Sprint 3.
 | Path                 | Page                                    | Roles          | Notes                                             |
 | -------------------- | --------------------------------------- | -------------- | ------------------------------------------------- |
 | `/login`             | Sign-in                                 | public         | Signed in → `returnTo` (if safe) or the dashboard |
-| `/`                  | Dashboard (welcome, organisation, role) | admin, officer |                                                   |
+| `/`                  | Dashboard (counts, breakdown, activity) | admin, officer | Landing page after sign-in (section 8)            |
 | `/holders`           | Holders (Coming soon)                   | admin, officer | Planned for Sprint 2                              |
 | `/credentials`       | Credentials (Coming soon)               | admin, officer | Planned for Sprint 2                              |
 | `/credential-offers` | Credential offers (Coming soon)         | admin, officer | Planned for Sprint 2                              |
@@ -229,16 +231,117 @@ deployed portal origin.
 
 ## 7. Tests
 
-| Suite                                      | Covers                                                                                                                                                                                                                             |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `test/login.test.tsx`                      | Success, every error code, lockout time in Asia/Colombo, client validation, pending state, show/hide, autocomplete, signed-in redirect                                                                                             |
-| `test/session.test.tsx`                    | returnTo redirect and back, open-redirect rejection, restore via `/auth/me`, invalid token, offline restore + retry, 401 mid-session (3 codes), 403 keeps the session, expiry timer, logout (online and offline), localStorage spy |
-| `test/routes.test.tsx`                     | Officer cannot see or open admin pages; admin can; placeholders; 404; route error boundary                                                                                                                                         |
-| `test/i18n.test.tsx`                       | Switch changes text and `<html lang>`, preference stored, key parity, Sinhala script, placeholders                                                                                                                                 |
-| `test/api-client.test.ts`                  | Bearer header, error parsing, network errors, session-ending 401s, abort                                                                                                                                                           |
-| `test/csp.test.ts`, `query-client.test.ts` | CSP directives; retry policy                                                                                                                                                                                                       |
-| `e2e/login.spec.ts` (Playwright)           | Real backend on a throwaway database. The steps:<br>1. `/holders` → login.<br>2. Wrong password shows the error.<br>3. Admin signs in → `/holders` with the admin menu.<br>4. Logout.<br>5. Officer signs in without admin items.  |
-| `portal-ui/test/`                          | AppShell, Sidebar (active item, role filtering, keyboard menu toggle, ARIA), Header, page blocks, primitives                                                                                                                       |
+| Suite                                      | Covers                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test/login.test.tsx`                      | Success, every error code, lockout time in Asia/Colombo, client validation, pending state, show/hide, autocomplete, signed-in redirect                                                                                                                                                                                                        |
+| `test/session.test.tsx`                    | returnTo redirect and back, open-redirect rejection, restore via `/auth/me`, invalid token, offline restore + retry, 401 mid-session (3 codes), 403 keeps the session, expiry timer, logout (online and offline), localStorage spy                                                                                                            |
+| `test/routes.test.tsx`                     | Officer cannot see or open admin pages; admin can; placeholders; 404; route error boundary                                                                                                                                                                                                                                                    |
+| `test/i18n.test.tsx`                       | Switch changes text and `<html lang>`, preference stored, key parity, Sinhala script, placeholders                                                                                                                                                                                                                                            |
+| `test/api-client.test.ts`                  | Bearer header, error parsing, network errors, session-ending 401s, abort                                                                                                                                                                                                                                                                      |
+| `test/dashboard.test.tsx`                  | Every count (Intl-formatted), card links and accessible names/descriptions, the stacked bar (named figure, legend with numbers), activity wording per event type and reason, loading skeletons, error + Try again (reference shown), network and 429 messages, empty state, refresh, staleTime / refetch on focus, Sinhala, officer and admin |
+| `test/csp.test.ts`, `query-client.test.ts` | CSP directives; retry policy                                                                                                                                                                                                                                                                                                                  |
+| `e2e/login.spec.ts` (Playwright)           | Real backend on a throwaway database. The steps:<br>1. `/holders` → login.<br>2. Wrong password shows the error.<br>3. Admin signs in → `/holders` with the admin menu.<br>4. Dashboard: every card equals the backend's `/dashboard/summary` (demo data seeded).<br>5. Logout.<br>6. Officer signs in without admin items.                   |
+| `portal-ui/test/`                          | AppShell, Sidebar (active item, role filtering, keyboard menu toggle, ARIA), Header, page blocks, primitives; StatCard, StackedBar, Skeleton (`dashboard-widgets.test.tsx`)                                                                                                                                                                   |
 
 **Mock backend:** MSW mocks the backend in unit tests (`test/mock-backend.ts`, with
 `onUnhandledFrame: 'error'`, so nothing reaches a real server).
+
+## 8. Dashboard
+
+**Route:** `/` (the landing page after sign-in), admin and officer. **Data:** one call to
+`GET /api/v1/dashboard/summary` ([dashboard-api.md](../api/dashboard-api.md)); the backend
+scopes it to the staff member's organisation. **Code:** `src/pages/DashboardPage.tsx`,
+`src/api/dashboard.ts`, `src/lib/activity.ts`.
+
+### 8.1 Layout
+
+| Part             | Content                                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Header           | Organisation name (`<h1>`), "Last updated _time_ (Sri Lanka time)" from `generatedAt` in Asia/Colombo, **Refresh** button                                          |
+| Primary cards    | **Issued**, **Active**, **Revoked**: large numbers with one plain-language sentence each                                                                           |
+| Secondary cards  | **Awaiting wallet**, **Superseded**, **Expired**, **Expiring in 30 days**, **Holders**                                                                             |
+| Status breakdown | Horizontal stacked bar of active / revoked / superseded / expired with a legend: label, number and share (e.g. "8 (73%)")                                          |
+| Recent activity  | Up to 10 events: action in plain words, credential type, shortened id ("8a01c2aa…", full id as tooltip), staff name or "Holder's wallet", relative + absolute time |
+
+- **Card links:** every card is a link (portal-ui `StatCard` with the React Router adapter):
+
+  | Card                | Opens                                                                  |
+  | ------------------- | ---------------------------------------------------------------------- |
+  | Issued              | `/credentials` (no single status matches)                              |
+  | Active              | `/credentials?effectiveStatus=valid`                                   |
+  | Revoked             | `/credentials?effectiveStatus=revoked`                                 |
+  | Awaiting wallet     | `/credentials?effectiveStatus=pending`                                 |
+  | Superseded          | `/credentials?effectiveStatus=superseded`                              |
+  | Expired             | `/credentials?effectiveStatus=expired`                                 |
+  | Expiring in 30 days | `/credentials?effectiveStatus=valid` (no "expiring" filter exists yet) |
+  | Holders             | `/holders`                                                             |
+
+  The credentials page is still a placeholder; the links are ready for it. The list's
+  `revoked` filter also shows credentials revoked while pending, which the dashboard's
+  "Revoked" does not count.
+
+- **Numbers:** `Intl.NumberFormat` for the language (`formatNumber`, `formatPercent` in
+  `lib/format.ts`). A zero is shown as `0`.
+- **Relative times** are measured from the server's `generatedAt`, not the browser clock, so
+  they agree with "Last updated" (and the render stays pure for the React Compiler lint).
+- **Responsive:** one column on phones; primary cards in 3 columns from `sm`; secondary cards
+  in 2 columns from `sm` and 5 from `lg`; breakdown and activity side by side from `lg`.
+
+### 8.2 States
+
+| State             | When                                            | Shown                                                                                                                                                                                       |
+| ----------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loading           | First fetch                                     | Header at once (organisation from the session); cards with skeleton numbers; two skeleton blocks; a screen-reader status "Loading the dashboard…" (`aria-busy` on the content)              |
+| Error, no data    | Fetch failed (after the query client's retries) | Alert: "The dashboard could not be loaded." + the shared ApiError message (`lib/api-errors.ts`: network, 429, or generic with "Reference: _requestId_") + **Try again**                     |
+| Error, stale data | A refresh failed                                | The same alert above the last numbers                                                                                                                                                       |
+| Empty             | `issued = 0` and `awaitingWallet = 0`           | Cards with 0; "No credentials issued yet", short guidance and a **Go to Holders** button instead of the breakdown; activity only if there is any (e.g. a credential revoked before signing) |
+| Only pending      | `issued = 0`, `awaitingWallet > 0`              | The breakdown card says "No credential has been signed into a wallet yet."                                                                                                                  |
+| Session ended     | 401 from the summary                            | The API client signs out with returnTo (section 3), like any other call                                                                                                                     |
+
+**Freshness (TanStack Query):** key `['dashboard', 'summary', <issuerId>]`, `staleTime` 30 s,
+refetch on window focus; **Refresh** refetches at once (the button shows "Refreshing…" and a
+spinning icon). The cache is cleared on sign-out.
+
+### 8.3 Activity wording
+
+| Event (`fromStatus → toStatus`, reason)   | English                              | Sinhala (draft, needs review)              |
+| ----------------------------------------- | ------------------------------------ | ------------------------------------------ |
+| `null → pending`                          | Created – waiting for the wallet     | සාදන ලදී – පසුම්බිය සඳහා රැඳී ඇත                |
+| `pending → valid`                         | Signed into wallet                   | පසුම්බියට අත්සන් කර ලබා දෙන ලදී                  |
+| `valid → superseded` (any reason)         | Replaced by a new credential         | නව අක්තපත්‍රයකින් ප්‍රතිස්ථාපනය කරන ලදී            |
+| `→ revoked`, `details_changed`            | Revoked – details changed            | අවලංගු කරන ලදී – විස්තර වෙනස් විය                |
+| `→ revoked`, `employment_ended`           | Revoked – employment ended           | අවලංගු කරන ලදී – රැකියාව අවසන් විය              |
+| `→ revoked`, `relationship_ended`         | Revoked – relationship ended         | අවලංගු කරන ලදී – සම්බන්ධතාවය අවසන් විය           |
+| `→ revoked`, `wallet_lost_or_compromised` | Revoked – wallet lost or compromised | අවලංගු කරන ලදී – පසුම්බිය නැති වී හෝ අනාරක්ෂිත වී ඇත |
+| `→ revoked`, `issued_in_error`            | Revoked – issued in error            | අවලංගු කරන ලදී – වැරදීමකින් නිකුත් කළ              |
+| `→ revoked`, `other`                      | Revoked – other reason               | අවලංගු කරන ලදී – වෙනත් හේතුවක්                  |
+| `→ revoked`, missing or unknown code      | Revoked – no reason given            | අවලංගු කරන ලදී – හේතුවක් දක්වා නැත              |
+| `valid → valid`, `dev_simulated_expiry`   | Expiry simulated (development)       | කල් ඉකුත්වීම අනුකරණය කරන ලදී (සංවර්ධන)            |
+| anything else                             | Status changed                       | තත්ත්වය වෙනස් විය                              |
+
+The reason code is never shown raw, and the API never sends the revocation note. Credential
+types read "Employment credential" / "KYC credential". Wallet events show "Holder's wallet"
+instead of a staff name.
+
+### 8.4 Accessibility
+
+- Each card is one link whose **name is "_label_ _number_"** (e.g. "Active 8") and whose
+  **description** is the sentence (`aria-labelledby` / `aria-describedby`); icons are hidden.
+- The two card rows are lists named "Credential totals" and "More figures".
+- The stacked bar is a `<figure>` named "Status of issued credentials". The SVG bar itself is
+  `aria-hidden`; the legend list carries every label, number and percentage in text, so nothing
+  depends on colour. Segments are SVG `<rect>` widths, not inline styles, because the
+  production CSP is `style-src 'self'`.
+- Times are `<time datetime="…">`.
+
+### 8.5 Shared components (portal-ui)
+
+`StatCard`, `StackedBar` and `Skeleton` live in `@univault/portal-ui` for the verifier portal
+(Sprint 3). Like the rest of portal-ui they take every label already translated, plus a
+pluggable link component; they contain no text, routes or API calls.
+
+### 8.6 Known limitation
+
+Chromium has no Sinhala data for `Intl.RelativeTimeFormat` or month names, so in Sinhala the
+relative times ("2 hours ago") and the month in dates stay English. The existing lockout time
+on the sign-in page has the same limitation. Bundling locale data is future work.

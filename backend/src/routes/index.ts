@@ -6,11 +6,13 @@ import type { KeyStore } from '../keys/key-store.js';
 import type { CredentialOffersService } from '../services/credential-offers.service.js';
 import type { CredentialStatusService } from '../services/credential-status.js';
 import type { CredentialsService } from '../services/credentials.service.js';
+import type { DashboardService } from '../services/dashboard.service.js';
 import type { HoldersService } from '../services/holders.service.js';
 import type { IssuerKeysService } from '../services/issuer-keys.service.js';
 import { authRouter } from './auth.routes.js';
 import { credentialOffersRouter } from './credential-offers.routes.js';
 import { credentialsRouter } from './credentials.routes.js';
+import { dashboardRouter } from './dashboard.routes.js';
 import { devRouter } from './dev.routes.js';
 import { healthRouter } from './health.routes.js';
 import { holdersRouter } from './holders.routes.js';
@@ -30,6 +32,7 @@ export interface ApiRouterDeps {
   credentials?: CredentialsService;
   credentialOffers?: CredentialOffersService;
   credentialStatus?: CredentialStatusService;
+  dashboard?: DashboardService;
   auth: AuthMiddleware;
   loginRateLimit: { max: number; windowMinutes: number };
   statusRateLimit: { max: number; windowMinutes: number };
@@ -56,6 +59,7 @@ export function apiRouter(deps: ApiRouterDeps): Router {
   router.use('/issuers', issuersRouter(deps.auth, deps.issuerKeys));
   router.use('/holders', holdersRouter(deps.auth, deps.holders));
   router.use('/credentials', credentialsRouter(deps.auth, deps.credentials));
+  router.use('/dashboard', dashboardRouter(deps.auth, deps.dashboard));
   router.use('/credential-offers', credentialOffersRouter(deps.auth, deps.credentialOffers));
   if (deps.devSimulateRedemption && deps.credentials) {
     router.use('/dev', devRouter(deps.auth, deps.credentials));

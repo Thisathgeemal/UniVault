@@ -6,7 +6,10 @@
  *   DOTENV_CONFIG_PATH points at a file that does not exist);
  * - migrated and seeded with the synthetic demo data and a random staff password that the
  *   Playwright config generated (UNIVAULT_E2E_PASSWORD, never printed);
- * - a random JWT_SECRET; CORS allows only the e2e portal origin.
+ * - a random JWT_SECRET; CORS allows only the e2e portal origin;
+ * - signing keys (keys:init) encrypted with a random passphrase, and the dashboard demo data
+ *   (db:seed:demo: credentials of every status for Serendib Trading), so the dashboard shows
+ *   real numbers.
  *
  * Playwright starts this as a webServer and stops it after the run. Folders left behind by an
  * interrupted run are removed at the next start.
@@ -61,6 +64,7 @@ const env = {
   DATABASE_URL: `pglite://${join(workDir, 'db').replace(/\\/g, '/')}`,
   ISSUER_KEYS_DIR: join(workDir, 'keys'),
   JWT_SECRET: randomBytes(32).toString('hex'),
+  ISSUER_KEY_PASSPHRASE: randomBytes(24).toString('hex'),
   CORS_ORIGINS: portalOrigin,
   SEED_STAFF_PASSWORD: password,
   LOGIN_RATE_LIMIT_MAX: '100',
@@ -81,6 +85,12 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 // Migrate and seed (prints counts and the demo logins table, never the custom password)
 const seed = node(['src/db/cli.ts', 'seed'], { stdio: 'inherit' });
 if (seed.status !== 0) process.exit(seed.status ?? 1);
+
+// Signing keys, then the dashboard demo data (prints key ids and counts per status only)
+for (const command of ['keys', 'seed-demo']) {
+  const step = node(['src/db/cli.ts', command], { stdio: 'inherit' });
+  if (step.status !== 0) process.exit(step.status ?? 1);
+}
 
 const server = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
   cwd: backendDir,

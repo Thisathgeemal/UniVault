@@ -11,3 +11,48 @@ export function formatColomboDateTime(iso: string, language: string): string | n
     timeStyle: 'short',
   }).format(date);
 }
+
+const locale = (language: string) => (language === 'si' ? 'si-LK' : 'en-LK');
+
+/** A count with the language's digit grouping, e.g. 12,345. */
+export function formatNumber(value: number, language: string): string {
+  return new Intl.NumberFormat(locale(language)).format(value);
+}
+
+/** A fraction as a whole percentage, e.g. 0.734 → "73%". */
+export function formatPercent(fraction: number, language: string): string {
+  return new Intl.NumberFormat(locale(language), {
+    style: 'percent',
+    maximumFractionDigits: 0,
+  }).format(fraction);
+}
+
+const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['year', 365 * 24 * 3600],
+  ['month', 30 * 24 * 3600],
+  ['week', 7 * 24 * 3600],
+  ['day', 24 * 3600],
+  ['hour', 3600],
+  ['minute', 60],
+];
+
+/**
+ * How long before `reference` an instant was, e.g. "3 hours ago" / "yesterday", in the
+ * portal's language. Both are ISO strings (the reference is the server's generatedAt, so the
+ * text is the same whatever the browser clock says). Null if either is invalid.
+ */
+export function formatRelativeTime(
+  iso: string,
+  reference: string,
+  language: string,
+): string | null {
+  const at = Date.parse(iso);
+  const ref = Date.parse(reference);
+  if (Number.isNaN(at) || Number.isNaN(ref)) return null;
+  const seconds = Math.round((at - ref) / 1000);
+  const format = new Intl.RelativeTimeFormat(locale(language), { numeric: 'auto' });
+  for (const [unit, size] of RELATIVE_UNITS) {
+    if (Math.abs(seconds) >= size) return format.format(Math.trunc(seconds / size), unit);
+  }
+  return format.format(0, 'minute'); // "this minute" / "now"
+}

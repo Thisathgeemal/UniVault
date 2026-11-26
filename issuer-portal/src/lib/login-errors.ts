@@ -3,14 +3,11 @@
  * "Error messages"). INVALID_CREDENTIALS never says which field was wrong.
  */
 import type { TFunction } from 'i18next';
-import { ApiError, NETWORK_ERROR } from '../api/errors.js';
+import { ApiError } from '../api/errors.js';
+import { apiErrorMessage, type ApiErrorMessage } from './api-errors.js';
 import { formatColomboDateTime } from './format.js';
 
-export interface LoginErrorMessage {
-  message: string;
-  /** Shown for unexpected errors so support can find the request in the server log. */
-  reference?: string;
-}
+export type LoginErrorMessage = ApiErrorMessage;
 
 export function loginErrorMessage(
   error: unknown,
@@ -35,15 +32,9 @@ export function loginErrorMessage(
       return { message: t('login.errors.rateLimited') };
     case 'VALIDATION_ERROR':
       return { message: t('login.errors.validation') };
-    case NETWORK_ERROR:
-      return { message: t('errors.network') };
     default:
+      // Sign-in keeps its own rate-limit wording; network and unexpected errors are shared
       if (error.status === 429) return { message: t('login.errors.rateLimited') };
-      return {
-        message: t('errors.generic'),
-        ...(error.requestId
-          ? { reference: t('common.reference', { requestId: error.requestId }) }
-          : {}),
-      };
+      return apiErrorMessage(error, t);
   }
 }
