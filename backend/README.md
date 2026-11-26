@@ -62,7 +62,7 @@ src/
   routes/credentials.routes.ts        credential issuance (pending), preview, list, get, revoke, reissue, events
   routes/credential-schemas.routes.ts the schemas this issuer may issue (GET /credential-schemas)
   routes/dev.routes.ts                DEV ONLY (temporary): simulated redemption and expiry
-  routes/credential-offers.routes.ts  QR offers and status; wallet redemption planned (Sprint 2)
+  routes/credential-offers.routes.ts  QR offers, status, cancel; wallet redemption planned (Sprint 2)
   routes/dashboard.routes.ts          issuer dashboard summary (officer/admin, own issuer, no-store)
   routes/status.routes.ts             PUBLIC credential status (open CORS, rate limit, no-store)
   routes/verifications.routes.ts      verification sessions (planned)
@@ -70,7 +70,7 @@ src/
   services/holders.service.ts      holder records (schema-validated, issuer-scoped)
   services/credentials.service.ts  pending credentials, expiry rules, signCredential (SD-JWT),
                                    revoke, reissue (supersede), status history
-  services/credential-offers.service.ts  pre-authorised offers (hash only), status, findOfferByCode
+  services/credential-offers.service.ts  pre-authorised offers (hash only), status + reason, cancel, findOfferByCode
   services/credential-schemas.ts   loads docs/schemas and validates claims (rules and messages
                                    from @univault/claims-validation, shared with the portal)
   services/credential-status.ts    effectiveStatus() + its SQL twin effectiveStatusCondition(), public lookup
@@ -108,12 +108,13 @@ JSON body (size-limited) → `/api/v1` routes → 404 → error handler.
 | POST   | `/credentials`                                       | Officer or admin | ✅ Implemented (creates **pending**; optional `validUntil`)  |
 | POST   | `/credentials/preview`                               | Officer or admin | ✅ Implemented (same path as issuance, writes nothing)       |
 | GET    | `/credential-schemas`                                | Officer or admin | ✅ Implemented (the issuer type's schema, from the files)    |
-| GET    | `/credentials`, `/credentials/:credentialId`         | Login            | ✅ Implemented                                               |
+| GET    | `/credentials`, `/credentials/:credentialId`         | Login            | ✅ Implemented (detail adds `activeOffer`: id + expiry only) |
 | POST   | `/credentials/:credentialId/revoke`                  | Admin            | ✅ Implemented (pending or valid)                            |
 | POST   | `/credentials/:credentialId/reissue`                 | Officer or admin | ✅ Implemented (supersedes, new pending)                     |
 | GET    | `/credentials/:credentialId/events`                  | Officer or admin | ✅ Implemented (status history)                              |
 | POST   | `/credential-offers`                                 | Officer or admin | ✅ Implemented (one-time QR offer)                           |
-| GET    | `/credential-offers/:offerId`                        | Login            | ✅ Implemented (status polling)                              |
+| GET    | `/credential-offers/:offerId`                        | Login            | ✅ Implemented (status, reason, `serverTime`)                |
+| POST   | `/credential-offers/:offerId/cancel`                 | Officer or admin | ✅ Implemented (active only, else 409 `OFFER_NOT_ACTIVE`)    |
 | GET    | `/dashboard/summary`                                 | Officer or admin | ✅ Implemented (own issuer from the token, `no-store`)       |
 | POST   | `/credential-offers/token`                           | Public (code)    | 501 – Sprint 2 (wallet)                                      |
 | POST   | `/credential-offers/credential`                      | Public (code)    | 501 – Sprint 2 (wallet)                                      |

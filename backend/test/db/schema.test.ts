@@ -12,6 +12,7 @@ import {
   REISSUE_REASONS,
   REVOCATION_REASONS,
 } from '../../src/services/credentials.service.js';
+import { OFFER_INVALIDATION_REASONS } from '../../src/services/credential-offers.service.js';
 import { dbError, freshDatabase } from './helpers.js';
 
 const rows = async <T>(database: Database, query: ReturnType<typeof sql>) =>
@@ -34,6 +35,7 @@ describe('migrations', () => {
       '0005_revocation_and_status_events.sql',
       '0006_reason_value_checks.sql',
       '0007_dev_simulated_expiry_event.sql',
+      '0008_offer_invalidation_reason.sql',
     ]);
     const tables = await rows<{ table_name: string }>(
       database,
@@ -63,6 +65,7 @@ describe('migrations', () => {
         '0005_revocation_and_status_events.sql',
         '0006_reason_value_checks.sql',
         '0007_dev_simulated_expiry_event.sql',
+        '0008_offer_invalidation_reason.sql',
       ],
     });
   });
@@ -371,6 +374,105 @@ describe('migration 0007 (dev simulated expiry event)', () => {
     expect(await dbError(insertEvent('valid', 'revoked', 'Left the company'))).toContain(
       'credential_status_events_reason_value',
     );
+  });
+});
+
+describe('migration 0008 (offer invalidation reason)', () => {
+  let database: Database;
+  let oldDir: string;
+  const KID = 'D'.repeat(43);
+  const HOLDER = '44444444-4444-4444-8444-444444444444';
+  const PENDING = 'd0000000-0000-4000-8000-000000000001';
+  const REVOKED = 'd0000000-0000-4000-8000-000000000002';
+  const SUPERSEDED = 'd0000000-0000-4000-8000-000000000003';
+  const offer = (n: number) => `e0000000-0000-4000-8000-00000000000${n}`;
+
+  beforeAll(async () => {
+    database = await createDatabase('pglite://memory');
+    // Apply 0001–0007, store invalidated offers without a reason, then apply 0008
+    oldDir = await mkdtemp(join(tmpdir(), 'univault-0008-'));
+    for (const file of (await readdir(MIGRATIONS_DIR)).filter((f) => f < '0008')) {
+      await copyFile(join(MIGRATIONS_DIR, file), join(oldDir, file));
+    }
+    await runMigrations(database, `${oldDir}/`);
+    await database.exec(`
+      INSERT INTO issuers (id, name, issuer_type) VALUES ('employer-a', 'Employer A', 'employer');
+      INSERT INTO issuer_keys (kid, issuer_id, public_jwk)
+        VALUES ('${KID}', 'employer-a', '{"kty":"RSA","kid":"${KID}"}');
+      INSERT INTO holders (id, issuer_id, record_type, external_ref, full_name, claims)
+        VALUES ('${HOLDER}', 'employer-a', 'employee', 'E-1', 'Test', '{}');
+      INSERT INTO credential_records (id, issuer_id, holder_id, credential_type, vct, status,
+          claims_snapshot, expires_at, revoked_at, revocation_reason)
+      VALUES
+        ('${PENDING}', 'employer-a', '${HOLDER}', 'EmploymentCredential', 'v', 'pending', '{}',
+         now() + interval '1 year', NULL, NULL),
+        ('${REVOKED}', 'employer-a', '${HOLDER}', 'EmploymentCredential', 'v', 'revoked', '{}',
+         now() + interval '1 year', now(), 'issued_in_error');
+      INSERT INTO credential_records (id, issuer_id, holder_id, credential_type, vct, status,
+          claims_snapshot, issuer_kid, holder_key_thumbprint, issued_at, expires_at, created_at,
+          superseded_at)
+      VALUES ('${SUPERSEDED}', 'employer-a', '${HOLDER}', 'EmploymentCredential', 'v',
+          'superseded', '{}', '${KID}', 't', now() - interval '2 days', now() + interval '1 year',
+          now() - interval '3 days', now());
+      INSERT INTO credential_offers (id, credential_id, pre_authorized_code_hash, expires_at,
+          created_at, invalidated_at)
+      VALUES
+        -- replaced by offer 2 (created at the instant offer 1 was invalidated)
+        ('${offer(1)}', '${PENDING}', 'HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH1', now() + interval '1 hour',
+         '2026-11-20T10:00:00Z', '2026-11-20T10:05:00Z'),
+        ('${offer(2)}', '${PENDING}', 'HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH2', now() + interval '1 hour',
+         '2026-11-20T10:05:00Z', NULL),
+        -- invalidated when its credential was revoked
+        ('${offer(3)}', '${REVOKED}', 'HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH3', now() + interval '1 hour',
+         '2026-11-20T10:00:00Z', '2026-11-20T11:00:00Z'),
+        -- replaced, then the credential was revoked: still 'replaced'
+        ('${offer(4)}', '${REVOKED}', 'HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH4', now() + interval '1 hour',
+         '2026-11-20T09:00:00Z', '2026-11-20T10:00:00Z'),
+        -- invalidated when its credential was reissued
+        ('${offer(5)}', '${SUPERSEDED}', 'HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH5', now() + interval '1 hour',
+         '2026-11-20T09:00:00Z', '2026-11-20T12:00:00Z');
+    `);
+    await runMigrations(database);
+  });
+  afterAll(async () => {
+    await database.close();
+    await rm(oldDir, { recursive: true, force: true });
+  });
+
+  it('backfills a reason for every invalidated offer, and none for the others', async () => {
+    const result = await rows<{ id: string; invalidation_reason: string | null }>(
+      database,
+      sql`select id, invalidation_reason from credential_offers order by id`,
+    );
+    expect(result.map((r) => r.invalidation_reason)).toEqual([
+      'replaced',
+      null,
+      'credential_revoked',
+      'replaced',
+      'credential_superseded',
+    ]);
+  });
+
+  it('validates both constraints (every existing row satisfies them)', async () => {
+    const constraints = await rows<{ conname: string; convalidated: boolean }>(
+      database,
+      sql`select conname, convalidated from pg_constraint
+          where conname like 'credential_offers_invalidation_reason%' order by conname`,
+    );
+    expect(constraints).toEqual([
+      { conname: 'credential_offers_invalidation_reason_value', convalidated: true },
+      { conname: 'credential_offers_invalidation_reason_with_time', convalidated: true },
+    ]);
+  });
+
+  it('lists exactly the service reasons (SQL and TypeScript agree)', async () => {
+    const [constraint] = await rows<{ def: string }>(
+      database,
+      sql`select pg_get_constraintdef(oid) as def from pg_constraint
+          where conname = 'credential_offers_invalidation_reason_value'`,
+    );
+    const values = [...constraint!.def.matchAll(/'([a-z_]+)'::text/g)].map((m) => m[1]).sort();
+    expect(values).toEqual([...OFFER_INVALIDATION_REASONS].sort());
   });
 });
 

@@ -15,6 +15,7 @@ export const offerIdParams = z.object({ offerId: z.uuid('must be a UUID') });
  * /api/v1/credential-offers – pre-authorised offers shown as QR codes (FR-ISS-01).
  *   POST /             officer/admin – create a one-time offer for a pending credential
  *   GET  /:offerId     offer status for the portal to poll (never the code)
+ *   POST /:offerId/cancel   officer/admin – cancel an active offer (its code stops working)
  *   POST /token, /credential   wallet redemption with the pre-authorised code (Sprint 2)
  */
 export function credentialOffersRouter(
@@ -66,6 +67,27 @@ export function credentialOffersRouter(
     async (req, res) => {
       const offer = await service().getOffer(req.auth!, String(req.params.offerId));
       res.set('Cache-Control', 'no-store').json(offer); // polled: always fresh
+    },
+  );
+
+  router.post(
+    '/:offerId/cancel',
+    auth.requireAuth,
+    auth.requireRole('officer', 'admin'),
+    validate({ params: offerIdParams }),
+    async (req, res) => {
+      const offer = await service().cancelOffer(req.auth!, String(req.params.offerId));
+      // Identifiers only: the code is not known here (only its hash is stored) and never logged
+      req.log?.info(
+        {
+          offerId: offer.offerId,
+          credentialId: offer.credentialId,
+          issuerId: req.auth?.issuer.id,
+          staffId: req.auth?.id,
+        },
+        'Credential offer cancelled',
+      );
+      res.set('Cache-Control', 'no-store').json(offer);
     },
   );
 

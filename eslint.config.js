@@ -64,6 +64,7 @@ export default defineConfig([
     files: REACT_PACKAGES.flatMap((dir) => [
       `${dir}/test/**/*`,
       `${dir}/e2e/**/*`,
+      `${dir}/scripts/**/*`,
       `${dir}/*.{js,mjs,ts}`,
     ]),
     languageOptions: { globals: { ...globals.node, ...globals.browser } },

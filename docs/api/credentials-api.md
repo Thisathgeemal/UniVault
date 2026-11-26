@@ -177,6 +177,11 @@ belonging to another issuer gives an empty list.
 
 Returns the same metadata object. Another issuer's credential returns `404`.
 
+It adds **`activeOffer`**: `{ offerId, expiresAt }` of the credential's newest offer that is
+not redeemed, not invalidated and not expired (only while the credential is `pending`), or
+`null`. Never the code. The portal uses it to say that a QR code cannot be shown again
+(Decision 021; [credential-offers-api.md](credential-offers-api.md)). The list does not carry it.
+
 ### POST `/api/v1/credentials/preview` (officer or admin)
 
 What `POST /credentials` would create **now**, without writing anything (Decision 019). The

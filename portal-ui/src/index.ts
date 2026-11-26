@@ -84,3 +84,14 @@ export {
   type CredentialCardPreviewProps,
   type CredentialCardSection,
 } from './CredentialCardPreview.js';
+export {
+  QR_ERROR_CORRECTION,
+  QR_QUIET_ZONE,
+  QrCode,
+  qrMatrix,
+  qrPath,
+  type QrCodeProps,
+  type QrMatrix,
+} from './QrCode.js';
+export { Countdown, formatCountdown, type CountdownProps } from './Countdown.js';
+export { FullscreenOverlay, type FullscreenOverlayProps } from './FullscreenOverlay.js';

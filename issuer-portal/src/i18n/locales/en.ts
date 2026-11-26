@@ -562,7 +562,8 @@ export const en = {
       holder: 'Holder',
       walletOffer: 'Wallet offer (QR code) – next step',
       walletOfferDescription:
-        'The QR code the holder scans to accept the credential arrives in the next update.',
+        'Create a one-time QR code for the holder to scan with the UniVault wallet. It works for a few minutes only.',
+      createOffer: 'Create wallet offer',
       backToHolder: 'Back to holder',
       issueAnother: 'Issue another',
       loadFailed: 'The credential could not be loaded.',
@@ -577,6 +578,80 @@ export const en = {
       description: 'Issue Employment or KYC credentials to the holders of your organisation.',
       issueTitle: 'Issue a credential',
       listSoon: 'The list of issued credentials arrives in the next update.',
+    },
+  },
+  offer: {
+    title: 'Wallet offer',
+    description: 'The holder scans this QR code with the UniVault wallet to accept the credential.',
+    qrAlt: 'QR code to add this credential to a UniVault wallet',
+    details: 'Offer details',
+    holder: 'Holder',
+    credentialType: 'Credential',
+    expiresAt: 'Expires at {{time}} (Asia/Colombo)',
+    timeLeft: 'Time left',
+    announceMinutes: '{{minutes}} minutes left to scan the QR code',
+    announceLastMinute: '1 minute left – the QR code expires soon',
+    lastMinute: 'Less than a minute left. Generate a new QR code if the holder needs more time.',
+    loading: 'Loading the credential…',
+    creating: 'Creating the QR code…',
+    actions: {
+      fullScreen: 'Show full screen',
+      closeFullScreen: 'Close full screen',
+      regenerate: 'Generate new QR code',
+      cancel: 'Cancel offer',
+      backToCredential: 'Back to credential',
+    },
+    fullScreenTitle: 'Scan with the UniVault wallet',
+    confirmRegenerate: {
+      title: 'Generate a new QR code?',
+      message: 'The current QR code stops working immediately. Only the new one can be scanned.',
+      confirm: 'Generate new QR code',
+      cancel: 'Keep current QR code',
+    },
+    confirmCancel: {
+      title: 'Cancel this offer?',
+      message: 'The QR code stops working immediately. You can generate a new one later.',
+      confirm: 'Cancel offer',
+      cancel: 'Keep offer',
+    },
+    states: {
+      redeemed: {
+        title: "Accepted by the holder's wallet",
+        message: 'The credential was signed and delivered to the wallet.',
+        link: 'View credential',
+      },
+      replaced: {
+        title: 'A newer QR code was generated for this credential',
+        message: 'This QR code no longer works. Generate a new one here if you need it.',
+      },
+      cancelled: { title: 'Offer cancelled', message: 'This QR code no longer works.' },
+      expired: {
+        title: 'This QR code has expired',
+        message: 'Generate a new QR code to continue.',
+      },
+      withdrawn: {
+        title: 'This credential can no longer be offered',
+        message: 'It was revoked or reissued, so the QR code no longer works.',
+      },
+      reload: {
+        title: "For security, this QR code can't be shown again.",
+        message: 'Generate a new one to continue.',
+      },
+      notPending: {
+        title: 'Only a credential awaiting the wallet can be offered',
+        message: 'This credential is {{status}}: there is nothing for a wallet to accept.',
+      },
+    },
+    errors: {
+      createFailed: 'The QR code could not be created.',
+      cancelFailed: 'The offer could not be cancelled.',
+      credentialExpired: 'This credential has expired, so it cannot be offered.',
+    },
+    dev: {
+      summary: 'Developer details',
+      warning:
+        'Development builds only. This JSON contains the one-time pre-authorised code: never share it or paste it into a bug report.',
+      label: 'Decoded credential_offer',
     },
   },
   credentialTypes: {

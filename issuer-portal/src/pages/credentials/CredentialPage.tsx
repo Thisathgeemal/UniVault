@@ -1,7 +1,8 @@
 /**
  * One credential (/credentials/:credentialId): status, id, type, expiry and holder from
- * GET /credentials/:id. After issuing (?issued=1) it is the success page, with the wallet
- * offer placeholder (the QR code arrives with the next task) and "Issue another".
+ * GET /credentials/:id. After issuing (?issued=1) it is the success page with "Issue another".
+ * A PENDING credential (on both views) shows "Create wallet offer", which opens the QR code
+ * screen (/credentials/:id/offer, CredentialOfferPage); other statuses have nothing to offer.
  * Another issuer's credential is a 404 from the backend → "Credential not found".
  */
 import { useQuery } from '@tanstack/react-query';
@@ -129,19 +130,27 @@ export function CredentialPage() {
             </dl>
           </CardContent>
         </Card>
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <QrCode aria-hidden="true" className="h-5 w-5" />
-              {t('issuance.result.walletOffer')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              {t('issuance.result.walletOfferDescription')}
-            </p>
-          </CardContent>
-        </Card>
+        {credential.effectiveStatus === 'pending' ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <QrCode aria-hidden="true" className="h-5 w-5" />
+                {t('issuance.result.walletOffer')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-start gap-4">
+              <p className="text-sm text-muted-foreground">
+                {t('issuance.result.walletOfferDescription')}
+              </p>
+              <Link
+                to={`/credentials/${credential.id}/offer`}
+                className={buttonVariants({ variant: 'default' })}
+              >
+                {t('issuance.result.createOffer')}
+              </Link>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
       {!issued ? (
         <p className="mt-4 text-sm text-muted-foreground">{t('issuance.result.moreActions')}</p>
@@ -153,7 +162,7 @@ export function CredentialPage() {
         >
           {t('issuance.result.backToHolder')}
         </Link>
-        <Link to="/credentials/new" className={buttonVariants({ variant: 'default' })}>
+        <Link to="/credentials/new" className={buttonVariants({ variant: 'outline' })}>
           {t('issuance.result.issueAnother')}
         </Link>
       </div>

@@ -7,6 +7,7 @@
  * - migrated and seeded with the synthetic demo data and a random staff password that the
  *   Playwright config generated (UNIVAULT_E2E_PASSWORD, never printed);
  * - a random JWT_SECRET; CORS allows only the e2e portal origin;
+ * - CREDENTIAL_OFFER_TTL_SECONDS=15 (the offer spec watches a QR code expire);
  * - signing keys (keys:init) encrypted with a random passphrase, and the dashboard demo data
  *   (db:seed:demo: credentials of every status for Serendib Trading), so the dashboard shows
  *   real numbers.
@@ -61,6 +62,8 @@ const env = {
   NODE_ENV: 'development',
   LOG_LEVEL: 'warn',
   PORT: port,
+  // credential_issuer in every offer: this backend, not the default :4000
+  PUBLIC_BASE_URL: `http://localhost:${port}`,
   DATABASE_URL: `pglite://${join(workDir, 'db').replace(/\\/g, '/')}`,
   ISSUER_KEYS_DIR: join(workDir, 'keys'),
   JWT_SECRET: randomBytes(32).toString('hex'),
@@ -68,6 +71,8 @@ const env = {
   CORS_ORIGINS: portalOrigin,
   SEED_STAFF_PASSWORD: password,
   LOGIN_RATE_LIMIT_MAX: '100',
+  // Short offer lifetime, so e2e/offer.spec.ts can watch the QR code expire
+  CREDENTIAL_OFFER_TTL_SECONDS: '15',
 };
 
 const node = (args, options) =>

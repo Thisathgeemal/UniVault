@@ -65,7 +65,8 @@ const envSchema = z
     KEY_RETRY_BACKOFF_SECONDS: z.coerce.number().int().min(0).max(3600).default(30),
     AI_SERVICE_URL: z.url().default('http://localhost:5001'),
     AI_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(1500),
-    CREDENTIAL_OFFER_TTL_SECONDS: z.coerce.number().int().positive().default(600),
+    // Offer (QR code) lifetime: 5 minutes (was 10 until 26 Nov 2026; Decisions 011 and 021)
+    CREDENTIAL_OFFER_TTL_SECONDS: z.coerce.number().int().positive().default(300),
     VERIFICATION_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(300),
     REQUEST_BODY_LIMIT: z.string().default('100kb'),
     // Folder with the credential JSON Schemas (default: <repo>/docs/schemas)
@@ -131,6 +132,14 @@ const envSchema = z
           code: 'custom',
           path: ['DEV_SIMULATE_REDEMPTION'],
           message: 'must not be enabled in production',
+        });
+      }
+      // credential_issuer in every OpenID4VCI offer is built from it; the spec requires https
+      if (!env.PUBLIC_BASE_URL.startsWith('https://')) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['PUBLIC_BASE_URL'],
+          message: 'must be an https:// URL in production (it is the OpenID4VCI credential_issuer)',
         });
       }
       // The embedded database is for development only

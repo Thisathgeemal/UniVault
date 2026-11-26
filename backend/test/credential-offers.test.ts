@@ -8,8 +8,11 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { credentialOffers, credentialRecords, holders, issuerStaff } from '../src/db/schema.js';
 import { loadCredentialSchemas } from '../src/services/credential-schemas.js';
+import type { StaffProfile } from '../src/auth/auth-service.js';
+import { loadConfig } from '../src/config/env.js';
 import {
   createCredentialOffersService,
+  OFFER_INVALIDATION_REASONS,
   offerStatus,
   PRE_AUTHORIZED_CODE_GRANT,
   type CredentialOffersService,
@@ -25,7 +28,8 @@ const BASE_URL = 'http://192.168.1.20:4000'; // a LAN address, as a phone needs 
 const QR_PREFIX = 'openid-credential-offer://?credential_offer=';
 const UNKNOWN_ID = '00000000-0000-4000-8000-000000000000';
 const CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-const DEFAULT_TTL = 600;
+/** The configured default offer lifetime (config.test.ts pins the value itself). */
+const DEFAULT_TTL = testConfig().CREDENTIAL_OFFER_TTL_SECONDS;
 
 const EMPLOYEE_CLAIMS = (
   JSON.parse(
@@ -168,6 +172,7 @@ describe('POST /credential-offers – Employment credential', () => {
         'holder',
         'offerId',
         'qrContent',
+        'serverTime',
         'status',
       ].sort(),
     );
@@ -179,6 +184,15 @@ describe('POST /credential-offers – Employment credential', () => {
       expiresInSeconds: DEFAULT_TTL,
     });
     expect(res.body.offerId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('returns the server time (ISO) for the portal to correct for clock skew', () => {
+    const serverTime = Date.parse(res.body.serverTime);
+    expect(res.body.serverTime).toBe(new Date(serverTime).toISOString());
+    expect(serverTime).toBeGreaterThanOrEqual(before);
+    expect(serverTime).toBeLessThanOrEqual(after);
+    // expiresAt - serverTime is exactly the TTL the portal counts down
+    expect(Date.parse(res.body.expiresAt) - serverTime).toBe(DEFAULT_TTL * 1000);
   });
 
   it('carries a 256-bit pre-authorised code: 43 base64url characters', () => {
@@ -211,7 +225,7 @@ describe('POST /credential-offers – Employment credential', () => {
     );
   });
 
-  it('expires TTL seconds (default 600) after creation', () => {
+  it('expires CREDENTIAL_OFFER_TTL_SECONDS (the default) after creation', () => {
     const expiresAt = new Date(res.body.expiresAt).getTime();
     expect(expiresAt).toBeGreaterThanOrEqual(before + DEFAULT_TTL * 1000);
     expect(expiresAt).toBeLessThanOrEqual(after + DEFAULT_TTL * 1000);
@@ -256,6 +270,12 @@ describe('POST /credential-offers – KYC credential', () => {
       holder: { externalRef: 'KYC-REC-0001' },
       status: 'active',
     });
+    expect(
+      checkOpenId4VciOffer(res.body.credentialOffer, {
+        allowHttp: true,
+        credentialType: 'KYCCredential',
+      }),
+    ).toEqual([]);
     expect(res.body.credentialOffer).toEqual({
       credential_issuer: `${BASE_URL}/api/v1/issuers/bank-a`,
       credential_configuration_ids: ['KYCCredential'],
@@ -329,7 +349,9 @@ describe('one usable offer per credential', () => {
 
     const firstStatus = await getOffer(tokens.employerOfficer, first.body.offerId);
     expect(firstStatus.body.status).toBe('invalidated');
-    expect(firstStatus.body.invalidatedAt).not.toBeNull();
+    expect(firstStatus.body.invalidationReason).toBe('replaced');
+    expect(firstStatus.body.invalidatedAt).toBe(second.body.serverTime);
+    expect((await offerRow(first.body.offerId)).invalidationReason).toBe('replaced');
     expect((await getOffer(tokens.employerOfficer, second.body.offerId)).body.status).toBe(
       'active',
     );
@@ -378,6 +400,7 @@ describe('one usable offer per credential', () => {
           redeemedAt: new Date(),
           redeemedWalletThumbprint: 'x'.repeat(43),
           invalidatedAt: new Date(),
+          invalidationReason: 'replaced',
         })
         .where(eq(credentialOffers.id, res.body.offerId)),
     );
@@ -410,8 +433,10 @@ describe('GET /credential-offers/:offerId – status tracking', () => {
       status: 'active',
       redeemedAt: null,
       invalidatedAt: null,
+      invalidationReason: null,
       createdBy: { displayName: 'Serendib Trading Company (Demo) Officer' },
     });
+    expect(Math.abs(Date.parse(res.body.serverTime) - Date.now())).toBeLessThan(5000);
     expect(res.body.holder).toMatchObject({ externalRef: expect.stringMatching(/^STC-7/) });
   });
 
@@ -555,6 +580,21 @@ describe('rejections', () => {
     expect(res.body.error.code).toBe('CREDENTIAL_NOT_PENDING');
   });
 
+  it('refuses a revoked credential (409 CREDENTIAL_NOT_PENDING): offers are for pending only', async () => {
+    const credentialId = await newPendingEmployment();
+    const revoke = await request(t.app)
+      .post(`/api/v1/credentials/${credentialId}/revoke`)
+      .set('Authorization', `Bearer ${tokens.employerAdmin}`)
+      .send({ reason: 'issued_in_error' });
+    expect(revoke.status).toBe(200);
+    const res = await createOffer(tokens.employerOfficer, credentialId);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatchObject({
+      code: 'CREDENTIAL_NOT_PENDING',
+      message: 'Only a pending credential can be offered (this one is revoked)',
+    });
+  });
+
   it('refuses an expired credential (409 CREDENTIAL_EXPIRED)', async () => {
     const credentialId = await newPendingEmployment();
     await t.database.db
@@ -578,6 +618,418 @@ describe('rejections', () => {
     const bad = await getOffer(tokens.employerOfficer, 'not-a-uuid');
     expect(bad.status).toBe(400);
     expect(bad.body.error.details[0].path).toBe('offerId');
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('POST /credential-offers/:offerId/cancel', () => {
+  const cancel = async (token: string | null, offerId: string) => {
+    const req = request(t.app).post(`/api/v1/credential-offers/${offerId}/cancel`);
+    const res = await (token ? req.set('Authorization', `Bearer ${token}`) : req);
+    getResponses.push(res.text);
+    return res;
+  };
+
+  it('cancels an active offer: invalidated with reason "cancelled", the code stops working', async () => {
+    const offer = await createOffer(tokens.employerOfficer, await newPendingEmployment());
+    const res = await cancel(tokens.employerOfficer, offer.body.offerId);
+    expect(res.status).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.body).toMatchObject({
+      offerId: offer.body.offerId,
+      status: 'invalidated',
+      invalidationReason: 'cancelled',
+      credentialStatus: 'pending',
+    });
+    expect(res.body.invalidatedAt).toBe(res.body.serverTime);
+    expect((await offerRow(offer.body.offerId)).invalidationReason).toBe('cancelled');
+    expect((await offersService.findOfferByCode(codeOf(offer.body)))?.status).toBe('invalidated');
+    expect((await getOffer(tokens.employerOfficer, offer.body.offerId)).body).toMatchObject({
+      status: 'invalidated',
+      invalidationReason: 'cancelled',
+    });
+  });
+
+  it('lets admins cancel, and a new offer can be created afterwards', async () => {
+    const credentialId = await newPendingEmployment();
+    const offer = await createOffer(tokens.employerOfficer, credentialId);
+    expect((await cancel(tokens.employerAdmin, offer.body.offerId)).status).toBe(200);
+    const next = await createOffer(tokens.employerOfficer, credentialId);
+    expect(next.status).toBe(201);
+    expect(next.body.status).toBe('active');
+  });
+
+  it('refuses an offer that is not active (409 OFFER_NOT_ACTIVE): replaced, cancelled, expired, redeemed', async () => {
+    const credentialId = await newPendingEmployment();
+    const first = await createOffer(tokens.employerOfficer, credentialId);
+    const second = await createOffer(tokens.employerOfficer, credentialId); // replaces the first
+    const replaced = await cancel(tokens.employerOfficer, first.body.offerId);
+    expect(replaced.status).toBe(409);
+    expect(replaced.body.error).toMatchObject({
+      code: 'OFFER_NOT_ACTIVE',
+      message: 'Only an active offer can be cancelled (this one is invalidated)',
+      details: { status: 'invalidated' },
+    });
+    expect((await offerRow(first.body.offerId)).invalidationReason).toBe('replaced'); // kept
+
+    expect((await cancel(tokens.employerOfficer, second.body.offerId)).status).toBe(200);
+    const twice = await cancel(tokens.employerOfficer, second.body.offerId);
+    expect(twice.status).toBe(409);
+    expect(twice.body.error.code).toBe('OFFER_NOT_ACTIVE');
+
+    const third = await createOffer(tokens.employerOfficer, credentialId);
+    await t.database.db
+      .update(credentialOffers)
+      .set({
+        createdAt: new Date(Date.now() - 20 * 60_000),
+        expiresAt: new Date(Date.now() - 10 * 60_000),
+      })
+      .where(eq(credentialOffers.id, third.body.offerId));
+    const expired = await cancel(tokens.employerOfficer, third.body.offerId);
+    expect(expired.status).toBe(409);
+    expect(expired.body.error.details).toEqual({ status: 'expired' });
+    expect((await offerRow(third.body.offerId)).invalidatedAt).toBeNull();
+
+    const fourth = await createOffer(tokens.employerOfficer, credentialId);
+    await t.database.db
+      .update(credentialOffers)
+      .set({ redeemedAt: new Date(), redeemedWalletThumbprint: 'r'.repeat(43) })
+      .where(eq(credentialOffers.id, fourth.body.offerId));
+    const redeemed = await cancel(tokens.employerOfficer, fourth.body.offerId);
+    expect(redeemed.status).toBe(409);
+    expect(redeemed.body.error.details).toEqual({ status: 'redeemed' });
+  });
+
+  it('requires a login (401) and leaves the offer active', async () => {
+    const offer = await createOffer(tokens.employerOfficer, await newPendingEmployment());
+    expect((await cancel(null, offer.body.offerId)).status).toBe(401);
+    expect((await offerRow(offer.body.offerId)).invalidatedAt).toBeNull();
+  });
+
+  it("hides another issuer's offer (404 OFFER_NOT_FOUND) and leaves it active", async () => {
+    const offer = await createOffer(tokens.employerOfficer, await newPendingEmployment());
+    for (const token of [tokens.bankOfficer, tokens.bankAdmin]) {
+      const res = await cancel(token, offer.body.offerId);
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('OFFER_NOT_FOUND');
+    }
+    expect((await offerRow(offer.body.offerId)).invalidatedAt).toBeNull();
+  });
+
+  it('returns 404 for an unknown offer and 400 for a malformed offer ID', async () => {
+    const unknown = await cancel(tokens.employerOfficer, UNKNOWN_ID);
+    expect(unknown.status).toBe(404);
+    expect(unknown.body.error.code).toBe('OFFER_NOT_FOUND');
+    const bad = await cancel(tokens.employerOfficer, 'not-a-uuid');
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.details[0].path).toBe('offerId');
+  });
+
+  it('logs the cancellation by ID only', () => {
+    const cancelled = logs().filter((l) => l.msg === 'Credential offer cancelled');
+    expect(cancelled.length).toBeGreaterThan(0);
+    for (const line of cancelled) {
+      expect(line).toMatchObject({
+        offerId: expect.any(String),
+        credentialId: expect.any(String),
+        issuerId: 'employer-a',
+        staffId: expect.any(String),
+      });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('invalidation reasons from revoke and reissue', () => {
+  it("revoking a pending credential invalidates its offer with reason 'credential_revoked'", async () => {
+    const credentialId = await newPendingEmployment();
+    const offer = await createOffer(tokens.employerOfficer, credentialId);
+    const revoke = await request(t.app)
+      .post(`/api/v1/credentials/${credentialId}/revoke`)
+      .set('Authorization', `Bearer ${tokens.employerAdmin}`)
+      .send({ reason: 'issued_in_error' });
+    expect(revoke.status).toBe(200);
+    expect((await getOffer(tokens.employerOfficer, offer.body.offerId)).body).toMatchObject({
+      status: 'invalidated',
+      invalidationReason: 'credential_revoked',
+      credentialStatus: 'revoked',
+    });
+  });
+
+  it("reissuing a credential invalidates its open offer with reason 'credential_superseded'", async () => {
+    const credentialId = await newPendingEmployment();
+    const offer = await createOffer(tokens.employerOfficer, credentialId);
+    // Signed without redeeming the offer (no redemption in Sprint 1): the offer stays open
+    const signer = createCredentialsService(t.database.db, loadCredentialSchemas(), {
+      keyStore: createKeyStore({
+        db: t.database.db,
+        source: 'file',
+        keysDir,
+        passphrase: PASSPHRASE,
+      }),
+      publicBaseUrl: BASE_URL,
+    });
+    await signer.signCredential(credentialId, walletJwk());
+    const reissue = await request(t.app)
+      .post(`/api/v1/credentials/${credentialId}/reissue`)
+      .set('Authorization', `Bearer ${tokens.employerOfficer}`)
+      .send({ reason: 'details_changed' });
+    expect(reissue.status).toBe(201);
+    expect((await getOffer(tokens.employerOfficer, offer.body.offerId)).body).toMatchObject({
+      status: 'invalidated',
+      invalidationReason: 'credential_superseded',
+    });
+  });
+
+  it('is backed by database rules: a reason exactly when invalidated, from the fixed list', async () => {
+    const offer = await createOffer(tokens.employerOfficer, await newPendingEmployment());
+    const set = (values: Partial<typeof credentialOffers.$inferInsert>) =>
+      dbError(
+        t.database.db
+          .update(credentialOffers)
+          .set(values)
+          .where(eq(credentialOffers.id, offer.body.offerId)),
+      );
+    expect(await set({ invalidatedAt: new Date() })).toMatch(
+      /credential_offers_invalidation_reason_with_time/,
+    );
+    expect(await set({ invalidationReason: 'cancelled' })).toMatch(
+      /credential_offers_invalidation_reason_with_time/,
+    );
+    expect(await set({ invalidatedAt: new Date(), invalidationReason: 'lost' })).toMatch(
+      /credential_offers_invalidation_reason_value/,
+    );
+    expect(OFFER_INVALIDATION_REASONS).toEqual([
+      'replaced',
+      'cancelled',
+      'credential_revoked',
+      'credential_superseded',
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+/**
+ * OpenID4VCI 1.0, §4.1.1 (Credential Offer parameters) and §4.1.2 (credential_offer by value):
+ *   credential_issuer             REQUIRED: the Credential Issuer's URL (https)
+ *   credential_configuration_ids  REQUIRED: non-empty array of unique strings, each a key of
+ *                                 credential_configurations_supported in the issuer metadata
+ *   grants                        OPTIONAL; for the pre-authorised code grant:
+ *     "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+ *        "pre-authorized_code" REQUIRED, "tx_code" OPTIONAL, "authorization_server" OPTIONAL }
+ * UniVault does not support tx_code yet (Decision 021), so it must be absent.
+ */
+function checkOpenId4VciOffer(
+  offer: Record<string, unknown>,
+  { allowHttp, credentialType }: { allowHttp: boolean; credentialType: string },
+): string[] {
+  const problems: string[] = [];
+  for (const key of Object.keys(offer)) {
+    if (!['credential_issuer', 'credential_configuration_ids', 'grants'].includes(key)) {
+      problems.push(`unknown parameter ${key}`);
+    }
+  }
+  const issuer = offer.credential_issuer;
+  if (typeof issuer !== 'string') problems.push('credential_issuer missing');
+  else {
+    const url = new URL(issuer);
+    if (!(allowHttp ? ['https:', 'http:'] : ['https:']).includes(url.protocol)) {
+      problems.push(`credential_issuer scheme ${url.protocol}`);
+    }
+    if (url.search || url.hash) problems.push('credential_issuer has a query or fragment');
+    if (issuer.endsWith('/')) problems.push('credential_issuer ends with /');
+  }
+  const ids = offer.credential_configuration_ids;
+  if (!Array.isArray(ids) || ids.length === 0) problems.push('credential_configuration_ids empty');
+  else {
+    if (new Set(ids).size !== ids.length) problems.push('credential_configuration_ids not unique');
+    if (!ids.every((id) => typeof id === 'string')) problems.push('non-string configuration id');
+    if (!ids.includes(credentialType)) problems.push('configuration id does not match');
+  }
+  const grants = offer.grants as Record<string, Record<string, unknown>> | undefined;
+  const grant = grants?.['urn:ietf:params:oauth:grant-type:pre-authorized_code'];
+  if (!grant) problems.push('pre-authorized_code grant missing');
+  else {
+    const code = grant['pre-authorized_code'];
+    if (typeof code !== 'string' || code === '') problems.push('pre-authorized_code missing');
+    if ('tx_code' in grant) problems.push('tx_code present (not supported yet)');
+    for (const key of Object.keys(grant)) {
+      if (!['pre-authorized_code', 'tx_code', 'authorization_server'].includes(key)) {
+        problems.push(`unknown grant parameter ${key}`);
+      }
+    }
+  }
+  return problems;
+}
+
+describe('the offer payload follows OpenID4VCI 1.0', () => {
+  it('passes the structure check in development (http allowed)', async () => {
+    const offer = await createOffer(tokens.employerOfficer, await newPendingEmployment());
+    expect(
+      checkOpenId4VciOffer(offer.body.credentialOffer, {
+        allowHttp: true,
+        credentialType: offer.body.credentialType,
+      }),
+    ).toEqual([]);
+    expect(offer.body.credentialOffer.credential_configuration_ids).toEqual([
+      'EmploymentCredential',
+    ]);
+  });
+
+  it('carries the offer by value in an openid-credential-offer:// URI with no other parameter', async () => {
+    const offer = await createOffer(tokens.employerOfficer, await newPendingEmployment());
+    const url = new URL(offer.body.qrContent);
+    expect(url.protocol).toBe('openid-credential-offer:');
+    expect([...url.searchParams.keys()]).toEqual(['credential_offer']);
+    expect(JSON.parse(url.searchParams.get('credential_offer')!)).toEqual(
+      offer.body.credentialOffer,
+    );
+  });
+
+  it('uses an https credential_issuer from PUBLIC_BASE_URL; production refuses anything else', async () => {
+    const httpsOffers = createCredentialOffersService(t.database.db, {
+      ttlSeconds: DEFAULT_TTL,
+      publicBaseUrl: 'https://issuer.univault.example/',
+    });
+    const [officer] = await t.database.db
+      .select({ id: issuerStaff.id })
+      .from(issuerStaff)
+      .where(eq(issuerStaff.email, STAFF.employerOfficer));
+    const staff: StaffProfile = {
+      id: officer!.id,
+      email: STAFF.employerOfficer,
+      displayName: 'Officer',
+      role: 'officer',
+      issuer: { id: 'employer-a', name: 'Serendib Trading Company (Demo)', type: 'employer' },
+    };
+    const offer = await httpsOffers.createOffer(staff, await newPendingEmployment());
+    issuedCodes.push(
+      offer.credentialOffer.grants[PRE_AUTHORIZED_CODE_GRANT]['pre-authorized_code'],
+    );
+    expect(offer.credentialOffer.credential_issuer).toBe(
+      'https://issuer.univault.example/api/v1/issuers/employer-a',
+    );
+    expect(
+      checkOpenId4VciOffer(offer.credentialOffer as unknown as Record<string, unknown>, {
+        allowHttp: false,
+        credentialType: 'EmploymentCredential',
+      }),
+    ).toEqual([]);
+    expect(() =>
+      loadConfig({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'x'.repeat(32),
+        ISSUER_KEY_PASSPHRASE: 'a-long-production-passphrase',
+        DATABASE_URL: 'postgres://localhost/univault',
+        PUBLIC_BASE_URL: 'http://issuer.univault.example',
+      }),
+    ).toThrow(/PUBLIC_BASE_URL: must be an https:\/\/ URL in production/);
+  });
+
+  it('the checker catches each deviation', () => {
+    const good = {
+      credential_issuer: 'https://a.example/api/v1/issuers/x',
+      credential_configuration_ids: ['EmploymentCredential'],
+      grants: { [PRE_AUTHORIZED_CODE_GRANT]: { 'pre-authorized_code': 'c' } },
+    };
+    const opts = { allowHttp: false, credentialType: 'EmploymentCredential' };
+    const check = (offer: Record<string, unknown>) => checkOpenId4VciOffer(offer, opts);
+    expect(check(good)).toEqual([]);
+    expect(check({ ...good, credential_issuer: 'http://a.example' })).toEqual([
+      'credential_issuer scheme http:',
+    ]);
+    expect(check({ ...good, credential_issuer: 'https://a.example/?x=1' })).toEqual([
+      'credential_issuer has a query or fragment',
+    ]);
+    expect(check({ ...good, credential_issuer: 'https://a.example/x/' })).toEqual([
+      'credential_issuer ends with /',
+    ]);
+    expect(check({ ...good, credential_issuer: 1 })).toEqual(['credential_issuer missing']);
+    expect(check({ ...good, credential_configuration_ids: [] })).toEqual([
+      'credential_configuration_ids empty',
+    ]);
+    expect(check({ ...good, credential_configuration_ids: ['KYCCredential'] })).toEqual([
+      'configuration id does not match',
+    ]);
+    expect(check({ ...good, credential_configuration_ids: ['EmploymentCredential', 3] })).toEqual([
+      'non-string configuration id',
+    ]);
+    expect(
+      check({
+        ...good,
+        credential_configuration_ids: ['EmploymentCredential', 'EmploymentCredential'],
+      }),
+    ).toEqual(['credential_configuration_ids not unique']);
+    expect(
+      check({
+        ...good,
+        grants: {
+          [PRE_AUTHORIZED_CODE_GRANT]: { 'pre-authorized_code': '', tx_code: {}, user_pin: true },
+        },
+      }),
+    ).toEqual([
+      'pre-authorized_code missing',
+      'tx_code present (not supported yet)',
+      'unknown grant parameter user_pin',
+    ]);
+    expect(check({ ...good, credentials: [] })).toEqual(['unknown parameter credentials']);
+    expect(check({ ...good, grants: {} })).toEqual(['pre-authorized_code grant missing']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('GET /credentials/:id – activeOffer (id and expiry only)', () => {
+  const credential = async (id: string) => {
+    const res = await request(t.app)
+      .get(`/api/v1/credentials/${id}`)
+      .set('Authorization', `Bearer ${tokens.employerOfficer}`);
+    getResponses.push(res.text);
+    expect(res.status).toBe(200);
+    return res.body as { activeOffer: { offerId: string; expiresAt: string } | null };
+  };
+
+  it('is null without an offer, the newest usable offer after one, null again once it ends', async () => {
+    const credentialId = await newPendingEmployment();
+    expect((await credential(credentialId)).activeOffer).toBeNull();
+
+    await createOffer(tokens.employerOfficer, credentialId);
+    const second = await createOffer(tokens.employerOfficer, credentialId);
+    expect((await credential(credentialId)).activeOffer).toEqual({
+      offerId: second.body.offerId,
+      expiresAt: second.body.expiresAt,
+    });
+
+    const cancel = await request(t.app)
+      .post(`/api/v1/credential-offers/${second.body.offerId}/cancel`)
+      .set('Authorization', `Bearer ${tokens.employerOfficer}`);
+    expect(cancel.status).toBe(200);
+    expect((await credential(credentialId)).activeOffer).toBeNull();
+
+    const third = await createOffer(tokens.employerOfficer, credentialId);
+    await t.database.db
+      .update(credentialOffers)
+      .set({
+        createdAt: new Date(Date.now() - 20 * 60_000),
+        expiresAt: new Date(Date.now() - 10 * 60_000),
+      })
+      .where(eq(credentialOffers.id, third.body.offerId));
+    expect((await credential(credentialId)).activeOffer).toBeNull();
+  });
+
+  it('is null once the credential is no longer pending', async () => {
+    const credentialId = await newPendingEmployment();
+    await createOffer(tokens.employerOfficer, credentialId);
+    const signer = createCredentialsService(t.database.db, loadCredentialSchemas(), {
+      keyStore: createKeyStore({
+        db: t.database.db,
+        source: 'file',
+        keysDir,
+        passphrase: PASSPHRASE,
+      }),
+      publicBaseUrl: BASE_URL,
+    });
+    await signer.signCredential(credentialId, walletJwk());
+    expect((await credential(credentialId)).activeOffer).toBeNull();
   });
 });
 

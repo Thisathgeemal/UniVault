@@ -8,6 +8,7 @@
  *     /holders/:holderId    one holder (the Holders route's roles)
  *     /credentials/new      issue a credential (the Credentials route's roles)
  *     /credentials/:id      one credential; the success page after issuing (?issued=1)
+ *     /credentials/:id/offer  the wallet offer (QR code) for a pending credential
  *     *                     404
  */
 import type { ReactNode } from 'react';
@@ -16,6 +17,7 @@ import { RequireRole } from './auth/RequireRole.js';
 import { ProtectedLayout } from './layout/ProtectedLayout.js';
 import { RootLayout } from './layout/RootLayout.js';
 import { ComingSoonPage } from './pages/ComingSoonPage.js';
+import { CredentialOfferPage } from './pages/credentials/CredentialOfferPage.js';
 import { CredentialPage } from './pages/credentials/CredentialPage.js';
 import { CredentialsPage } from './pages/credentials/CredentialsPage.js';
 import { IssueCredentialPage } from './pages/credentials/IssueCredentialPage.js';
@@ -88,6 +90,15 @@ export function createRoutes(): RouteObject[] {
               element: (
                 <RequireRole roles={CREDENTIALS.roles}>
                   <CredentialPage />
+                </RequireRole>
+              ),
+              errorElement: <RouteErrorPage />,
+            },
+            {
+              path: '/credentials/:credentialId/offer',
+              element: (
+                <RequireRole roles={CREDENTIALS.roles}>
+                  <CredentialOfferPage />
                 </RequireRole>
               ),
               errorElement: <RouteErrorPage />,

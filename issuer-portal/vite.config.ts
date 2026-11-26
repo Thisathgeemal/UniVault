@@ -38,6 +38,8 @@ export default defineConfig(({ mode }) => {
       include: [
         '@univault/claims-validation > ajv/dist/runtime/ucs2length.js',
         '@univault/claims-validation > ajv-formats/dist/formats.js',
+        // portal-ui's QR encoder (CommonJS)
+        '@univault/portal-ui > qrcode',
       ],
     },
     server: { port: 5173, strictPort: true },

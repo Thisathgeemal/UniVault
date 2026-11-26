@@ -14,6 +14,18 @@ export function formatColomboDateTime(iso: string, language: string): string | n
 
 const locale = (language: string) => (language === 'si' ? 'si-LK' : 'en-LK');
 
+/** e.g. "15:30": the 24-hour time of an ISO instant in Asia/Colombo; null if invalid. */
+export function formatColomboTime(iso: string, language: string): string | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(locale(language), {
+    timeZone: PORTAL_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
+}
+
 /** A count with the language's digit grouping, e.g. 12,345. */
 export function formatNumber(value: number, language: string): string {
   return new Intl.NumberFormat(locale(language)).format(value);

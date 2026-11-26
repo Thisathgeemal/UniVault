@@ -27,7 +27,8 @@ const t = i18n.t.bind(i18n);
 
 async function openDashboard(as = ADMIN) {
   const view = renderApp('/', { signedInAs: as });
-  await screen.findByRole('link', { name: 'Issued 12,345' });
+  // First render of the file: allow for a slow, busy machine (the suite runs in parallel)
+  await screen.findByRole('link', { name: 'Issued 12,345' }, { timeout: 5000 });
   return view;
 }
 

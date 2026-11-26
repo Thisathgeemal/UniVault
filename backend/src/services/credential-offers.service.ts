@@ -36,6 +36,20 @@ const CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 export type OfferStatus = 'active' | 'redeemed' | 'expired' | 'invalidated';
 
+/**
+ * Why an invalidated offer stopped working (migration 0008, Decision 021). Set exactly when
+ * invalidatedAt is: 'replaced' = a newer offer for the same credential, 'cancelled' = staff
+ * cancelled it, 'credential_revoked' / 'credential_superseded' = its credential was revoked /
+ * reissued.
+ */
+export const OFFER_INVALIDATION_REASONS = [
+  'replaced',
+  'cancelled',
+  'credential_revoked',
+  'credential_superseded',
+] as const;
+export type OfferInvalidationReason = (typeof OFFER_INVALIDATION_REASONS)[number];
+
 /** OpenID4VCI credential offer object (pre-authorised code flow). */
 export interface CredentialOfferPayload {
   credential_issuer: string;
@@ -60,6 +74,8 @@ export interface CreatedOffer {
   status: 'active';
   expiresAt: string;
   expiresInSeconds: number;
+  /** The server's clock when the offer was created (ISO), so the portal can correct for skew. */
+  serverTime: string;
   credentialOffer: CredentialOfferPayload;
   qrContent: string;
   /** Earlier offers this one replaced (for logging; not part of the response). */
@@ -78,7 +94,11 @@ export interface OfferDetail {
   expiresAt: string;
   redeemedAt: string | null;
   invalidatedAt: string | null;
+  /** Set exactly when status is 'invalidated'. */
+  invalidationReason: OfferInvalidationReason | null;
   createdBy: { id: string; displayName: string } | null;
+  /** The server's clock when this answer was made (ISO), for the portal's skew correction. */
+  serverTime: string;
 }
 
 /** What redemption (Sprint 2) needs to know about an offer found by its code. No hash. */
@@ -101,6 +121,11 @@ export interface OfferForRedemption {
 export interface CredentialOffersService {
   createOffer(staff: StaffProfile, credentialId: string): Promise<CreatedOffer>;
   getOffer(staff: StaffProfile, offerId: string): Promise<OfferDetail>;
+  /**
+   * Cancels an ACTIVE offer of the staff member's issuer (404 otherwise; 409 OFFER_NOT_ACTIVE
+   * if it is redeemed, expired or already invalidated). Its code stops working at once.
+   */
+  cancelOffer(staff: StaffProfile, offerId: string): Promise<OfferDetail>;
   /** Hashes the code and looks the offer up by hash. Null for an unknown or malformed code. */
   findOfferByCode(code: unknown): Promise<OfferForRedemption | null>;
 }
@@ -113,6 +138,8 @@ export interface CredentialOffersServiceOptions {
 
 export const offerNotFound = () =>
   new AppError(404, 'OFFER_NOT_FOUND', 'Credential offer not found');
+
+type Executor = Pick<Db, 'select' | 'update'>;
 
 /** Base64url SHA-256 of a pre-authorised code – the only form that is stored. */
 export function hashPreAuthorizedCode(code: string): string {
@@ -136,6 +163,62 @@ export function createCredentialOffersService(
 ): CredentialOffersService {
   const now = options.now ?? (() => new Date());
   const baseUrl = options.publicBaseUrl.replace(/\/+$/, '');
+
+  /** One offer of the staff member's issuer as the portal sees it (404 for any other). */
+  const readOffer = async (
+    executor: Executor,
+    staff: StaffProfile,
+    offerId: string,
+    at: Date = now(),
+  ): Promise<OfferDetail> => {
+    const [row] = await executor
+      .select({
+        offerId: credentialOffers.id,
+        createdAt: credentialOffers.createdAt,
+        expiresAt: credentialOffers.expiresAt,
+        redeemedAt: credentialOffers.redeemedAt,
+        invalidatedAt: credentialOffers.invalidatedAt,
+        invalidationReason: credentialOffers.invalidationReason,
+        createdById: issuerStaff.id,
+        createdByName: issuerStaff.displayName,
+        credentialId: credentialRecords.id,
+        credentialType: credentialRecords.credentialType,
+        credentialStatus: credentialRecords.status,
+        holderId: holders.id,
+        holderName: holders.fullName,
+        holderRef: holders.externalRef,
+      })
+      .from(credentialOffers)
+      .innerJoin(credentialRecords, eq(credentialRecords.id, credentialOffers.credentialId))
+      .innerJoin(holders, eq(holders.id, credentialRecords.holderId))
+      .leftJoin(issuerStaff, eq(issuerStaff.id, credentialOffers.createdByStaffId))
+      .where(
+        and(eq(credentialOffers.id, offerId), eq(credentialRecords.issuerId, staff.issuer.id)),
+      );
+    if (!row) throw offerNotFound();
+
+    const status = offerStatus(row, at);
+    return {
+      offerId: row.offerId,
+      credentialId: row.credentialId,
+      credentialType: row.credentialType,
+      credentialStatus: row.credentialStatus,
+      holder: { id: row.holderId, fullName: row.holderName, externalRef: row.holderRef },
+      status,
+      createdAt: row.createdAt.toISOString(),
+      expiresAt: row.expiresAt.toISOString(),
+      redeemedAt: row.redeemedAt?.toISOString() ?? null,
+      invalidatedAt: row.invalidatedAt?.toISOString() ?? null,
+      // The 0008 CHECK guarantees a reason for every invalidated row
+      invalidationReason:
+        status === 'invalidated' ? (row.invalidationReason as OfferInvalidationReason) : null,
+      createdBy:
+        row.createdById && row.createdByName
+          ? { id: row.createdById, displayName: row.createdByName }
+          : null,
+      serverTime: at.toISOString(),
+    };
+  };
 
   return {
     async createOffer(staff, credentialId) {
@@ -179,7 +262,7 @@ export function createCredentialOffersService(
         // Only one usable offer per credential: invalidate earlier ones that could still be redeemed
         const invalidated = await tx
           .update(credentialOffers)
-          .set({ invalidatedAt: createdAt })
+          .set({ invalidatedAt: createdAt, invalidationReason: 'replaced' })
           .where(
             and(
               eq(credentialOffers.credentialId, credential.id),
@@ -223,6 +306,7 @@ export function createCredentialOffersService(
         status: 'active',
         expiresAt: result.expiresAt.toISOString(),
         expiresInSeconds: Math.round((result.expiresAt.getTime() - createdAt.getTime()) / 1000),
+        serverTime: createdAt.toISOString(),
         credentialOffer,
         qrContent:
           CREDENTIAL_OFFER_URI_PREFIX + encodeURIComponent(JSON.stringify(credentialOffer)),
@@ -230,48 +314,42 @@ export function createCredentialOffersService(
       };
     },
 
-    async getOffer(staff, offerId) {
-      const [row] = await db
-        .select({
-          offerId: credentialOffers.id,
-          createdAt: credentialOffers.createdAt,
-          expiresAt: credentialOffers.expiresAt,
-          redeemedAt: credentialOffers.redeemedAt,
-          invalidatedAt: credentialOffers.invalidatedAt,
-          createdById: issuerStaff.id,
-          createdByName: issuerStaff.displayName,
-          credentialId: credentialRecords.id,
-          credentialType: credentialRecords.credentialType,
-          credentialStatus: credentialRecords.status,
-          holderId: holders.id,
-          holderName: holders.fullName,
-          holderRef: holders.externalRef,
-        })
-        .from(credentialOffers)
-        .innerJoin(credentialRecords, eq(credentialRecords.id, credentialOffers.credentialId))
-        .innerJoin(holders, eq(holders.id, credentialRecords.holderId))
-        .leftJoin(issuerStaff, eq(issuerStaff.id, credentialOffers.createdByStaffId))
-        .where(
-          and(eq(credentialOffers.id, offerId), eq(credentialRecords.issuerId, staff.issuer.id)),
-        );
-      if (!row) throw offerNotFound();
+    getOffer: (staff, offerId) => readOffer(db, staff, offerId),
 
-      return {
-        offerId: row.offerId,
-        credentialId: row.credentialId,
-        credentialType: row.credentialType,
-        credentialStatus: row.credentialStatus,
-        holder: { id: row.holderId, fullName: row.holderName, externalRef: row.holderRef },
-        status: offerStatus(row, now()),
-        createdAt: row.createdAt.toISOString(),
-        expiresAt: row.expiresAt.toISOString(),
-        redeemedAt: row.redeemedAt?.toISOString() ?? null,
-        invalidatedAt: row.invalidatedAt?.toISOString() ?? null,
-        createdBy:
-          row.createdById && row.createdByName
-            ? { id: row.createdById, displayName: row.createdByName }
-            : null,
-      };
+    async cancelOffer(staff, offerId) {
+      return db.transaction(async (tx) => {
+        // Lock the offer and its credential (as createOffer does), so a cancel and a new
+        // offer for the same credential are serialised
+        const [row] = await tx
+          .select({
+            id: credentialOffers.id,
+            expiresAt: credentialOffers.expiresAt,
+            redeemedAt: credentialOffers.redeemedAt,
+            invalidatedAt: credentialOffers.invalidatedAt,
+          })
+          .from(credentialOffers)
+          .innerJoin(credentialRecords, eq(credentialRecords.id, credentialOffers.credentialId))
+          .where(
+            and(eq(credentialOffers.id, offerId), eq(credentialRecords.issuerId, staff.issuer.id)),
+          )
+          .for('update');
+        if (!row) throw offerNotFound();
+        const at = now();
+        const status = offerStatus(row, at);
+        if (status !== 'active') {
+          throw new AppError(
+            409,
+            'OFFER_NOT_ACTIVE',
+            `Only an active offer can be cancelled (this one is ${status})`,
+            { status },
+          );
+        }
+        await tx
+          .update(credentialOffers)
+          .set({ invalidatedAt: at, invalidationReason: 'cancelled' })
+          .where(eq(credentialOffers.id, row.id));
+        return readOffer(tx, staff, offerId, at);
+      });
     },
 
     async findOfferByCode(code) {

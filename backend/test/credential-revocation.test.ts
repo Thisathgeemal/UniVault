@@ -160,7 +160,7 @@ beforeAll(async () => {
     publicBaseUrl: BASE_URL,
   });
   offersService = createCredentialOffersService(t.database.db, {
-    ttlSeconds: 600,
+    ttlSeconds: testConfig().CREDENTIAL_OFFER_TTL_SECONDS,
     publicBaseUrl: BASE_URL,
   });
 });
@@ -190,7 +190,7 @@ describe('POST /credentials/:id/revoke', () => {
 
     // Same shape and values as GET /credentials/:id
     const get = await getCredential(id);
-    expect(get.body).toEqual(res.body);
+    expect(get.body).toEqual({ ...res.body, activeOffer: null }); // the detail adds activeOffer
 
     const row = await recordOf(id);
     expect(row.revokedByStaffId).toBe(res.body.revokedBy.id);
@@ -338,7 +338,10 @@ describe('POST /credentials/:id/reissue', () => {
     });
     expect(old.body.supersededAt).toBe(res.body.credential.createdAt);
     // The new credential's own GET matches the reissue response
-    expect((await getCredential(newId)).body).toEqual(res.body.credential);
+    expect((await getCredential(newId)).body).toEqual({
+      ...res.body.credential,
+      activeOffer: null,
+    });
   });
 
   it("builds the replacement from the holder's CURRENT record", async () => {

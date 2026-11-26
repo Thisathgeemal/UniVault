@@ -129,6 +129,11 @@ export const credentialOffers = pgTable('credential_offers', {
   failedAttempts: integer('failed_attempts').notNull().default(0),
   /** Set when a newer offer for the same credential replaced this one (migration 0004). */
   invalidatedAt: timestamp('invalidated_at', { withTimezone: true }),
+  /**
+   * Why it was invalidated (migration 0008): 'replaced' | 'cancelled' | 'credential_revoked' |
+   * 'credential_superseded'; set exactly when invalidatedAt is.
+   */
+  invalidationReason: text('invalidation_reason'),
   createdByStaffId: uuid('created_by_staff_id').references(() => issuerStaff.id),
   ...timestamps,
 });

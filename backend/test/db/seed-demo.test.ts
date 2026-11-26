@@ -29,7 +29,11 @@ import { createCredentialsService } from '../../src/services/credentials.service
 import { createDashboardService } from '../../src/services/dashboard.service.js';
 import { createIssuerKeysService } from '../../src/services/issuer-keys.service.js';
 import { fileURLToPath } from 'node:url';
+import { testConfig } from '../helpers.js';
 import { freshDatabase } from './helpers.js';
+
+/** The configured default offer lifetime, as db:seed:demo uses it. */
+const OFFER_TTL_SECONDS = testConfig().CREDENTIAL_OFFER_TTL_SECONDS;
 
 const PASSPHRASE = 'test-key-passphrase-123';
 const BASE_URL = 'http://localhost:4000';
@@ -44,7 +48,7 @@ const options = (overrides: Partial<DemoSeedOptions> = {}): DemoSeedOptions => (
   keyStore,
   schemas,
   publicBaseUrl: BASE_URL,
-  offerTtlSeconds: 600,
+  offerTtlSeconds: OFFER_TTL_SECONDS,
   nodeEnv: 'development',
   now: () => NOW,
   ...overrides,
@@ -172,7 +176,7 @@ describe('db:seed:demo', () => {
   it('is idempotent: a second run skips and creates nothing', async () => {
     const before = await rowCounts();
     // Same injected clock as the first run: never mix it with the real time (Sprint 1 Issue
-    // "date-dependent test – time bomb": the offers expire 600 s after NOW)
+    // "date-dependent test – time bomb": the offers expire OFFER_TTL_SECONDS after NOW)
     const again = await seedDemoData(database.db, options());
     expect(again).toEqual({ outcome: 'skipped', counts: EXPECTED_COUNTS });
     expect(await rowCounts()).toEqual(before);
@@ -180,7 +184,7 @@ describe('db:seed:demo', () => {
 
   it('a skipped run counts at its own clock: open offers drop to 0 after their TTL', async () => {
     const before = await rowCounts();
-    const afterTtl = new Date(NOW.getTime() + 600_000); // offer expiry is exclusive
+    const afterTtl = new Date(NOW.getTime() + OFFER_TTL_SECONDS * 1000); // expiry is exclusive
     const later = await seedDemoData(database.db, options({ now: () => afterTtl }));
     expect(later).toEqual({ outcome: 'skipped', counts: { ...EXPECTED_COUNTS, openOffers: 0 } });
     expect(await rowCounts()).toEqual(before);

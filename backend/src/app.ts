@@ -169,6 +169,7 @@ export function createApp(config: AppConfig, logger: Logger, deps: AppDependenci
     ? createCredentialOffersService(deps.database.db, {
         ttlSeconds: config.CREDENTIAL_OFFER_TTL_SECONDS,
         publicBaseUrl: config.PUBLIC_BASE_URL,
+        now,
       })
     : undefined;
   // DEV ONLY (remove in Sprint 2 with wallet redemption): one warning when the app is built,

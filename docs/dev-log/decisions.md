@@ -34,6 +34,7 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 | [018](#decision-018-one-shared-claims-validation-package-the-portal-precompiles-the-schemas-at-build-time)                                              | One shared claims-validation package; the portal precompiles the schemas at build time                                               | Thu 26 Nov 2026 | S2                       | Draft – review | FR-ISS-01, NFR-02, NFR-05, NFR-08                             |
 | [019](#decision-019-issuance-form-is-read-only-and-previewed-server-side)                                                                               | Issuance form is read-only and previewed server-side; schema limited by issuer type                                                  | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-01, FR-ISS-02, FR-WAL-06                               |
 | [020](#decision-020-portrait-embedded-in-the-credential-size-limited-and-selectively-disclosable)                                                       | Portrait embedded in the credential, size-limited (40 KB) and selectively disclosable                                                | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-03, NFR-06, NFR-08, FR-WAL-06                             |
+| [021](#decision-021-pre-authorised-code-kept-only-in-portal-memory-qr-never-re-shown)                                                                   | Pre-authorised code kept only in portal memory; QR never re-shown; tx_code deferred                                                  | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -874,8 +875,8 @@ by value). `credential_configuration_ids` holds `EmploymentCredential` or `KYCCr
 
 - The code is 256 random bits (`crypto.randomBytes(32)`, base64url); only its SHA-256 hash is
   stored.
-- An offer expires after `CREDENTIAL_OFFER_TTL_SECONDS` (default 600) and never outlives its
-  credential.
+- An offer expires after `CREDENTIAL_OFFER_TTL_SECONDS` (default 600 when decided; 300 since
+  26 Nov 2026, see Consequences) and never outlives its credential.
 - Only one usable offer per credential: a new offer invalidates the previous usable one
   (`invalidated_at`, migration 0004; the credential row is locked).
 - The response carrying the code is sent once, with `Cache-Control: no-store`; the code is never
@@ -906,6 +907,15 @@ by value). `credential_configuration_ids` holds `EmploymentCredential` or `KYCCr
   `credential_issuer` is built from it.
 - Revoking or reissuing a credential invalidates its open offers in the same transaction
   (Decision 012), so a QR code for a withdrawn credential can no longer be redeemed.
+- **Offer lifetime reduced from 10 to 5 minutes (26 Nov 2026):** enough time for the holder to
+  scan and accept, and a shorter window for an intercepted QR code to be misused.
+  (`CREDENTIAL_OFFER_TTL_SECONDS` default 600 → 300.)
+
+**Follow-up (26 Nov 2026):** a backend test now checks the offer against OpenID4VCI 1.0
+(`checkOpenId4VciOffer`); every field name already matched. Production refuses a non-https
+`PUBLIC_BASE_URL` (the `credential_issuer`). Offers gained `serverTime`, an
+`invalidation_reason` (migration 0008) and a cancel endpoint; `tx_code` stays out and the
+portal keeps the code in memory only (Decision 021).
 
 ## Decision 012: Reissue supersedes immediately; status changes recorded as append-only events
 
@@ -1810,3 +1820,96 @@ as a JPEG data URI rather than referenced. The v1 limit (`maxLength` 70 000 char
   limit and the message already exist in the shared validation.
 - **Changing the limit later** is a schema change: `maxLength` in both files. The message
   follows automatically.
+
+## Decision 021: Pre-authorised code kept only in portal memory; QR never re-shown
+
+- **Date:** Thu 26 Nov 2026
+- **Sprint:** S2 (Sprint 1 carry-over)
+- **Status:** Draft – review
+- **Requirements:** FR-ISS-01, NFR-06, NFR-08
+- **Related:** Decision 011 (OpenID4VCI pre-authorised offer), Decision 016 (staff token never
+  in localStorage), [credential-offers-api.md](../api/credential-offers-api.md),
+  [issuer-portal.md](../frontend/issuer-portal.md) §11, migration
+  `backend/migrations/0008_offer_invalidation_reason.sql`
+- **Evidence:** `issuer-portal/test/offer.test.tsx` (code absent from the URL, both storages,
+  the query caches and the console; reload message; developer panel absent in production),
+  `issuer-portal/scripts/check-production-bundle.mjs` (run by `npm run build`: panel not in the production bundle),
+  `issuer-portal/e2e/offer.spec.ts`, `backend/test/credential-offers.test.ts`;
+  [s1-offer-qr-guide.md](evidence/s1-offer-qr-guide.md)
+
+### Context
+
+The QR code on the offer screen is `openid-credential-offer://?credential_offer=…` with the
+one-time **pre-authorised code** inside (Decision 011). Whoever has the code (a photo of the
+screen, a copy in browser storage, a log line) can redeem the credential into their own wallet
+until the offer expires (5 minutes by default; 10 until 26 Nov 2026). The backend already stores only the code's
+hash and returns the code once, in the create response. The portal now had to decide what
+happens to that response: where it is kept, and what the screen does after a reload, the back
+button or a second tab, when staff expect to see the QR again.
+
+### Options considered
+
+1. **Re-fetchable code, stored encrypted on the server:** keep the code encrypted (not just
+   hashed) so `GET` can return it again and the screen can re-show the same QR after a reload.
+2. **Memory only, never re-shown:** the code lives in the offer screen's component state only.
+   It is never written to the URL, `sessionStorage` / `localStorage`, the TanStack Query caches
+   or the console. Opened without it while the offer is still active, the screen says so and
+   offers a new QR code.
+
+And, independently, for the offer itself:
+
+- **With a transaction code (`tx_code`):** OpenID4VCI's optional PIN, sent to the holder out of
+  band (SMS or e-mail) and typed into the wallet, so the QR alone is not enough.
+- **Without `tx_code`:** the QR alone is enough.
+
+### Decision
+
+**Option 2, without `tx_code` for now.**
+
+- `createOffer()` (`issuer-portal/src/api/offers.ts`) is called directly, **not through
+  TanStack Query**, so no query or mutation cache ever holds the code. The result is kept in
+  `CredentialOfferPage`'s state; leaving the page drops it.
+- The page is `/credentials/:credentialId/offer`: no offer id or code in the URL.
+- The polled status (`GET /credential-offers/:offerId`) and the cancel response carry no code;
+  their queries use `gcTime: 0` and are removed when the page unmounts.
+- **Never re-shown:** `GET /credentials/:id` returns `activeOffer` (id and expiry only). Opened
+  without the code in memory while an offer is active, the screen shows "For security, this QR
+  code can't be shown again. Generate a new one to continue." It never asks for the code.
+  Generating a new one invalidates the old offer (`invalidation_reason = 'replaced'`).
+- **Developer panel:** the decoded `credential_offer` (code included), for wallet development
+  in Sprint 2, exists in **non-production builds only**: `import.meta.env.PROD` is tested inline
+  at the render site, so the production build drops the panel's code (a build test checks the
+  bundle).
+- **`tx_code` deferred:** UniVault has no out-of-band channel to the holder yet (no SMS or
+  e-mail sending). The offer payload therefore has no `tx_code`; a backend test checks it is
+  absent.
+
+### Reason
+
+- **Nothing to steal at rest (NFR-06, NFR-08):** with option 2 the code exists in exactly two
+  places, the create response in flight and the screen's memory, both short-lived. Option 1
+  would add a reversible copy on the server and a key to protect, and turn every `GET` into a
+  way to obtain a redeemable code, undoing the "hash only, shown once" rule of Decision 011.
+- **Browser storage is readable by any script on the origin** and survives the tab;
+  Decision 016 already keeps the staff token out of `localStorage` for that reason. The code is
+  a bearer secret of the same kind.
+- **Re-showing is not needed:** generating a new QR takes one click and invalidates the old
+  one, so a lost screen costs the holder seconds, not a trip back to the counter.
+- **`tx_code`** adds real protection against a photographed QR, but only with a channel the
+  holder controls; showing the PIN on the same screen as the QR would add nothing. The holder
+  is normally in front of the officer, and the offer expires in minutes.
+
+### Consequences
+
+- A reload, the back button or a second tab always means a new QR code (the old one stops
+  working). Staff are told why on screen.
+- `GET /credentials/:id` gained `activeOffer`; `GET /credential-offers/:offerId` gained
+  `invalidationReason` and `serverTime` (the countdown runs on the server's clock), and
+  `POST /credential-offers/:offerId/cancel` was added (migration 0008 records the reason).
+- **Backlog:** `tx_code` (transaction PIN) once an SMS or e-mail channel exists
+  (`docs/dev-log/sprint-1.md`).
+- A screenshot of the QR is still a working code until it expires or is replaced: staff
+  should not share the screen. The short TTL and "Cancel offer" limit the window.
+- **Offer lifetime reduced from 10 to 5 minutes (26 Nov 2026):** enough time for the holder to
+  scan and accept, and a shorter window for an intercepted QR code to be misused.
+  (`CREDENTIAL_OFFER_TTL_SECONDS` default 600 → 300.)

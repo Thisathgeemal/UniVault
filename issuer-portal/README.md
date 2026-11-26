@@ -12,7 +12,8 @@ The layout comes from the shared [`@univault/portal-ui`](../portal-ui/README.md)
 
 **Status (26 Nov 2026):** sign-in, session, role-based layout, dashboard, holder management
 (list, registration form generated from the credential schema, detail), credential issuance
-(four steps previewed by the server, Decision 019) and placeholder pages.
+(four steps previewed by the server, Decision 019), the wallet offer QR screen (code kept in
+memory only, never re-shown, Decision 021) and placeholder pages.
 Design and flows: [docs/frontend/issuer-portal.md](../docs/frontend/issuer-portal.md)
 (Decisions 015, 016 and 018).
 
@@ -108,14 +109,16 @@ src/
   router.tsx               route tree (React Router data router)
   routes/app-routes.tsx    protected pages + roles: ONE list for the router guards and the sidebar
   api/                     client (Bearer, ApiError, session-ending 401s), auth, dashboard,
-                           holders, credentials
+                           holders, credentials, offers (create is NOT cached: one-time code)
   auth/                    AuthProvider (session), RequireRole, returnTo checks, sessionStorage
   layout/                  RootLayout (session provider), ProtectedLayout (AppShell + redirect)
   pages/                   Login, Dashboard, holders/ (list, register, detail), credentials/
-                           (picker, issue flow, credential / success page), ComingSoon,
+                           (picker, issue flow, credential / success page, wallet offer QR
+                           screen), ComingSoon,
                            Not permitted / 404 / error
   holders/                 form-model (form from the schema), validation, display, list-params
   issuance/                preview claim display, problems, HolderPicker (claims never built here)
+  offers/                  useNow (1 s clock), offer screen settings
   i18n/                    react-i18next set-up; locales/en.ts, locales/si.ts
   lib/                     sign-in messages, Asia/Colombo time formatting
 csp.ts                     production Content-Security-Policy

@@ -127,6 +127,11 @@ export const credentialMetadataSchema = z.object({
   issuedAt: z.string().nullable(),
   expiresAt: z.string(),
   createdAt: z.string(),
+  /**
+   * GET /credentials/:id only: the credential's active offer (id and expiry, never the code),
+   * or null. The offer screen uses it to refuse to re-show a QR code (Decision 021).
+   */
+  activeOffer: z.object({ offerId: z.string(), expiresAt: z.string() }).nullable().optional(),
 });
 export type CredentialMetadata = z.infer<typeof credentialMetadataSchema>;
 

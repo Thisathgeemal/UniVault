@@ -2,8 +2,9 @@
  * MSW handlers that behave like the backend's /auth endpoints (backend/src/routes/auth.routes.ts)
  * GET /dashboard/summary, /holders (list with search / sort / paging, detail, create with the
  * 409 duplicate rule), GET /credentials?holderId and the issuance endpoints (GET
- * /credential-schemas, POST /credentials/preview, POST /credentials, GET /credentials/:id) for
- * the seeded demo staff. Tokens are fake JWT-shaped strings (unsigned): the portal never
+ * /credential-schemas, POST /credentials/preview, POST /credentials, GET /credentials/:id) and the
+ * credential offers (create, status, cancel; with a skewable server clock) for the seeded demo
+ * staff. Tokens are fake JWT-shaped strings (unsigned): the portal never
  * verifies them, it only reads `exp` for timing.
  */
 import { http, HttpResponse } from 'msw';
@@ -12,6 +13,7 @@ import type { Staff } from '../src/api/auth.js';
 import { schemas as schemaFiles } from 'virtual:claims-validators';
 import type { CredentialItem, CredentialMetadata } from '../src/api/credentials.js';
 import type { DashboardSummary } from '../src/api/dashboard.js';
+import type { OfferInvalidationReason, OfferStatus } from '../src/api/offers.js';
 import type { HolderDetail } from '../src/api/holders.js';
 import { DEFAULT_API_BASE_URL } from '../src/config.js';
 
@@ -618,26 +620,255 @@ export const issuanceHandlers = [
     issuedStore.set(id, credential);
     return HttpResponse.json(credential, { status: 201 });
   }),
+];
+
+// ---------------------------------------------------------------------------
+// Credential offers: POST /credential-offers, GET /credential-offers/:offerId,
+// POST /credential-offers/:offerId/cancel, and activeOffer on GET /credentials/:id.
+// The mock server has its own clock (this browser's clock + mockServerClock.offsetMs), so
+// tests can give the PC a wrong time.
+
+/** The backend's default CREDENTIAL_OFFER_TTL_SECONDS (5 minutes; Decisions 011, 021). */
+export const OFFER_TTL_SECONDS = 300;
+export const mockServerClock = { offsetMs: 0 };
+const serverNow = () => Date.now() + mockServerClock.offsetMs;
+const OFFER_PREFIX = 'openid-credential-offer://?credential_offer=';
+const PRE_AUTH_GRANT = 'urn:ietf:params:oauth:grant-type:pre-authorized_code';
+
+export interface MockOffer {
+  offerId: string;
+  credentialId: string;
+  /** The one-time code (the real backend stores only its hash). */
+  code: string;
+  qrContent: string;
+  createdAt: number;
+  expiresAt: number;
+  redeemedAt: number | null;
+  invalidatedAt: number | null;
+  reason: OfferInvalidationReason | null;
+}
+export const offerStore = new Map<string, MockOffer>();
+
+const offerStatusAt = (offer: MockOffer, at: number): OfferStatus =>
+  offer.redeemedAt !== null
+    ? 'redeemed'
+    : offer.invalidatedAt !== null
+      ? 'invalidated'
+      : offer.expiresAt <= at
+        ? 'expired'
+        : 'active';
+
+/** A pending credential for `holderId` (an employer-a employee by default), for offer tests. */
+export function addPendingCredential(
+  holderId: string = HOLDER_IDS.nimesha,
+  status: CredentialMetadata['status'] = 'pending',
+): string {
+  const holder = holderStore.find((h) => h.id === holderId)!;
+  const id = `e0000000-0000-4000-8000-${String(issuedStore.size + 1).padStart(12, '0')}`;
+  issuedStore.set(id, {
+    id,
+    holder: { id: holder.id, externalRef: holder.externalRef, fullName: holder.fullName },
+    credentialType: holder.credentialType,
+    status,
+    effectiveStatus: status,
+    issuedAt: status === 'pending' ? null : MOCK_NOW,
+    expiresAt: '2027-11-26T04:30:00.000Z',
+    createdAt: MOCK_NOW,
+  });
+  return id;
+}
+
+/** Creates an offer directly in the store (e.g. one made in another tab). */
+export function mockCreateOffer(credentialId: string): MockOffer {
+  const at = serverNow();
+  for (const other of offerStore.values()) {
+    if (other.credentialId === credentialId && offerStatusAt(other, at) === 'active') {
+      other.invalidatedAt = at;
+      other.reason = 'replaced';
+    }
+  }
+  const n = offerStore.size + 1;
+  const code = `OneTimeCode${String(n).padStart(4, '0')}`.padEnd(43, 'Z');
+  const credential = issuedStore.get(credentialId)!;
+  const issuerId = holderStore.find((h) => h.id === credential.holder.id)!.issuerId;
+  const credentialOffer = {
+    credential_issuer: `http://localhost:4000/api/v1/issuers/${issuerId}`,
+    credential_configuration_ids: [credential.credentialType],
+    grants: { [PRE_AUTH_GRANT]: { 'pre-authorized_code': code } },
+  };
+  const offer: MockOffer = {
+    offerId: `f0000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+    credentialId,
+    code,
+    qrContent: OFFER_PREFIX + encodeURIComponent(JSON.stringify(credentialOffer)),
+    createdAt: at,
+    expiresAt: at + OFFER_TTL_SECONDS * 1000,
+    redeemedAt: null,
+    invalidatedAt: null,
+    reason: null,
+  };
+  offerStore.set(offer.offerId, offer);
+  return offer;
+}
+
+/** The wallet redeemed it (Sprint 2): the credential becomes valid. */
+export function mockRedeemOffer(offerId: string) {
+  const offer = offerStore.get(offerId)!;
+  offer.redeemedAt = serverNow();
+  const credential = issuedStore.get(offer.credentialId)!;
+  issuedStore.set(credential.id, { ...credential, status: 'valid', effectiveStatus: 'valid' });
+}
+
+export function mockInvalidateOffer(offerId: string, reason: OfferInvalidationReason) {
+  const offer = offerStore.get(offerId)!;
+  offer.invalidatedAt = serverNow();
+  offer.reason = reason;
+}
+
+const iso = (ms: number | null) => (ms === null ? null : new Date(ms).toISOString());
+
+function offerDetail(offer: MockOffer) {
+  const at = serverNow();
+  const credential = issuedStore.get(offer.credentialId)!;
+  const status = offerStatusAt(offer, at);
+  return {
+    offerId: offer.offerId,
+    credentialId: offer.credentialId,
+    credentialType: credential.credentialType,
+    credentialStatus: credential.status,
+    holder: {
+      id: credential.holder.id,
+      fullName: credential.holder.fullName,
+      externalRef: credential.holder.externalRef,
+    },
+    status,
+    createdAt: iso(offer.createdAt),
+    expiresAt: iso(offer.expiresAt),
+    redeemedAt: iso(offer.redeemedAt),
+    invalidatedAt: iso(offer.invalidatedAt),
+    invalidationReason: status === 'invalidated' ? offer.reason : null,
+    serverTime: iso(at),
+  };
+}
+
+const activeOfferOf = (credentialId: string) => {
+  const at = serverNow();
+  const offer = [...offerStore.values()]
+    .filter((o) => o.credentialId === credentialId && offerStatusAt(o, at) === 'active')
+    .at(-1);
+  return offer ? { offerId: offer.offerId, expiresAt: iso(offer.expiresAt)! } : null;
+};
+
+/** The credential if it belongs to the staff member's issuer. */
+const ownCredential = (staff: Staff, credentialId: string) => {
+  const known = issuedStore.get(credentialId);
+  const holder = known && holderStore.find((h) => h.id === known.holder.id);
+  return known && holder && holder.issuerId === staff.issuer.id ? known : undefined;
+};
+const offerNotFound = () =>
+  HttpResponse.json(errorBody('OFFER_NOT_FOUND', 'Credential offer not found'), { status: 404 });
+
+export const offerHandlers = [
   http.get(`${API}/credentials/:credentialId`, ({ request, params }) => {
     record(request, `/credentials/${String(params.credentialId)}`);
     const staff = staffFor(request);
     if (!staff) return unauthenticated();
-    const known = issuedStore.get(String(params.credentialId));
-    const holder = known && holderStore.find((h) => h.id === known.holder.id);
-    if (!known || !holder || holder.issuerId !== staff.issuer.id) {
+    const known = ownCredential(staff, String(params.credentialId));
+    if (!known) {
       return HttpResponse.json(errorBody('CREDENTIAL_NOT_FOUND', 'Credential not found'), {
         status: 404,
       });
     }
-    return HttpResponse.json(known);
+    return HttpResponse.json({
+      ...known,
+      activeOffer: known.status === 'pending' ? activeOfferOf(known.id) : null,
+    });
+  }),
+  http.post(`${API}/credential-offers`, async ({ request }) => {
+    const body = (await request.json()) as { credentialId: string };
+    record(request, '/credential-offers', body);
+    const staff = staffFor(request);
+    if (!staff) return unauthenticated();
+    const credential = ownCredential(staff, body.credentialId);
+    if (!credential) {
+      return HttpResponse.json(errorBody('CREDENTIAL_NOT_FOUND', 'Credential not found'), {
+        status: 404,
+      });
+    }
+    if (credential.status !== 'pending') {
+      return HttpResponse.json(
+        errorBody(
+          'CREDENTIAL_NOT_PENDING',
+          `Only a pending credential can be offered (this one is ${credential.status})`,
+        ),
+        { status: 409 },
+      );
+    }
+    const offer = mockCreateOffer(credential.id);
+    return HttpResponse.json(
+      {
+        offerId: offer.offerId,
+        credentialId: credential.id,
+        credentialType: credential.credentialType,
+        holder: {
+          id: credential.holder.id,
+          fullName: credential.holder.fullName,
+          externalRef: credential.holder.externalRef,
+        },
+        status: 'active',
+        expiresAt: iso(offer.expiresAt),
+        expiresInSeconds: OFFER_TTL_SECONDS,
+        serverTime: iso(offer.createdAt),
+        credentialOffer: JSON.parse(
+          decodeURIComponent(offer.qrContent.slice(OFFER_PREFIX.length)),
+        ) as unknown,
+        qrContent: offer.qrContent,
+      },
+      { status: 201, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }),
+  http.get(`${API}/credential-offers/:offerId`, ({ request, params }) => {
+    record(request, `/credential-offers/${String(params.offerId)}`);
+    const staff = staffFor(request);
+    if (!staff) return unauthenticated();
+    const offer = offerStore.get(String(params.offerId));
+    if (!offer || !ownCredential(staff, offer.credentialId)) return offerNotFound();
+    return HttpResponse.json(offerDetail(offer), { headers: { 'Cache-Control': 'no-store' } });
+  }),
+  http.post(`${API}/credential-offers/:offerId/cancel`, ({ request, params }) => {
+    record(request, `/credential-offers/${String(params.offerId)}/cancel`);
+    const staff = staffFor(request);
+    if (!staff) return unauthenticated();
+    const offer = offerStore.get(String(params.offerId));
+    if (!offer || !ownCredential(staff, offer.credentialId)) return offerNotFound();
+    const status = offerStatusAt(offer, serverNow());
+    if (status !== 'active') {
+      return HttpResponse.json(
+        errorBody(
+          'OFFER_NOT_ACTIVE',
+          `Only an active offer can be cancelled (this one is ${status})`,
+          { status },
+        ),
+        { status: 409 },
+      );
+    }
+    mockInvalidateOffer(offer.offerId, 'cancelled');
+    return HttpResponse.json(offerDetail(offer), { headers: { 'Cache-Control': 'no-store' } });
   }),
 ];
 
-export const server = setupServer(...handlers, ...holderHandlers, ...issuanceHandlers);
+export const server = setupServer(
+  ...handlers,
+  ...holderHandlers,
+  ...issuanceHandlers,
+  ...offerHandlers,
+);
 
 export function resetMockBackend() {
   tokens.clear();
   requests.length = 0;
   holderStore.splice(0, holderStore.length, ...seedHolders());
   issuedStore.clear();
+  offerStore.clear();
+  mockServerClock.offsetMs = 0;
 }

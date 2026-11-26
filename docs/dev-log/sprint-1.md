@@ -500,6 +500,72 @@ ISSUER_KEY_UNAVAILABLE` with a generic message; the code goes to the log with is
   `issuer-portal/test/holders-validation.test.ts`, `backend/test/holders.test.ts`,
   `backend/test/credential-preview.test.ts`.
 
+### Thu 26 Nov (issuer portal: wallet offer QR code screen)
+
+- **Done:**
+  - **Backend:**
+    - Offer responses carry `serverTime` (create and status) for the portal's clock-skew
+      correction.
+    - Invalidated offers record why: `invalidation_reason` = `replaced`, `cancelled`,
+      `credential_revoked` or `credential_superseded` (migration 0008, backfilled, two CHECKs).
+    - `POST /credential-offers/:offerId/cancel` (officer/admin, own issuer, `404` otherwise,
+      `409 OFFER_NOT_ACTIVE` unless active; ids-only log).
+    - `GET /credentials/:id` returns `activeOffer` (id and expiry, never the code).
+    - Pending-only offers were already enforced; a revoked-credential test was added.
+    - An OpenID4VCI 1.0 structure check (`checkOpenId4VciOffer`) passes for Employment and KYC:
+      **no field name needed fixing**. `loadConfig()` now refuses a non-https
+      `PUBLIC_BASE_URL` in production.
+    - The offers service now gets the app's injected clock, like the other services.
+  - **Portal:**
+    - `/credentials/:id/offer`, reached from **Create wallet offer** on the success page and
+      on the credential page (pending only).
+    - The QR code is drawn locally (`qrcode` matrix, error correction M, quiet zone, SVG),
+      with the holder, the type, "Expires at HH:MM (Asia/Colombo)" and a countdown on the
+      server's clock (amber last minute, announced once a minute).
+    - The status is polled every 5 s and on focus; every final state has its own message and
+      polling stops in it.
+    - Full screen, "Generate new QR code" and "Cancel offer", both with confirmation.
+    - Reload message; the code kept in memory only (Decision 021).
+    - Developer panel only outside production.
+  - **portal-ui:** `QrCode`, `Countdown`, `FullscreenOverlay`.
+  - **Tests:**
+    - backend 545 (+22): 90.48 / 87.22 / 93.88 / 91.15;
+    - issuer portal 329 (+27): 97.52 / 92.47 / 98.57 / 98.57;
+    - portal-ui 65 (+9): 100 / 98.25 / 100 / 100;
+    - Playwright 8 (+2, with `CREDENTIAL_OFFER_TTL_SECONDS=15`);
+    - claims-validation 23 (unchanged).
+    - `npm run build` now also runs `scripts/check-production-bundle.mjs` (no developer panel,
+      no `eval`).
+- **Next:** Wallet redemption (Sprint 2) calls `findOfferByCode()` + `signCredential()` and
+  sets `redeemed_at`, which the screen already shows as "Accepted by the holder's wallet".
+  Native-speaker review of the new Sinhala strings. Screenshots
+  ([evidence/s1-offer-qr-guide.md](evidence/s1-offer-qr-guide.md)).
+- **Blockers:** None.
+- **Evidence:** `backend/test/credential-offers.test.ts`, `backend/test/db/schema.test.ts`
+  (0008), `issuer-portal/test/offer.test.tsx`, `issuer-portal/e2e/offer.spec.ts`,
+  `portal-ui/test/offer-widgets.test.tsx`.
+
+### Thu 26 Nov (change: offer lifetime 10 → 5 minutes)
+
+- **Done:**
+  - `CREDENTIAL_OFFER_TTL_SECONDS` default 600 → **300** (`backend/src/config/env.ts`,
+    `backend/.env.example`).
+  - **Reason:** 5 minutes is enough time for the holder to scan and accept, and it halves the
+    window in which an intercepted (e.g. photographed) QR code could be misused. Recorded under
+    Consequences in Decisions 011 and 021.
+  - Tests now read the configured TTL instead of hard-coding 600:
+    - backend: `testConfig().CREDENTIAL_OFFER_TTL_SECONDS` in the offer, revocation and demo-data
+      tests; `config.test.ts` pins the default at 300;
+    - portal: the offer tests derive the countdown text, the minute announcements, the expiry
+      time and the timer advances from the mock's `OFFER_TTL_SECONDS` (300).
+  - API doc examples, the portal doc and CLAUDE.md say 5 minutes.
+  - **Local `backend/.env`:** not edited; it should say `CREDENTIAL_OFFER_TTL_SECONDS=300` (or
+    leave the line out to use the default).
+- **Next:** Unchanged (wallet redemption, Sinhala review, screenshots).
+- **Blockers:** None.
+- **Evidence:** `backend/test/config.test.ts`, `backend/test/credential-offers.test.ts`,
+  `issuer-portal/test/offer.test.tsx`.
+
 ## Backlog
 
 - **Holder update endpoint and edit form** (needed for reissue with reason `details_changed`):
@@ -509,8 +575,14 @@ ISSUER_KEY_UNAVAILABLE` with a generic message; the code goes to the log with is
   form reusing the registration form (`src/holders/form-model.ts`).
 - **Portrait upload** (optional `portrait` claim, JPEG data URI ≤ 40 KB, Decision 020) is not in the
   registration form yet (`OMITTED_CLAIMS`).
-- **Credential list** on `/credentials` (today a holder picker only) and the **wallet offer
-  (QR code)** step from the issuance success page.
+- **Credential list** on `/credentials` (today a holder picker only). (The wallet offer QR
+  screen was done on 26 Nov.)
+- **`tx_code` (transaction PIN) for offers** once an SMS or e-mail channel to the holder
+  exists: OpenID4VCI's optional PIN, sent out of band, so a photographed QR code alone cannot
+  be redeemed. Deferred in Decision 021; a backend test checks it is absent today.
+- **OpenID4VCI issuer metadata** (`/.well-known/openid-credential-issuer` with
+  `credential_configurations_supported`) for Sprint 2: `credential_configuration_ids`
+  (`EmploymentCredential`, `KYCCredential`) must be its keys.
 - **Jira field list** for the issuance story: update it to the schema field names
   (`docs/schemas/credential-schemas.md` §11).
 
@@ -936,3 +1008,49 @@ Record the tests that show the sprint goal is met, with links to output in `evid
 - **Note:** The task named the cap `passport_expiry`. The rule caps at **any** ID document
   expiry (passport or driving licence), so the API says `id_document_expiry`; the portal names
   the document ("Limited to the passport's / driving licence's expiry date").
+
+### Issue 28: The countdown showed 10:01 for a 10-minute offer (26 Nov 2026)
+
+- **Task:** offer screen countdown
+- **Symptom:** A new offer showed `10:01`, and the minute announcement said "11 minutes".
+- **Cause:** The countdown rounded **up**, and the clock it subtracts is re-read only once a
+  second, so it could be up to a second old when the offer arrived.
+- **Resolution:** Round **down**: the screen never shows more time than the server allows (at
+  worst the QR disappears under a second early). Tests whose checkpoints sat exactly on a
+  minute boundary were moved off it, because real time also moves the fake clock
+  (`shouldAdvanceTime`).
+
+### Issue 29: The QR code on screen did not decode in the e2e test (26 Nov 2026)
+
+- **Task:** `e2e/offer.spec.ts`, decoding a screenshot with jsQR
+- **Symptom:** The unit test decoded the SVG, but a Chromium screenshot of the same QR code at
+  288 px did not decode.
+- **Cause:** The code has 85 modules (with the quiet zone), so 288 px is about 3.4 px per
+  module. Fractional scaling with `crispEdges` makes modules 3 or 4 px wide unevenly, which a
+  decoder (and a phone camera) handles badly.
+- **Resolution:** `QrCode` now treats `size` as a minimum and renders a whole number of pixels
+  per module (85 × 4 = 340 px). The screenshot then decoded.
+
+### Issue 30: The e2e offer pointed at the wrong server (26 Nov 2026)
+
+- **Task:** `e2e/offer.spec.ts`
+- **Symptom:** `credential_issuer` in the decoded QR was `http://localhost:4000/…`, but the e2e
+  backend runs on port 4100.
+- **Cause:** `e2e/start-backend.mjs` did not set `PUBLIC_BASE_URL`, so the default was used. A
+  wallet would have contacted the wrong server.
+- **Resolution:** The launcher sets `PUBLIC_BASE_URL=http://localhost:<port>`. In production
+  `loadConfig()` now also requires an https `PUBLIC_BASE_URL`.
+
+### Issue 31: The developer panel was hidden in production but still in the bundle (26 Nov 2026)
+
+- **Task:** offer screen, "Developer details" (decoded `credential_offer`)
+- **Symptom:** In a production build the panel never rendered, but its component and
+  translation keys were still in the JavaScript bundle.
+- **Cause:** The check was a helper function (`() => !import.meta.env.PROD`) in another module;
+  the minifier did not inline it, so the branch stayed.
+- **Resolution:** `import.meta.env.PROD` is tested inline at the render site, so the build turns
+  it into `false` and removes the panel. `scripts/check-production-bundle.mjs` (run by
+  `npm run build`) fails the build if the panel's keys or `eval` appear. A first version of
+  this check ran inside Vitest. It had to build with `NODE_ENV=production` (Vite derives
+  `PROD` from it), and the parallel build slowed the other test files until the dashboard
+  test's first `findBy` timed out. That test now allows 5 s.

@@ -7,6 +7,7 @@ const PRODUCTION = {
   JWT_SECRET: 'x'.repeat(32),
   ISSUER_KEY_PASSPHRASE: 'a-long-production-passphrase',
   DATABASE_URL: 'postgres://localhost/univault',
+  PUBLIC_BASE_URL: 'https://issuer.univault.example',
 };
 
 describe('environment configuration', () => {
@@ -18,7 +19,7 @@ describe('environment configuration', () => {
       LOG_LEVEL: 'info',
       CORS_ORIGINS: ['http://localhost:5173', 'http://localhost:5174'],
       AI_SERVICE_URL: 'http://localhost:5001',
-      CREDENTIAL_OFFER_TTL_SECONDS: 600,
+      CREDENTIAL_OFFER_TTL_SECONDS: 300, // 5 minutes (Decisions 011, 021)
     });
   });
 
@@ -81,6 +82,21 @@ describe('environment configuration', () => {
     expect(() => loadConfig({ DATABASE_URL: 'mysql://localhost/db' })).toThrow(
       /DATABASE_URL: must start with/,
     );
+  });
+
+  it('requires an https PUBLIC_BASE_URL in production (the OpenID4VCI credential_issuer)', () => {
+    expect(() =>
+      loadConfig({ ...PRODUCTION, PUBLIC_BASE_URL: 'http://issuer.univault.example' }),
+    ).toThrow(/PUBLIC_BASE_URL: must be an https:\/\/ URL in production/);
+    const { PUBLIC_BASE_URL: _unused, ...withoutBaseUrl } = PRODUCTION;
+    expect(() => loadConfig(withoutBaseUrl)).toThrow(/PUBLIC_BASE_URL: must be an https/); // the http default
+    expect(
+      loadConfig({
+        ...PRODUCTION,
+        NODE_ENV: 'development',
+        PUBLIC_BASE_URL: 'http://192.168.1.20:4000',
+      }).PUBLIC_BASE_URL,
+    ).toBe('http://192.168.1.20:4000');
   });
 
   it('refuses the embedded database in production', () => {

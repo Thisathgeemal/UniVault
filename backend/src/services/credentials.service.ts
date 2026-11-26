@@ -128,6 +128,15 @@ export interface CredentialMetadata {
   createdAt: string;
 }
 
+/**
+ * GET /credentials/:id: the metadata plus the credential's ACTIVE offer, if any (id and expiry
+ * only, never the code). The portal uses it to say "this QR code can't be shown again" instead
+ * of silently replacing an offer that is still usable (Decision 021).
+ */
+export interface CredentialDetail extends CredentialMetadata {
+  activeOffer: { offerId: string; expiresAt: string } | null;
+}
+
 export interface CreateCredentialInput {
   holderId: string;
   credentialType?: CredentialTypeName | undefined;
@@ -250,7 +259,7 @@ export interface CredentialsService {
     staff: StaffProfile,
     query: ListCredentialsQuery,
   ): Promise<{ credentials: CredentialMetadata[]; total: number; limit: number; offset: number }>;
-  get(staff: StaffProfile, credentialId: string): Promise<CredentialMetadata>;
+  get(staff: StaffProfile, credentialId: string): Promise<CredentialDetail>;
   /** Pending or valid → revoked (the route allows admins only). */
   revoke(
     staff: StaffProfile,
@@ -704,12 +713,20 @@ export function createCredentialsService(
     return row!.id;
   };
 
-  /** Invalidates every offer of a credential that is neither redeemed nor already invalidated. */
-  const invalidateOpenOffers = async (tx: Executor, credentialId: string, at: Date) =>
+  /**
+   * Invalidates every offer of a credential that is neither redeemed nor already invalidated,
+   * recording why (migration 0008: the portal shows a message per reason).
+   */
+  const invalidateOpenOffers = async (
+    tx: Executor,
+    credentialId: string,
+    at: Date,
+    reason: 'credential_revoked' | 'credential_superseded',
+  ) =>
     (
       await tx
         .update(credentialOffers)
-        .set({ invalidatedAt: at })
+        .set({ invalidatedAt: at, invalidationReason: reason })
         .where(
           and(
             eq(credentialOffers.credentialId, credentialId),
@@ -874,7 +891,30 @@ export function createCredentialsService(
         ),
       );
       if (!found) throw credentialNotFound();
-      return found;
+      const at = now();
+      // Same rule as offerStatus() 'active': not redeemed, not invalidated, not yet expired
+      const [offer] =
+        found.status === 'pending'
+          ? await db
+              .select({ offerId: credentialOffers.id, expiresAt: credentialOffers.expiresAt })
+              .from(credentialOffers)
+              .where(
+                and(
+                  eq(credentialOffers.credentialId, found.id),
+                  isNull(credentialOffers.redeemedAt),
+                  isNull(credentialOffers.invalidatedAt),
+                  gt(credentialOffers.expiresAt, at),
+                ),
+              )
+              .orderBy(desc(credentialOffers.createdAt))
+              .limit(1)
+          : [];
+      return {
+        ...found,
+        activeOffer: offer
+          ? { offerId: offer.offerId, expiresAt: offer.expiresAt.toISOString() }
+          : null,
+      };
     },
 
     async revoke(staff, credentialId, input) {
@@ -899,7 +939,12 @@ export function createCredentialsService(
               inArray(credentialRecords.status, ACTIVE_STATUSES),
             ),
           );
-        const invalidatedOfferIds = await invalidateOpenOffers(tx, credential.id, at);
+        const invalidatedOfferIds = await invalidateOpenOffers(
+          tx,
+          credential.id,
+          at,
+          'credential_revoked',
+        );
         await recordEvent(tx, {
           credentialId: credential.id,
           issuerId: credential.issuerId,
@@ -961,7 +1006,12 @@ export function createCredentialsService(
           issuedOn,
           old.id,
         );
-        const invalidatedOfferIds = await invalidateOpenOffers(tx, old.id, issuedOn);
+        const invalidatedOfferIds = await invalidateOpenOffers(
+          tx,
+          old.id,
+          issuedOn,
+          'credential_superseded',
+        );
         await recordEvent(tx, {
           credentialId: old.id,
           issuerId: old.issuerId,
