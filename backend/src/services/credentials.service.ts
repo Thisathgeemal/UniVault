@@ -46,7 +46,13 @@ import {
 } from '../db/schema.js';
 import type { KeyStore } from '../keys/key-store.js';
 import { AppError } from '../lib/errors.js';
-import type { ClaimIssue, CredentialSchemas, CredentialTypeName } from './credential-schemas.js';
+import type { CredentialSchemas, CredentialTypeName } from './credential-schemas.js';
+
+/** HOLDER_DATA_INVALID details: path + English message (no code; unchanged API). */
+interface HolderDataIssue {
+  path: string;
+  message: string;
+}
 import {
   effectiveStatus,
   effectiveStatusCondition,
@@ -441,7 +447,7 @@ export function createCredentialsService(
     const schema = schemas.metadata(type);
     // The holder record may have been stored under an older schema: validate it again
     const claims = withDerivedClaims(type, holder.claims, issuedOn);
-    const issues: ClaimIssue[] = schemas
+    const issues: HolderDataIssue[] = schemas
       .validate(type, claims)
       .map((i) => ({ path: `claims.${i.path}`, message: i.message }));
     const documentExpiry =

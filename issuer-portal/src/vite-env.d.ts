@@ -8,3 +8,16 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Precompiled claim validators and the schemas (claims-validators-plugin.ts, Decision 018). */
+declare module 'virtual:claims-validators' {
+  import type { CredentialTypeName, ErrorObject } from '@univault/claims-validation';
+
+  interface ClaimsValidator {
+    (claims: unknown): boolean;
+    errors?: ErrorObject[] | null;
+  }
+  export const validators: Record<CredentialTypeName, ClaimsValidator>;
+  /** The JSON Schemas from docs/schemas, as read at build time. */
+  export const schemas: Record<CredentialTypeName, Record<string, unknown>>;
+}

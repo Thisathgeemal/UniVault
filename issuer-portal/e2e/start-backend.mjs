@@ -73,13 +73,16 @@ const env = {
 const node = (args, options) =>
   spawnSync(process.execPath, ['--import', 'tsx', ...args], { cwd: backendDir, env, ...options });
 
-// crypto-core must be built for the backend to start
+// crypto-core and claims-validation must be built for the backend to start
 // (a fixed command string: npm is a .cmd script on Windows, so it needs a shell)
-const build = spawnSync('npm --prefix ../crypto-core run build', {
-  cwd: backendDir,
-  stdio: 'inherit',
-  shell: true,
-});
+const build = spawnSync(
+  'npm --prefix ../crypto-core run build && npm --prefix ../claims-validation run build',
+  {
+    cwd: backendDir,
+    stdio: 'inherit',
+    shell: true,
+  },
+);
 if (build.status !== 0) process.exit(build.status ?? 1);
 
 // Migrate and seed (prints counts and the demo logins table, never the custom password)

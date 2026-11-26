@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { loadEnv, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+import { claimsValidators } from './claims-validators-plugin.js';
 import { contentSecurityPolicy } from './csp.js';
 
 export const DEFAULT_API_BASE_URL = 'http://localhost:4000/api/v1';
@@ -28,9 +29,17 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   const apiBaseUrl = env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
   return {
-    plugins: [react(), tailwindcss(), cspMetaTag(apiBaseUrl)],
+    plugins: [react(), tailwindcss(), claimsValidators(), cspMetaTag(apiBaseUrl)],
     // portal-ui is linked (file:../portal-ui) and has its own React for its tests: always use one
     resolve: { dedupe: ['react', 'react-dom'] },
+    // The linked claims-validation package's CommonJS runtime helpers (ajv, ajv-formats) are
+    // not under the portal's node_modules, so name them for pre-bundling (dev server)
+    optimizeDeps: {
+      include: [
+        '@univault/claims-validation > ajv/dist/runtime/ucs2length.js',
+        '@univault/claims-validation > ajv-formats/dist/formats.js',
+      ],
+    },
     server: { port: 5173, strictPort: true },
     preview: { port: 4173, strictPort: true },
     build: {

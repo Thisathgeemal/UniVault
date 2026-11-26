@@ -25,6 +25,11 @@ public keys, credential status) or one-time pre-authorised codes.
 | POST   | `/api/v1/auth/logout` | Token         | `204`; the portal discards its token                                             |
 | GET    | `/api/v1/staff`       | Token + admin | Staff of the admin's own issuer                                                  |
 
+`staff` (login) and `GET /auth/me` both return
+`{ id, email, displayName, role, issuer: { id, name, type } }`. `issuer.type` (`employer` or
+`bank`) decides which holder form the issuer portal shows (employee or customer); a test pins
+it for both types (`backend/test/auth.test.ts`).
+
 ## 3. Access rules
 
 ### Public vs protected

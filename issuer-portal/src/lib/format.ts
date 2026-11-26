@@ -56,3 +56,27 @@ export function formatRelativeTime(
   }
   return format.format(0, 'minute'); // "this minute" / "now"
 }
+
+/** e.g. "24 Nov 2026" for an ISO instant, as the date in Asia/Colombo; null if invalid. */
+export function formatColomboDate(iso: string, language: string): string | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(locale(language), {
+    timeZone: PORTAL_TIME_ZONE,
+    dateStyle: 'medium',
+  }).format(date);
+}
+
+/**
+ * A calendar date claim (YYYY-MM-DD, e.g. a date of birth) in the language's style. It is a
+ * date, not an instant, so it is formatted in UTC (never shifted by a time zone). Anything
+ * else is returned unchanged.
+ */
+export function formatCalendarDate(value: string, language: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(locale(language), { timeZone: 'UTC', dateStyle: 'medium' }).format(
+    date,
+  );
+}

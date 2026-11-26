@@ -356,6 +356,73 @@ ISSUER_KEY_UNAVAILABLE` with a generic message; the code goes to the log with is
 - **Blockers:** None.
 - **Evidence:** `backend/test/db/seed-demo.test.ts`.
 
+### Thu 26 Nov (issuer portal: holder management)
+
+- **Done:** Holder management in the issuer portal (FR-ISS-01, NFR-02, NFR-05, NFR-08;
+  Decision 018, draft). Docs: `docs/frontend/issuer-portal.md` §9, `docs/api/holders-api.md`.
+  - **Shared validation (Decision 018):** new package `@univault/claims-validation` with the one
+    Ajv configuration, the error mapping (now with a stable `code` per issue) and the reference
+    rule. The backend compiles `docs/schemas` with it at start-up as before. The portal
+    compiles the **same files** at build time into standalone validator code (a Vite plugin),
+    because the production CSP forbids `eval` (Issue 21). Proof: every record of the seed data
+    plus 28 crafted invalid claims give identical issues in the portal and the backend.
+  - **`/holders/new`:** the form type follows the signed-in issuer's type (`/auth/me` already
+    returned `issuer.type`; a backend test now pins it). Employee form (Employment
+    fields) or customer form (KYC fields), generated from the schema plus a small UI config
+    (groups, order, input hints):
+    - required markers;
+    - the KYC if/then rules live (NIC vs passport / driving licence, residential address →
+      proof of residence);
+    - the P.O. Box message;
+    - customer number with the backend pattern;
+    - validation on blur and submit, with an error summary that takes focus and links to the
+      fields;
+    - server errors mapped onto fields;
+    - the 409 message with a link to the existing holder;
+    - no double submit, an unsaved-changes prompt, and a success toast leading to the detail
+      page.
+  - **`/holders`:** debounced backend search, paging and sorting with `q`, `page`, `size`,
+    `sort` in the URL. ID numbers are masked to the last 4 characters. Both empty states,
+    loading skeleton, error + retry.
+  - **`/holders/:id`:** fields grouped like the form, the full ID number, the server's
+    "Over 18", who added the record, the credential summary by status, and a disabled
+    "Issue credential" button with a tooltip. Another issuer's holder shows "Holder not found".
+  - **Backend API (additive):**
+    - holder `VALIDATION_ERROR` details are `{ path, code, message }`;
+    - `409 HOLDER_ALREADY_EXISTS` has `details.holderId`;
+    - list summaries have `idNumberLast4` (the masking happens on the server);
+    - new sort values `oldest`, `name_desc`, `ref`, `ref_desc`.
+  - **portal-ui:** DataTable, Pagination, SearchInput, FormField, ErrorSummary, StatusBadge,
+    Toast, ConfirmDialog, Tooltip, Select (labels passed in, for the verifier portal too).
+  - **Tests:**
+    - backend 505 (+6): coverage 90.04 / 86.82 / 93.44 / 90.70;
+    - issuer portal 267 (+186, of which 100 are one seed record each): 97.55 / 91.95 /
+      98.67 / 98.77;
+    - portal-ui 52 (+21): 100 / 97.63 / 100 / 100;
+    - claims-validation 20 (new): 98.48 / 89.83 / 100 / 98.41;
+    - Playwright 4 (+3: employee with a validation error first, customer with a passport,
+      duplicate → 409 link).
+    - All thresholds kept. The holder tests passed first time, so two rules were broken on
+      purpose and caught (Issue 24).
+- **Next:** Native-speaker review of the new Sinhala strings (`si.ts` `holders` block, 25
+  district names). Take the screenshots in
+  [evidence/s1-holders-guide.md](evidence/s1-holders-guide.md). Supervisor review of Decision 018. The issue-credential flow (next task) replaces the disabled button.
+- **Blockers:** None.
+- **Evidence:** `issuer-portal/test/holders-*.test.ts(x)`, `issuer-portal/e2e/holders.spec.ts`,
+  `claims-validation/test/claims-validation.test.ts`, `backend/test/holders.test.ts`,
+  `backend/test/auth.test.ts`; screenshots per
+  [evidence/s1-holders-guide.md](evidence/s1-holders-guide.md) (to be taken).
+
+## Backlog
+
+- **Holder update endpoint and edit form** (needed for reissue with reason `details_changed`):
+  reissue builds the replacement from the holder's **current** record (Decision 012), but there
+  is no way yet to change a holder record. Needs `PATCH /holders/:holderId` (same schema
+  validation and shared rules, audit of who changed what without logging claims) and an edit
+  form reusing the registration form (`src/holders/form-model.ts`).
+- **Portrait upload** (optional `portrait` claim, JPEG data URI ≤ ~50 KB) is not in the
+  registration form yet (`OMITTED_CLAIMS`).
+
 ## Testing evidence
 
 Record the tests that show the sprint goal is met, with links to output in `evidence/`.
@@ -683,3 +750,60 @@ Record the tests that show the sprint goal is met, with links to output in `evid
 - **Lesson:** A test that sets up data with an injected clock and then checks it against the
   real time is a time bomb. It passes on the day it is written. Use one clock per test, and
   never compare fixed dates with the real clock.
+
+### Issue 21: Ajv in the browser would break under the production CSP (26 Nov 2026)
+
+- **Task:** Holder form validation with the backend's schemas
+- **Symptom:** Found while designing the form, before any code. Ajv's `compile()` generates the
+  validator with `new Function`, and the portal's production CSP is `script-src 'self'` without
+  `'unsafe-eval'`. The e2e test runs on the Vite dev server, which has no CSP, so it would have
+  passed while production failed.
+- **Resolution:** The portal compiles the schemas **at build time** into Ajv standalone code (a
+  Vite plugin, `virtual:claims-validators`). Ajv's output still had one `require()` for its
+  Unicode string-length helper. The generator swaps it for an import from the shared package's
+  `runtime` entry and refuses to emit code that still contains `require()`. After `vite build`
+  the bundle was checked: no `new Function`, no `eval`. Recorded as Decision 018.
+- **Lesson:** A test environment without the production security headers can hide a
+  production-only failure. Check the CSP's effect on any library that generates code.
+
+### Issue 22: Vite rewrote `new URL(…, import.meta.url)` in a backend file (26 Nov 2026)
+
+- **Task:** The portal test that compares the portal and backend validators
+- **Symptom:** Importing `backend/src/services/credential-schemas.ts` into a portal test failed
+  with `The URL must be of scheme file`. A test that read the seed data with a template string
+  in `new URL(…, import.meta.url)` failed with `Denied ID …/seed-data/README.md?url`.
+- **Cause:** Vite treats `new URL(<string>, import.meta.url)` as an asset reference and rewrites
+  it into a served URL (or, with a template, an asset glob over the whole folder).
+- **Resolution:** The backend's default schema folder and the test's file paths are built with
+  `path.join(dirname(fileURLToPath(import.meta.url)), …)` / `import.meta.dirname`. Same result in
+  Node; Vite leaves it alone.
+- **Lesson:** Code shared with a Vite-built package should not use the `new URL(..., import.meta.url)`
+  pattern for files on disk.
+
+### Issue 23: The toast region's role="status" clashed with the loading message (26 Nov 2026)
+
+- **Task:** Success toast after registering a holder
+- **Symptom:** An existing session test (`getByRole('status')` for "Loading…") found two
+  elements once the always-present toast region was added.
+- **Resolution:** The toast region is a polite live region (`aria-live="polite"`) without
+  `role="status"`. Screen readers still announce new toasts, and a page's own status message
+  stays the only `status`.
+- **Lesson:** An always-present landmark or live-region role can change other pages'
+  accessibility tree. Prefer the attribute that gives the behaviour (`aria-live`) when the role
+  adds nothing.
+
+### Issue 24: The holder tests passed first time, so they were mutation-checked (26 Nov 2026)
+
+- **Task:** Holder form tests
+- **Symptom:** The 18 registration tests passed on their first run.
+- **Resolution:** Two rules were broken on purpose:
+  - the double-submit guard was removed (handler check and disabled button): the
+    double-submit test failed;
+  - the if/then evaluator was made to ignore `const`: 5 tests failed (the NIC vs passport form
+    test and 4 form-model tests).
+    Both changes were reverted. Separately, moving the error mapping out of the backend lowered
+    its statement coverage to 89.9% (well-covered lines left). The two remaining untested holder
+    paths got tests instead of a lower threshold: a non-duplicate database error is rethrown
+    (500, never 409), and a duplicate whose row cannot be found is a 409 without an id.
+- **Lesson:** As Issue 19: a quick mutation of the rule a test protects shows the test can
+  fail.

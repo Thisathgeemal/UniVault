@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { AuthMiddleware } from '../auth/middleware.js';
 import { AppError } from '../lib/errors.js';
 import { getValidated, validate } from '../middleware/validate.js';
-import type { HoldersService } from '../services/holders.service.js';
+import { HOLDER_SORTS, type HoldersService } from '../services/holders.service.js';
 
 // No issuerId or recordType: both come from the logged-in staff member's issuer.
 // Claims are checked in detail against the credential schema by the service.
@@ -16,7 +16,7 @@ export const listHoldersQuery = z.object({
   search: z.string().trim().min(1).max(100).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).max(100_000).default(0),
-  sort: z.enum(['newest', 'name']).default('newest'),
+  sort: z.enum(HOLDER_SORTS).default('newest'),
 });
 
 export const holderIdParams = z.object({ holderId: z.uuid('must be a UUID') });

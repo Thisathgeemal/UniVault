@@ -75,7 +75,7 @@ the full record:
 | `search` | –        | Name or reference contains this text (case-insensitive; `%` and `_` are literal) |
 | `limit`  | 20       | 1–100                                                                            |
 | `offset` | 0        | Number of records to skip                                                        |
-| `sort`   | `newest` | `newest` or `name`                                                               |
+| `sort`   | `newest` | `newest`, `oldest`, `name`, `name_desc`, `ref` or `ref_desc` (reference)         |
 
 **Response:**
 
@@ -87,6 +87,7 @@ the full record:
       "externalRef": "STC-00001",
       "fullName": "Lahiru Silva",
       "recordType": "employee",
+      "idNumberLast4": "0063",
       "credentialCount": 1,
       "createdAt": "…"
     }
@@ -99,6 +100,11 @@ the full record:
 
 The list returns **summaries only**, without personal claims such as NIC numbers
 or addresses. Full claims come from `GET /holders/:holderId`.
+
+**Masking rule:** `idNumberLast4` is the last 4 characters of the ID number
+(customers: `id_document_number`; employees: the optional `nic_number`), or `null`
+when there is none. The full number never appears in the list; the issuer portal shows
+it as `•••• 0063` and the full number on the holder's detail page only.
 
 ## 3. Rules
 
@@ -118,10 +124,32 @@ or addresses. Full claims come from `GET /holders/:holderId`.
 | Situation                                                            | Status | Code                                                               |
 | -------------------------------------------------------------------- | ------ | ------------------------------------------------------------------ |
 | Not logged in                                                        | 401    | `UNAUTHENTICATED`                                                  |
-| Claims don't match the schema, or a missing or invalid `externalRef` | 400    | `VALIDATION_ERROR` (`details[].path` such as `claims.designation`) |
-| Reference already exists at this issuer                              | 409    | `HOLDER_ALREADY_EXISTS`                                            |
+| Claims don't match the schema, or a missing or invalid `externalRef` | 400    | `VALIDATION_ERROR` (`details[]` = `{ path, code, message }`)       |
+| Reference already exists at this issuer                              | 409    | `HOLDER_ALREADY_EXISTS` (`details.holderId` = the existing record) |
 | Unknown ID, or another issuer's record                               | 404    | `HOLDER_NOT_FOUND`                                                 |
 | Malformed ID or query value                                          | 400    | `VALIDATION_ERROR`                                                 |
+
+### Validation details
+
+Each problem in a `VALIDATION_ERROR` from `POST /holders` is
+`{ "path": "claims.permanent_address.line1", "code": "poBox", "message": "must be a street address (P.O. Box addresses are not accepted)" }`:
+
+- `path`: `claims.<claim>` (dotted inside objects) or `externalRef`;
+- `code` (added 26 Nov 2026): a stable reason the issuer portal translates: `required`,
+  `notAllowed`, `poBox`, `notAccepted`, `pattern`, `format`, `minLength`, `maxLength`,
+  `enum`, `const`, `type`, `mismatch` (employee `externalRef` ≠ `employee_id`) or `invalid`;
+- `message`: English text, as before.
+
+The issues come from `@univault/claims-validation` (Decision 018), the same code the issuer
+portal runs in the browser on the same schema files, so the portal and the API report the
+same problems. (Request-shape errors from the route's zod check, e.g. a missing `claims`
+object, keep `{ path, message }`.)
+
+### Duplicate reference
+
+`409 HOLDER_ALREADY_EXISTS` has `details: { "holderId": "<id>" }`, the existing record of the
+**same** issuer (references are unique per issuer, so nothing about another issuer is shown).
+The portal links to it.
 
 ## 5. Not in scope yet
 

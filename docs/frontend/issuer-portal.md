@@ -15,6 +15,8 @@ The issuer portal now has:
 - a restorable session;
 - the **dashboard** (section 8): credential totals, a status breakdown and recent activity
   from `GET /dashboard/summary`;
+- **holder management** (section 9): list with search and paging, registration form generated
+  from the credential schema (validated with the backend's rules), and the holder's detail page;
 - the protected application frame (header, role-filtered sidebar, content);
 - placeholder pages for the features of the next sprints;
 - English and Sinhala.
@@ -28,7 +30,9 @@ will reuse in Sprint 3.
 | -------------------- | --------------------------------------- | -------------- | ------------------------------------------------- |
 | `/login`             | Sign-in                                 | public         | Signed in → `returnTo` (if safe) or the dashboard |
 | `/`                  | Dashboard (counts, breakdown, activity) | admin, officer | Landing page after sign-in (section 8)            |
-| `/holders`           | Holders (Coming soon)                   | admin, officer | Planned for Sprint 2                              |
+| `/holders`           | Holder list (search, paging, sorting)   | admin, officer | Section 9; state in the URL                       |
+| `/holders/new`       | Register a holder                       | admin, officer | Form for the issuer type (section 9.1)            |
+| `/holders/:holderId` | One holder and its credentials          | admin, officer | Another issuer's holder → "Holder not found"      |
 | `/credentials`       | Credentials (Coming soon)               | admin, officer | Planned for Sprint 2                              |
 | `/credential-offers` | Credential offers (Coming soon)         | admin, officer | Planned for Sprint 2                              |
 | `/issuer-keys`       | Issuer keys (Coming soon)               | **admin**      | Planned for Sprint 4. Officer → "Not permitted"   |
@@ -231,17 +235,22 @@ deployed portal origin.
 
 ## 7. Tests
 
-| Suite                                      | Covers                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `test/login.test.tsx`                      | Success, every error code, lockout time in Asia/Colombo, client validation, pending state, show/hide, autocomplete, signed-in redirect                                                                                                                                                                                                        |
-| `test/session.test.tsx`                    | returnTo redirect and back, open-redirect rejection, restore via `/auth/me`, invalid token, offline restore + retry, 401 mid-session (3 codes), 403 keeps the session, expiry timer, logout (online and offline), localStorage spy                                                                                                            |
-| `test/routes.test.tsx`                     | Officer cannot see or open admin pages; admin can; placeholders; 404; route error boundary                                                                                                                                                                                                                                                    |
-| `test/i18n.test.tsx`                       | Switch changes text and `<html lang>`, preference stored, key parity, Sinhala script, placeholders                                                                                                                                                                                                                                            |
-| `test/api-client.test.ts`                  | Bearer header, error parsing, network errors, session-ending 401s, abort                                                                                                                                                                                                                                                                      |
-| `test/dashboard.test.tsx`                  | Every count (Intl-formatted), card links and accessible names/descriptions, the stacked bar (named figure, legend with numbers), activity wording per event type and reason, loading skeletons, error + Try again (reference shown), network and 429 messages, empty state, refresh, staleTime / refetch on focus, Sinhala, officer and admin |
-| `test/csp.test.ts`, `query-client.test.ts` | CSP directives; retry policy                                                                                                                                                                                                                                                                                                                  |
-| `e2e/login.spec.ts` (Playwright)           | Real backend on a throwaway database. The steps:<br>1. `/holders` → login.<br>2. Wrong password shows the error.<br>3. Admin signs in → `/holders` with the admin menu.<br>4. Dashboard: every card equals the backend's `/dashboard/summary` (demo data seeded).<br>5. Logout.<br>6. Officer signs in without admin items.                   |
-| `portal-ui/test/`                          | AppShell, Sidebar (active item, role filtering, keyboard menu toggle, ARIA), Header, page blocks, primitives; StatCard, StackedBar, Skeleton (`dashboard-widgets.test.tsx`)                                                                                                                                                                   |
+| Suite                                      | Covers                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test/login.test.tsx`                      | Success, every error code, lockout time in Asia/Colombo, client validation, pending state, show/hide, autocomplete, signed-in redirect                                                                                                                                                                                                          |
+| `test/session.test.tsx`                    | returnTo redirect and back, open-redirect rejection, restore via `/auth/me`, invalid token, offline restore + retry, 401 mid-session (3 codes), 403 keeps the session, expiry timer, logout (online and offline), localStorage spy                                                                                                              |
+| `test/routes.test.tsx`                     | Officer cannot see or open admin pages; admin can; placeholders; 404; route error boundary                                                                                                                                                                                                                                                      |
+| `test/i18n.test.tsx`                       | Switch changes text and `<html lang>`, preference stored, key parity, Sinhala script, placeholders                                                                                                                                                                                                                                              |
+| `test/api-client.test.ts`                  | Bearer header, error parsing, network errors, session-ending 401s, abort                                                                                                                                                                                                                                                                        |
+| `test/dashboard.test.tsx`                  | Every count (Intl-formatted), card links and accessible names/descriptions, the stacked bar (named figure, legend with numbers), activity wording per event type and reason, loading skeletons, error + Try again (reference shown), network and 429 messages, empty state, refresh, staleTime / refetch on focus, Sinhala, officer and admin   |
+| `test/holders-validation.test.ts`          | Portal validator = backend validator on every seed record and 28 invalid claims; every schema claim in the form or omitted on purpose; input types, if/then rules, conditional fields, `toClaims`; server issues mapped; messages; English text for every field and option                                                                      |
+| `test/holders-register.test.tsx`           | Employee form for an employer, customer form for a bank; required errors with the summary (focus, links); blur validation; employee ID and customer-number patterns; NIC vs passport; residential address; P.O. Box; success → detail + toast; server field errors; 409 link; other failures; no double submit; unsaved-changes prompt; Sinhala |
+| `test/holders-list.test.tsx`               | Columns, masked ID, bank column label, row click, debounced search with `search=`, URL `q`, sorting (`aria-sort`, URL, request), paging and page size (offset, limit), Back keeps the state, both empty states, loading, error + retry                                                                                                          |
+| `test/holders-detail.test.tsx`             | Grouped fields, full ID number, option labels, Over 18, added by, credential summary and list, disabled Issue credential with tooltip, 404 page, load errors, nothing in the console, Sinhala                                                                                                                                                   |
+| `test/csp.test.ts`, `query-client.test.ts` | CSP directives; retry policy                                                                                                                                                                                                                                                                                                                    |
+| `e2e/login.spec.ts` (Playwright)           | Real backend on a throwaway database. The steps:<br>1. `/holders` → login.<br>2. Wrong password shows the error.<br>3. Admin signs in → `/holders` with the admin menu.<br>4. Dashboard: every card equals the backend's `/dashboard/summary` (demo data seeded).<br>5. Logout.<br>6. Officer signs in without admin items.                     |
+| `e2e/holders.spec.ts` (Playwright)         | Employer admin registers an employee (validation error first, then fixed), finds them by search, opens the detail page; bank admin registers a customer with a passport; a duplicate reference shows the 409 message and its link                                                                                                               |
+| `portal-ui/test/`                          | AppShell, Sidebar (active item, role filtering, keyboard menu toggle, ARIA), Header, page blocks, primitives; StatCard, StackedBar, Skeleton (`dashboard-widgets.test.tsx`); DataTable, Pagination, SearchInput, FormField, ErrorSummary, StatusBadge, Toast, ConfirmDialog, Tooltip, Select (`forms-and-tables.test.tsx`)                      |
 
 **Mock backend:** MSW mocks the backend in unit tests (`test/mock-backend.ts`, with
 `onUnhandledFrame: 'error'`, so nothing reaches a real server).
@@ -345,3 +354,143 @@ pluggable link component; they contain no text, routes or API calls.
 Chromium has no Sinhala data for `Intl.RelativeTimeFormat` or month names, so in Sinhala the
 relative times ("2 hours ago") and the month in dates stay English. The existing lockout time
 on the sign-in page has the same limitation. Bundling locale data is future work.
+
+## 9. Holders
+
+**Routes** (admin and officer; the guards reuse the Holders route's roles from
+`app-routes.tsx`):
+
+| Path                 | Page                    | Code                                       |
+| -------------------- | ----------------------- | ------------------------------------------ |
+| `/holders`           | List, search, paging    | `src/pages/holders/HoldersListPage.tsx`    |
+| `/holders/new`       | Register a holder       | `src/pages/holders/HolderRegisterPage.tsx` |
+| `/holders/:holderId` | One holder, credentials | `src/pages/holders/HolderDetailPage.tsx`   |
+
+**Data:** `GET /holders`, `POST /holders`, `GET /holders/:holderId`
+([holders-api.md](../api/holders-api.md)) and `GET /credentials?holderId=` for the credential
+summary. The backend scopes all of them to the staff member's organisation; another issuer's
+holder is a `404`, shown as "Holder not found".
+
+### 9.1 Form generated from the schema
+
+The form type comes from the signed-in issuer's type (`/auth/me` → `issuer.type`):
+employer → **employee** form (Employment credential), bank → **customer** form (KYC
+credential). `src/holders/form-model.ts` builds it from the credential JSON Schema of that type
+(the files in `docs/schemas`, compiled into the build, Decision 018) plus a small UI config:
+
+| From the schema                                                                    | From the UI config (`FORM_UI`)                                  |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Input type (`enum` → select, `format: date` → date, `format: email` → email)       | Group and order of the fields                                   |
+| Options of a select, `maxLength`                                                   | `tel` input for phone numbers (the schema only says "string")   |
+| Required fields (`required`, nested address `required`, the `allOf` if/then rules) | `autocomplete` hints                                            |
+| Conditional fields (shown only while the schema requires them)                     | Which object claim is an optional section (residential address) |
+| Constants (address `country` = `LK`, filled in, never typed)                       | Labels, hints and messages: i18n keys (`holders.fields.*`)      |
+
+- **Groups:** employee: Personal details, Employment details, Contact details. Customer:
+  Account details (customer number), Personal details, Identity document, Contact details,
+  Permanent address, Residential address (switched on by a checkbox).
+- **Not in the form:** `age_over_18` (calculated by the server, Decision 005) and `portrait`
+  (no photo upload yet). A test fails if a schema property is neither in the form nor in this
+  list (`OMITTED_CLAIMS`).
+- **KYC rules, live:** with **NIC** the expiry date is hidden; **passport** or **driving
+  licence** shows it as required, and the ID-number hint and error text change to that
+  document's format. A different residential address makes its fields and the proof of
+  residence required. The P.O. Box rule has its own message.
+- **Reference (`externalRef`):** bank customers enter the customer number (3–30 capital letters,
+  digits or hyphens, the backend's `CUSTOMER_REF_PATTERN`). For employees the reference **is**
+  the employee ID, so there is no separate field; its hint says so.
+- **Defaults:** ID document type NIC and nationality LK (ordinary choices, not rules).
+
+### 9.2 Validation flow
+
+```mermaid
+sequenceDiagram
+    participant U as Officer
+    participant F as Form (browser)
+    participant V as Precompiled validators<br/>(same schema files)
+    participant B as POST /holders
+    participant S as Backend validator<br/>(same schema files)
+    U->>F: types, leaves a field (blur)
+    F->>V: claims (age_over_18 placeholder)
+    V-->>F: issues {path, code}
+    F-->>U: error under the touched field (en / si)
+    U->>F: Register holder
+    F->>V: whole form
+    alt problems in the browser
+        V-->>F: issues
+        F-->>U: error summary (takes focus) + every field marked
+    else valid
+        F->>B: {externalRef?, claims}
+        B->>S: claims (+ age_over_18 calculated)
+        alt 400 VALIDATION_ERROR
+            S-->>B: details[] {path, code, message}
+            B-->>F: 400
+            F-->>U: errors on their fields; unknown paths in the summary
+        else 409 HOLDER_ALREADY_EXISTS
+            B-->>F: 409 details.holderId
+            F-->>U: message + link to the existing holder
+        else 201
+            B-->>F: the new record
+            F-->>U: detail page + toast "… was registered."
+        end
+    end
+```
+
+- **When errors show:** after a field loses focus (blur), and for every field after a submit.
+  Editing a field removes the server's error for it.
+- **Error summary** (portal-ui `ErrorSummary`): at the top, `role="alert"`, takes focus after
+  each failed submit, each item links to (and focuses) its field. Fields carry `aria-invalid`,
+  `aria-required` and `aria-describedby` (hint + error).
+- **Messages** come from the issue `code` (`holders.errors.*`), with the field's own text for
+  pattern problems (`holders.fields.<field>.patternError`; for the ID number one per document
+  type), so the browser and the server problems read the same, in English and Sinhala.
+- **No double submit:** the button is disabled and shows "Registering…" while the request runs,
+  and the submit handler ignores a second submit.
+- **Unsaved changes:** a changed form asks "Leave without saving?" before an in-app navigation
+  (React Router `useBlocker`, portal-ui `ConfirmDialog`) and before closing the tab
+  (`beforeunload`). Not after a successful save.
+
+**Same rules as the server:** `test/holders-validation.test.ts` runs every record of
+`backend/seed-data` plus 28 crafted invalid claims through the portal validator and the
+backend validator and expects identical issues.
+
+### 9.3 List
+
+- **Columns:** name (link), reference (label "Employee ID" or "Customer number"), ID number
+  **masked**, date added (Asia/Colombo), credential count. A row click opens the holder.
+- **Masking rule:** the list shows only the last 4 characters of the ID number
+  (`•••• 0063`, read as "ID number ending in 0063"). The backend sends nothing more
+  (`idNumberLast4`); the full number appears on the detail page only.
+- **Search:** debounced (300 ms, Enter searches at once) through the backend's `search`
+  (name or reference).
+- **URL state:** `q`, `page`, `size` (10 / 20 / 50) and `sort` (`newest`, `oldest`, `name`,
+  `name_desc`, `ref`, `ref_desc`) live in the query string, so Back and refresh keep the list.
+  Defaults are left out (`/holders` stays plain); invalid values fall back to the defaults.
+  Sorting is done by the backend; the column headings carry `aria-sort`.
+- **States:** loading skeleton rows; "No holders yet" with **Register holder**; "No holders
+  match “…”" with **Clear search**; error with **Try again**.
+
+### 9.4 Detail
+
+- Every registered field, grouped like the form, with option labels and dates in the
+  language's style; **the full ID number** (only here).
+- KYC: **Over 18: Yes / No**, the server's `age_over_18`, with "Calculated by the server from
+  the date of birth".
+- Date added and the staff member who added the record.
+- **Credentials:** counts by effective status (badges) and a list (type, status badge, signed,
+  expires). Links to each credential come with the credentials page.
+- **Issue credential:** shown with `aria-disabled` and the tooltip "Available in the next
+  update" (still focusable, so the tooltip is reachable by keyboard).
+
+### 9.5 Privacy
+
+Nothing about a holder is written to the browser console (a test spies on every console
+method). The list carries no full ID numbers. Holder data is kept only in the TanStack Query
+cache, which is cleared on sign-out.
+
+### 9.6 Shared components (portal-ui)
+
+`DataTable` (sortable headings, row click, loading rows), `Pagination`, `SearchInput`
+(debounced), `FormField`, `ErrorSummary`, `StatusBadge`, `ToastProvider` / `useToast`,
+`ConfirmDialog`, `Tooltip` and `Select`. All labels are passed in, so the verifier portal can
+reuse them.

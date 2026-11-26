@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build:deps": "npm --prefix ../crypto-core run build",
+    "build:deps": "npm --prefix ../crypto-core run build && npm --prefix ../claims-validation run build",
     "predev": "npm run build:deps",
     "dev": "tsx watch src/server.ts",
     "prebuild": "npm run build:deps",
@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.17",
+    "@univault/claims-validation": "file:../claims-validation",
     "@univault/crypto-core": "file:../crypto-core",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",

@@ -36,7 +36,6 @@ export const APP_ROUTES: readonly AppRoute[] = [
     labelKey: 'nav.holders',
     icon: Users,
     roles: EVERYONE,
-    comingInSprint: 2,
   },
   {
     id: 'credentials',

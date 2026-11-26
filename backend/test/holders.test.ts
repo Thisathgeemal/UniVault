@@ -3,7 +3,9 @@ import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { credentialRecords, holders } from '../src/db/schema.js';
-import { ageOn } from '../src/services/holders.service.js';
+import type { Db } from '../src/db/client.js';
+import { loadCredentialSchemas } from '../src/services/credential-schemas.js';
+import { ageOn, createHoldersService } from '../src/services/holders.service.js';
 import { authedTestApp, STAFF, type AuthedTestApp } from './auth-helpers.js';
 import { captureLogger, testConfig } from './helpers.js';
 
@@ -94,10 +96,13 @@ describe('POST /holders – new holder records can be created', () => {
     expect(res.body).toMatchObject({ issuerId: 'employer-a', recordType: 'employee' });
   });
 
-  it('rejects a duplicate reference at the same issuer with 409', async () => {
+  it('rejects a duplicate reference at the same issuer with 409, naming the existing record', async () => {
+    const existing = await get(employerOfficer, '?search=STC-90001');
     const res = await post(employerOfficer, { claims: employeeClaims('STC-90001') });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('HOLDER_ALREADY_EXISTS');
+    // The portal links to it; it is this issuer's own record, so nothing leaks
+    expect(res.body.error.details).toEqual({ holderId: existing.body.holders[0].id });
   });
 
   it('allows the same reference at a different issuer (independent issuers)', async () => {
@@ -144,6 +149,7 @@ describe('POST /holders – invalid data is rejected', () => {
     expect(res.status).toBe(400);
     expect(res.body.error.details).toContainEqual({
       path: 'claims.salary',
+      code: 'notAllowed',
       message: 'is not allowed by the credential schema',
     });
   });
@@ -186,9 +192,10 @@ describe('POST /holders – invalid data is rejected', () => {
     const res = await post(bankOfficer, { externalRef: 'CUS-000301', claims });
     expect(res.body.error.details).toEqual(
       expect.arrayContaining([
-        { path: 'claims.id_document_expiry', message: 'is required' },
+        { path: 'claims.id_document_expiry', code: 'required', message: 'is required' },
         {
           path: 'claims.permanent_address.line1',
+          code: 'poBox',
           message: 'must be a street address (P.O. Box addresses are not accepted)',
         },
       ]),
@@ -197,9 +204,28 @@ describe('POST /holders – invalid data is rejected', () => {
 
   it('requires a valid customer number for bank customers', async () => {
     expect(paths(await post(bankOfficer, { claims: customerClaims() }))).toContain('externalRef');
-    expect(
-      paths(await post(bankOfficer, { externalRef: 'bad ref!', claims: customerClaims() })),
-    ).toContain('externalRef');
+    const bad = await post(bankOfficer, { externalRef: 'bad ref!', claims: customerClaims() });
+    expect(bad.body.error.details).toContainEqual({
+      path: 'externalRef',
+      code: 'pattern',
+      message: 'must be 3–30 uppercase letters, digits or hyphens',
+    });
+  });
+
+  it('gives every issue a stable code (the portal translates it)', async () => {
+    const res = await post(employerOfficer, {
+      claims: { employee_id: 'stc 1', full_name: 'A', date_of_joining: 'soon' },
+    });
+    const details = res.body.error.details as { path: string; code: string }[];
+    expect(details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'claims.employee_id', code: 'pattern' }),
+        expect.objectContaining({ path: 'claims.full_name', code: 'minLength' }),
+        expect.objectContaining({ path: 'claims.date_of_joining', code: 'format' }),
+        expect.objectContaining({ path: 'claims.designation', code: 'required' }),
+      ]),
+    );
+    for (const d of details) expect(Object.keys(d).sort()).toEqual(['code', 'message', 'path']);
   });
 
   it('requires externalRef to match employee_id for employees', async () => {
@@ -209,6 +235,7 @@ describe('POST /holders – invalid data is rejected', () => {
     });
     expect(res.body.error.details).toContainEqual({
       path: 'externalRef',
+      code: 'mismatch',
       message: 'must equal claims.employee_id for employee records',
     });
   });
@@ -233,6 +260,7 @@ describe('GET /holders – existing records can be retrieved', () => {
         'externalRef',
         'fullName',
         'id',
+        'idNumberLast4',
         'recordType',
       ]);
       expect(h.recordType).toBe('employee');
@@ -290,6 +318,55 @@ describe('GET /holders – existing records can be retrieved', () => {
     });
     const res = await get(employerOfficer, '?search=STC-90020');
     expect(res.body.holders[0].credentialCount).toBe(1);
+  });
+
+  it('shows only the last 4 characters of the ID number (masking rule)', async () => {
+    await post(bankOfficer, {
+      externalRef: 'CUS-000400',
+      claims: customerClaims({ id_document_number: '199012345678' }),
+    });
+    const [customer] = (await get(bankOfficer, '?search=CUS-000400')).body.holders;
+    expect(customer.idNumberLast4).toBe('5678');
+    expect(JSON.stringify(customer)).not.toContain('19901234');
+    // Employees: the optional nic_number, or null without one
+    const { nic_number: _nic, ...noNic } = employeeClaims('STC-90040', 'No Nic') as Record<
+      string,
+      unknown
+    >;
+    await post(employerOfficer, { claims: noNic });
+    await post(employerOfficer, {
+      claims: { ...employeeClaims('STC-90041', 'With Nic'), nic_number: '851234567V' },
+    });
+    const list = (await get(employerOfficer, '?search=STC-9004')).body.holders as {
+      externalRef: string;
+      idNumberLast4: string | null;
+    }[];
+    expect(Object.fromEntries(list.map((h) => [h.externalRef, h.idNumberLast4]))).toEqual({
+      'STC-90040': null,
+      'STC-90041': '567V',
+    });
+  });
+
+  it('sorts by date, name or reference in both directions', async () => {
+    const order = async (sort: string, key: 'fullName' | 'externalRef' | 'createdAt') =>
+      (
+        (await get(employerOfficer, `?sort=${sort}&limit=100`)).body.holders as Record<
+          string,
+          string
+        >[]
+      ).map((h) => h[key]!);
+    // Names: as the existing paging test (collation and localeCompare agree on these names);
+    // references and ISO timestamps: plain code-unit order
+    const asc = (values: string[]) => [...values].sort();
+    const names = await order('name', 'fullName');
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    expect(await order('name_desc', 'fullName')).toEqual([...names].reverse());
+    const refs = await order('ref', 'externalRef');
+    expect(refs).toEqual(asc(refs));
+    expect(await order('ref_desc', 'externalRef')).toEqual([...refs].reverse());
+    const oldest = await order('oldest', 'createdAt');
+    expect(oldest).toEqual(asc(oldest));
+    expect((await order('newest', 'createdAt'))[0]).toBe(oldest.at(-1));
   });
 
   it('validates list parameters', async () => {
@@ -350,5 +427,40 @@ describe('ageOn', () => {
     expect(ageOn('2008-11-20', on)).toBe(18);
     expect(ageOn('2008-11-21', on)).toBe(17);
     expect(ageOn('not-a-date', on)).toBeNull();
+  });
+});
+
+describe('createHoldersService – database errors', () => {
+  const staff = {
+    id: 'staff-1',
+    email: 'officer@serendib-trading.example',
+    displayName: 'Officer',
+    role: 'officer' as const,
+    issuer: { id: 'employer-a', name: 'Serendib Trading', type: 'employer' as const },
+  };
+  /** A database whose insert fails with `error` and whose lookups find nothing. */
+  const failingDb = (error: unknown) =>
+    ({
+      insert: () => ({ values: () => ({ returning: () => Promise.reject(error) }) }),
+      select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }),
+    }) as unknown as Db;
+
+  it('rethrows a failure that is not a duplicate (it becomes a 500, never a 409)', async () => {
+    const service = createHoldersService(
+      failingDb(new Error('connection lost')),
+      loadCredentialSchemas(),
+    );
+    await expect(service.create(staff, { claims: employeeClaims('STC-90050') })).rejects.toThrow(
+      'connection lost',
+    );
+  });
+
+  it('a duplicate found by the database (also via a wrapped cause) is a 409, without an id if the row is gone', async () => {
+    const wrapped = new Error('insert failed', { cause: { code: '23505' } });
+    const service = createHoldersService(failingDb(wrapped), loadCredentialSchemas());
+    const error = await service
+      .create(staff, { claims: employeeClaims('STC-90051') })
+      .catch((e: unknown) => e);
+    expect(error).toMatchObject({ status: 409, code: 'HOLDER_ALREADY_EXISTS', details: undefined });
   });
 });

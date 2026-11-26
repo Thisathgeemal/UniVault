@@ -70,7 +70,8 @@ src/
   services/credentials.service.ts  pending credentials, expiry rules, signCredential (SD-JWT),
                                    revoke, reissue (supersede), status history
   services/credential-offers.service.ts  pre-authorised offers (hash only), status, findOfferByCode
-  services/credential-schemas.ts   loads docs/schemas and validates claims
+  services/credential-schemas.ts   loads docs/schemas and validates claims (rules and messages
+                                   from @univault/claims-validation, shared with the portal)
   services/credential-status.ts    effectiveStatus() + its SQL twin effectiveStatusCondition(), public lookup
   services/dashboard.service.ts    dashboard counts (one aggregate query) and recent activity
   db/schema.ts           Drizzle table definitions and relations

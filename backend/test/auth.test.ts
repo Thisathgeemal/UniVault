@@ -86,6 +86,22 @@ describe('AC1 – valid issuer staff can log in', () => {
     });
   });
 
+  it('GET /auth/me includes the issuer type (the portal picks the holder form from it)', async () => {
+    for (const [email, type] of [
+      [STAFF.employerOfficer, 'employer'],
+      [STAFF.bankOfficer, 'bank'],
+    ] as const) {
+      const res = await request(t.app)
+        .get('/api/v1/auth/me')
+        .set(bearer(await t.tokenFor(email)));
+      expect(res.body.staff.issuer).toEqual({
+        id: expect.any(String),
+        name: expect.any(String),
+        type,
+      });
+    }
+  });
+
   it('POST /auth/logout returns 204', async () => {
     const token = await t.tokenFor(STAFF.bankAdmin);
     expect((await request(t.app).post('/api/v1/auth/logout').set(bearer(token))).status).toBe(204);

@@ -1,0 +1,48 @@
+{
+  "name": "@univault/claims-validation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UniVault shared credential-claims validation: one Ajv configuration, one error-message mapping and the reference patterns, used by the backend (runtime) and the issuer portal (precompiled at build time)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "default": "./dist/runtime.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run build",
+    "test": "vitest run",
+    "pretest:coverage": "npm run build",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@vitest/coverage-v8": "5.1.1",
+    "typescript": "5.9.3",
+    "vitest": "5.1.1"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-win32-x64-msvc": "1.2.19"
+  }
+}

@@ -6,6 +6,15 @@
 
 ---
 
+> **One set of rules, two places (26 Nov 2026, Decision 018).** The backend (`POST /holders`,
+> issuance) and the issuer portal's holder registration form validate claims with **these same
+> files**, through the shared package `@univault/claims-validation` (same Ajv 2020 options,
+> formats, custom `x-univault` keyword and error messages). The portal compiles the files at build
+> time, and its form takes field types, options, lengths, required fields and the `allOf` if/then
+> rules from them. A test runs the seed data and invalid samples through both and expects
+> identical results. **Never copy a rule from here into the UI or the backend: change the schema
+> file.**
+
 ## 1. Sources
 
 | Source                                                                                                                           | Used for              |

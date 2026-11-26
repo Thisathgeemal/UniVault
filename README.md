@@ -67,6 +67,8 @@ UniVault/
 │
 ├── crypto-core/       # Shared SD-JWT cryptographic library
 │
+├── claims-validation/ # Shared claim validation (backend + issuer portal, same schemas)
+│
 ├── backend/           # Node.js / Express backend API
 │
 ├── issuer-portal/     # React.js issuer application

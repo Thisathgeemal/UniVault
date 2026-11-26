@@ -31,6 +31,7 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 | [015](#decision-015-frontend-stack-react--vite--ts-react-router-tanstack-query-tailwind--shadcnui-react-i18next-shared-portal-ui-package)               | Frontend stack: React + Vite + TS, React Router, TanStack Query, Tailwind + shadcn/ui, react-i18next, shared portal-ui package       | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
 | [016](#decision-016-staff-token-in-memory--sessionstorage-never-localstorage-httponly-cookie-as-future-work)                                            | Staff token in memory + sessionStorage, never localStorage; httpOnly cookie as future work                                           | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
 | [017](#decision-017-dashboard-demo-data-via-the-real-services-marked-by-an-inactive-staff-account-reset-lifts-the-append-only-guard-in-one-transaction) | Dashboard demo data via the real services, marked by an inactive staff account; reset lifts the append-only guard in one transaction | Wed 25 Nov 2026 | S2                       | Draft – review | FR-ISS-01, FR-ISS-03, NFR-08                                  |
+| [018](#decision-018-one-shared-claims-validation-package-the-portal-precompiles-the-schemas-at-build-time)                                              | One shared claims-validation package; the portal precompiles the schemas at build time                                               | Thu 26 Nov 2026 | S2                       | Draft – review | FR-ISS-01, NFR-02, NFR-05, NFR-08                             |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -1548,3 +1549,84 @@ domain>`, `is_active = false`, random password never stored in clear): demo cred
   (`signCredential()` is the real path), but its expired credential needs a replacement for
   `simulateExpiry()`: the injected clock (create and sign more than a year in the past) works
   without it.
+
+## Decision 018: One shared claims-validation package; the portal precompiles the schemas at build time
+
+- **Date:** Thu 26 Nov 2026
+- **Sprint:** S2
+- **Status:** Draft – review
+- **Requirements:** FR-ISS-01, NFR-02, NFR-05, NFR-08
+- **Related:** [credential-schemas.md](../schemas/credential-schemas.md), Decision 003, Decision
+  004, Decision 005 (`age_over_18` is calculated by the server), Decision 015 (frontend stack)
+- **Evidence:** `claims-validation/test/claims-validation.test.ts`,
+  `issuer-portal/test/holders-validation.test.ts`, `issuer-portal/e2e/holders.spec.ts`
+
+### Context
+
+The holder registration form in the issuer portal has to check the claims before they are
+sent, with the same rules as `POST /holders`: required fields, formats (dates, email), lengths,
+allowed values, the KYC `allOf` if/then rules (passport or driving licence → expiry date;
+residential address → proof of residence) and the P.O. Box rule. The rules live in the JSON
+Schemas in `docs/schemas` (single source of truth). Copying them into the UI would let the
+browser and the server drift apart.
+
+Two constraints:
+
+1. **The production CSP** (`script-src 'self'`, no `'unsafe-eval'`, `csp.ts`). Ajv's normal
+   `compile()` generates code with `new Function`, which the CSP blocks. The e2e test runs on
+   the Vite dev server without a CSP, so it would not notice.
+2. **The friendly error messages** (`toIssue()` in the backend's `credential-schemas.ts`) were
+   backend-only. The browser must show the same problems, and in Sinhala too.
+
+### Options considered
+
+1. **Hand-written form rules (zod) in the portal:** simple, but a second copy of every rule.
+2. **Ajv in the browser with `compile()` at runtime:** the same rules, but blocked by the CSP
+   (or the CSP weakened with `'unsafe-eval'`).
+3. **Import a backend source file into the portal:** couples the portal to backend internals
+   (Node APIs in the same file) and still needs a CSP-safe compile.
+4. **A small shared package plus build-time compilation:** `@univault/claims-validation` owns
+   the Ajv options, the custom keyword, the error mapping (with a stable `code` per issue) and
+   the reference rule (`checkExternalRef`). The backend compiles the schema files at start-up
+   as before; a Vite plugin in the portal compiles the same files into Ajv **standalone** code
+   when the portal is built (or served, or tested).
+
+### Decision
+
+**Option 4.**
+
+- `claims-validation/` (built with `tsc` to `dist/`, like portal-ui): `index.ts` is
+  browser-safe (no runtime imports); `node.ts` reads the schema files, creates the shared Ajv
+  and generates standalone code; `runtime.ts` re-exports the two helpers the generated code
+  needs (ajv-formats' format functions and Ajv's Unicode string length), so the browser runs
+  exactly the same format checks as the server.
+- `issuer-portal/claims-validators-plugin.ts` provides `virtual:claims-validators`
+  (`validators` and the `schemas`). The form layout (`src/holders/form-model.ts`) reads field
+  types, options, lengths, required fields and the if/then rules from those schemas; the UI
+  config only orders and groups fields and adds input hints.
+- The backend's holder `VALIDATION_ERROR` details gain `code` (additive), so the portal maps a
+  server error onto the field and translates it.
+- **Rule:** never duplicate a schema rule in the UI or the backend. Change the schema file;
+  both sides follow.
+
+### Reason
+
+- One set of rules, two consumers, and a test that proves they agree: every record of the
+  synthetic seed data plus 28 crafted invalid claims give **identical** issues (path, code,
+  message) in the portal validator and the backend validator.
+- The CSP stays strict: the production bundle contains no `new Function` or `eval` (checked
+  after `vite build`).
+- The package is small (about 320 lines with comments) and has its own tests, including one that compares
+  the generated standalone code with runtime compilation for the same samples.
+
+### Consequences
+
+- A third built package. `build:deps` of the backend and the portal build it, and so does the
+  e2e backend start (`e2e/start-backend.mjs`).
+- The portal's form generator understands the `if` keywords the schemas use today
+  (`properties` with `const`, and `required`). A test fails if a schema starts using another
+  `if` keyword, so the generator is extended deliberately rather than silently wrong.
+- Ajv's standalone output still contains one `require()` for a runtime helper; the generator
+  swaps it for an import and refuses to emit code that still contains `require()`.
+- The Vite dev server needs `optimizeDeps.include` for the package's two CommonJS helpers
+  (it is linked through `file:`, so not pre-bundled automatically).

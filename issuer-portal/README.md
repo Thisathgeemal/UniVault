@@ -10,8 +10,14 @@ digital credentials. It is built with React, Vite and TypeScript, using:
 
 The layout comes from the shared [`@univault/portal-ui`](../portal-ui/README.md) package.
 
-**Status (24 Nov 2026):** sign-in, session, role-based layout and placeholder pages. Design and
-flows: [docs/frontend/issuer-portal.md](../docs/frontend/issuer-portal.md) (Decisions 015 and 016).
+**Status (26 Nov 2026):** sign-in, session, role-based layout, dashboard, holder management
+(list, registration form generated from the credential schema, detail) and placeholder pages.
+Design and flows: [docs/frontend/issuer-portal.md](../docs/frontend/issuer-portal.md)
+(Decisions 015, 016 and 018).
+
+Holder claims are validated in the browser with the **same schema files and rules as the
+backend** (`@univault/claims-validation`, compiled at build time by
+`claims-validators-plugin.ts`). Never copy a schema rule into the portal.
 
 ## Setup
 
@@ -100,13 +106,17 @@ src/
   main.tsx                 entry: i18n, QueryClient, router, top-level error boundary
   router.tsx               route tree (React Router data router)
   routes/app-routes.tsx    protected pages + roles: ONE list for the router guards and the sidebar
-  api/                     client (Bearer, ApiError, session-ending 401s), auth endpoints
+  api/                     client (Bearer, ApiError, session-ending 401s), auth, dashboard,
+                           holders, credentials
   auth/                    AuthProvider (session), RequireRole, returnTo checks, sessionStorage
   layout/                  RootLayout (session provider), ProtectedLayout (AppShell + redirect)
-  pages/                   Login, Dashboard, ComingSoon, Not permitted / 404 / error
+  pages/                   Login, Dashboard, holders/ (list, register, detail), ComingSoon,
+                           Not permitted / 404 / error
+  holders/                 form-model (form from the schema), validation, display, list-params
   i18n/                    react-i18next set-up; locales/en.ts, locales/si.ts
   lib/                     sign-in messages, Asia/Colombo time formatting
 csp.ts                     production Content-Security-Policy
+claims-validators-plugin.ts virtual:claims-validators (docs/schemas compiled at build time)
 public/_redirects          SPA fallback (Netlify / Cloudflare Pages format)
 test/                      Vitest tests and the MSW mock backend
 e2e/                       Playwright spec and the throwaway-backend launcher

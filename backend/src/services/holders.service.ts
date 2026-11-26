@@ -7,6 +7,11 @@
  * (docs/schemas), so only data that can become a valid credential is stored.
  * Personal data in claims is never written to logs.
  */
+import {
+  checkExternalRef,
+  CUSTOMER_REF_PATTERN,
+  type RecordType,
+} from '@univault/claims-validation';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import type { StaffProfile } from '../auth/auth-service.js';
 import type { Db } from '../db/client.js';
@@ -14,7 +19,7 @@ import { holders } from '../db/schema.js';
 import { AppError } from '../lib/errors.js';
 import type { CredentialSchemas, CredentialTypeName } from './credential-schemas.js';
 
-export type RecordType = 'employee' | 'customer';
+export type { RecordType };
 
 /** What each issuer type keeps records of, and which credential those records become. */
 export const ISSUER_RECORD_TYPES = {
@@ -25,7 +30,12 @@ export const ISSUER_RECORD_TYPES = {
   { recordType: RecordType; credentialType: CredentialTypeName }
 >;
 
-export const CUSTOMER_REF_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,29}$/;
+/** Shared with the issuer portal (@univault/claims-validation): the customer number rule. */
+export { CUSTOMER_REF_PATTERN };
+
+/** Sort orders of GET /holders (the portal's sortable columns). */
+export const HOLDER_SORTS = ['newest', 'oldest', 'name', 'name_desc', 'ref', 'ref_desc'] as const;
+export type HolderSort = (typeof HOLDER_SORTS)[number];
 
 export interface CreateHolderInput {
   /** Required for bank customers (customer number). For employees it is the employee_id claim. */
@@ -38,6 +48,11 @@ export interface HolderSummary {
   externalRef: string;
   fullName: string;
   recordType: RecordType;
+  /**
+   * The last 4 characters of the ID number (customers: id_document_number; employees:
+   * nic_number, optional), or null. The list never returns the full number (masking rule).
+   */
+  idNumberLast4: string | null;
   credentialCount: number;
   createdAt: string;
 }
@@ -59,7 +74,7 @@ export interface ListHoldersQuery {
   search?: string | undefined;
   limit: number;
   offset: number;
-  sort: 'newest' | 'name';
+  sort: HolderSort;
 }
 
 export interface HoldersService {
@@ -141,34 +156,18 @@ export function createHoldersService(
         if (age !== null) claims.age_over_18 = age >= 18;
       }
 
-      const issues = schemas
-        .validate(credentialType, claims)
-        .map((i) => ({ path: `claims.${i.path}`, message: i.message }));
-
-      // The external reference: employee ID for employees, customer number for customers
-      let externalRef: string | undefined;
-      if (recordType === 'employee') {
-        externalRef = typeof claims.employee_id === 'string' ? claims.employee_id : undefined;
-        if (input.externalRef !== undefined && input.externalRef !== externalRef) {
-          issues.push({
-            path: 'externalRef',
-            message: 'must equal claims.employee_id for employee records',
-          });
-        }
-      } else {
-        externalRef = input.externalRef;
-        if (!externalRef)
-          issues.push({
-            path: 'externalRef',
-            message: 'is required for bank customer records (customer number)',
-          });
-        else if (!CUSTOMER_REF_PATTERN.test(externalRef)) {
-          issues.push({
-            path: 'externalRef',
-            message: 'must be 3–30 uppercase letters, digits or hyphens',
-          });
-        }
-      }
+      // details[]: { path, code, message } – the same issues the portal computes in the browser
+      // (@univault/claims-validation); `code` lets it show them in the user's language
+      const reference = checkExternalRef(recordType, input.externalRef, claims);
+      const issues = [
+        ...schemas.validate(credentialType, claims).map((i) => ({
+          path: `claims.${i.path}`,
+          code: i.code,
+          message: i.message,
+        })),
+        ...reference.issues.map(({ path, code, message }) => ({ path, code, message })),
+      ];
+      const externalRef = reference.externalRef;
       if (issues.length > 0 || !externalRef) {
         throw new AppError(
           400,
@@ -193,10 +192,19 @@ export function createHoldersService(
         return toDetail(row!, { id: staff.id, displayName: staff.displayName });
       } catch (err) {
         if (isUniqueViolation(err)) {
+          // The existing record is this issuer's own (the reference is unique per issuer), so
+          // its id may be shown: the portal links to it
+          const [existing] = await db
+            .select({ id: holders.id })
+            .from(holders)
+            .where(
+              and(eq(holders.issuerId, staff.issuer.id), eq(holders.externalRef, externalRef)),
+            );
           throw new AppError(
             409,
             'HOLDER_ALREADY_EXISTS',
             `A holder with reference "${externalRef}" already exists`,
+            existing ? { holderId: existing.id } : undefined,
           );
         }
         throw err;
@@ -214,6 +222,18 @@ export function createHoldersService(
       const where = and(...conditions);
       // Table aliases are explicit: an unqualified "id" inside the subquery would mean credential_records.id
       const credentialCount = sql<number>`(select count(*)::int from credential_records cr where cr.holder_id = "holders"."id")`;
+      // Masking rule: only the last 4 characters of the ID number ever leave the server here
+      const idNumberLast4 = sql<
+        string | null
+      >`right(coalesce(${holders.claims}->>'id_document_number', ${holders.claims}->>'nic_number'), 4)`;
+      const order = {
+        newest: [desc(holders.createdAt), asc(holders.id)],
+        oldest: [asc(holders.createdAt), asc(holders.id)],
+        name: [asc(holders.fullName), asc(holders.id)],
+        name_desc: [desc(holders.fullName), asc(holders.id)],
+        ref: [asc(holders.externalRef), asc(holders.id)],
+        ref_desc: [desc(holders.externalRef), asc(holders.id)],
+      }[query.sort];
 
       const [rows, totals] = await Promise.all([
         db
@@ -222,16 +242,13 @@ export function createHoldersService(
             externalRef: holders.externalRef,
             fullName: holders.fullName,
             recordType: holders.recordType,
+            idNumberLast4,
             credentialCount,
             createdAt: holders.createdAt,
           })
           .from(holders)
           .where(where)
-          .orderBy(
-            ...(query.sort === 'name'
-              ? [asc(holders.fullName), asc(holders.id)]
-              : [desc(holders.createdAt), asc(holders.id)]),
-          )
+          .orderBy(...order)
           .limit(query.limit)
           .offset(query.offset),
         db.select({ n: count() }).from(holders).where(where),
@@ -240,6 +257,7 @@ export function createHoldersService(
       return {
         holders: rows.map((r) => ({
           ...r,
+          idNumberLast4: r.idNumberLast4 ?? null,
           credentialCount: Number(r.credentialCount),
           createdAt: r.createdAt.toISOString(),
         })),
