@@ -75,7 +75,7 @@ UniVault/
 │
 ├── portal-ui/         # Shared layout package for the two web portals
 │
-├── wallet/            # React Native Expo mobile wallet
+├── wallet/            # React Native mobile wallet (Expo SDK 58, Expo Router; see wallet/README.md)
 │
 ├── verifier-portal/   # React.js verifier application
 │
@@ -91,7 +91,9 @@ UniVault/
 ## Development Setup
 
 See [docs/development-setup.md](docs/development-setup.md) for prerequisites, ports,
-environment variables and the shared lint/format/secrets scripts.
+environment variables and the shared lint/format/secrets scripts. To run the mobile wallet on a
+phone with Expo Go (LAN IP or tunnel, firewall ports 4000 and 8081), see
+[wallet/README.md](wallet/README.md).
 
 ## Development Roadmap
 

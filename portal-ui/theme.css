@@ -1,11 +1,16 @@
 /*
  * UniVault portal design tokens (Tailwind CSS v4 theme variables).
  *
+ * GENERATED from src/tokens.ts by `npm run build` (scripts/generate-theme-css.mjs): do not edit
+ * this file by hand; change the tokens and rebuild. test/tokens.test.ts checks the two match.
+ *
  * Import AFTER Tailwind in the portal's stylesheet, and let Tailwind scan this package:
  *
  *   @import 'tailwindcss';
  *   @import '@univault/portal-ui/theme.css';
  *   @source '../../portal-ui/src';
+ *   @source not '../../portal-ui/src/tokens.ts';
+ *   @source not '../../portal-ui/src/theme-css.ts';
  *
  * Every token becomes a CSS variable (e.g. --color-primary) and a utility (bg-primary,
  * text-muted-foreground, w-sidebar, h-header). Components in this package use the semantic

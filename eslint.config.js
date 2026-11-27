@@ -3,8 +3,11 @@
 import js from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import prettier from 'eslint-config-prettier';
+import expo from 'eslint-plugin-expo';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
+import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
+import reactNative from 'eslint-plugin-react-native';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -71,10 +74,50 @@ export default defineConfig([
     rules: { 'react-refresh/only-export-components': 'off' },
   },
 
-  // wallet/ (React Native / Expo): rules intentionally left for later.
-  // When the Expo app is scaffolded, add a block here for 'wallet/**/*' with
-  // React Native globals and eslint-plugin-react / react-hooks / react-native
-  // (or eslint-config-expo's flat config).
+  // wallet/ (React Native / Expo). Scoped like the portals, with React Native rules instead of
+  // the web-only jsx-a11y: eslint-plugin-react (JSX runtime), react-hooks 7 (React Compiler
+  // checks), eslint-plugin-react-native (no text outside <Text>, no unused / inline styles, no
+  // colour literals: colours come from the shared tokens) and eslint-plugin-expo
+  // (EXPO_PUBLIC_* must be read in full, or Expo cannot inline it).
+  {
+    files: ['wallet/**/*.{js,jsx,ts,tsx}'],
+    extends: [
+      react.configs.flat.recommended,
+      react.configs.flat['jsx-runtime'],
+      reactHooks.configs.flat['recommended-latest'],
+    ],
+    plugins: { 'react-native': reactNative, expo },
+    settings: { react: { version: '19.3' } },
+    languageOptions: {
+      globals: { ...reactNative.environments['react-native'].globals, __DEV__: 'readonly' },
+    },
+    rules: {
+      'react/prop-types': 'off', // TypeScript checks props
+      'react-native/no-raw-text': 'error',
+      'react-native/no-unused-styles': 'error',
+      'react-native/no-inline-styles': 'warn',
+      'react-native/no-color-literals': 'error',
+      'react-native/no-single-element-style-arrays': 'error',
+      'expo/no-dynamic-env-var': 'error',
+      'expo/no-env-var-destructuring': 'error',
+    },
+  },
+  // Wallet config files, scripts and Jest tests run in Node (CommonJS config files included).
+  {
+    files: [
+      'wallet/*.{js,ts}',
+      'wallet/scripts/**/*',
+      'wallet/test/**/*',
+      'wallet/jest.config.js',
+      'wallet/metro.config.js',
+    ],
+    languageOptions: { globals: { ...globals.node, ...globals.jest } },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      'react-native/no-raw-text': 'off',
+      'react-native/no-inline-styles': 'off',
+    },
+  },
 
   // Must stay last: turns off stylistic rules that conflict with Prettier.
   prettier,

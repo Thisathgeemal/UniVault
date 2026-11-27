@@ -3,6 +3,9 @@
 
 /* Let Tailwind see the class names used by the shared layout package */
 @source '../../portal-ui/src';
+/* ...but not the token data: words like "ring" or "muted" there are not class names */
+@source not '../../portal-ui/src/tokens.ts';
+@source not '../../portal-ui/src/theme-css.ts';
 
 @layer base {
   html {

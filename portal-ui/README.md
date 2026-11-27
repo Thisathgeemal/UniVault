@@ -29,7 +29,16 @@ portals depend on it through `file:../portal-ui`, and a `pre…` script builds i
 | `QrCode`, `Countdown`, `FullscreenOverlay`                  | A QR code drawn as SVG in the browser (`qrcode` matrix, error correction M, 4-module quiet zone, whole pixels per module, alt text passed in, no inline styles); a mm:ss countdown (`role="timer"`, amber warning, a separate polite live text the caller changes when it should be read); a full-window dialog (focus on Close, Tab trap, Escape)                                 |
 | `Dialog`, `ActionMenu`, `FilterTabs`, `CopyButton`          | A modal with content such as a form (`role="dialog"`, focus inside, Tab trap, Escape unless busy, focus returned); a button opening a list of actions (`aria-expanded`, Escape / outside click closes, a disabled item keeps its visible reason via `aria-describedby`); filter toggle buttons with counts (`aria-pressed`); copy-to-clipboard with a polite "Copied" announcement |
 | `ToastProvider`, `useToast`, `ConfirmDialog`                | Short confirmations in a polite live region; a modal confirmation (`role="alertdialog"`, focus on the safe choice, Tab trap, Escape)                                                                                                                                                                                                                                               |
-| `theme.css`                                                 | Design tokens as Tailwind v4 theme variables: colours, typography (a Sinhala-capable font stack), layout spacing                                                                                                                                                                                                                                                                   |
+| `theme.css`                                                 | GENERATED from `src/tokens.ts`: the design tokens as Tailwind v4 theme variables (colours, typography with a Sinhala-capable font stack, layout spacing, card radius). Never edit by hand                                                                                                                                                                                          |
+
+**Design tokens (`src/tokens.ts`, exported as `@univault/portal-ui/tokens`):** the single
+source of UniVault's colours, font stacks, type scale, spacing and radii, as plain data (no
+imports, no DOM), so the React Native wallet uses the same values. `npm run build` regenerates
+`theme.css` from it (`src/theme-css.ts`, `scripts/generate-theme-css.mjs`) and
+`test/tokens.test.ts` fails if the committed `theme.css` differs. To change a colour: edit
+`src/tokens.ts`, run `npm run build`, commit both files. The wallet maps the import to the
+source file `src/tokens.ts` itself (see `wallet/metro.config.js`), so keep that file
+import-free plain TypeScript: Metro, Jest, Expo's config loader and Node load it unbuilt.
 
 **Rules:**
 
@@ -46,6 +55,8 @@ portals depend on it through `file:../portal-ui`, and a `pre…` script builds i
 @import 'tailwindcss';
 @import '@univault/portal-ui/theme.css';
 @source '../../portal-ui/src'; /* Tailwind must scan the package's class names */
+@source not '../../portal-ui/src/tokens.ts'; /* ...but not the token data (words like */
+@source not '../../portal-ui/src/theme-css.ts'; /* "ring" would become utilities) */
 ```
 
 ```json
@@ -61,7 +72,7 @@ stack falls back to the Sinhala fonts that ship with Windows (Nirmala UI, Iskool
 ## Scripts
 
 ```
-npm run build       # tsc -> dist/
+npm run build       # tsc -> dist/, then regenerates theme.css from src/tokens.ts
 npm run typecheck
 npm test            # Vitest + Testing Library (jsdom)
 npm run test:coverage

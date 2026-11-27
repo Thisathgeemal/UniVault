@@ -35,6 +35,7 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 | [019](#decision-019-issuance-form-is-read-only-and-previewed-server-side)                                                                               | Issuance form is read-only and previewed server-side; schema limited by issuer type                                                  | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-01, FR-ISS-02, FR-WAL-06                               |
 | [020](#decision-020-portrait-embedded-in-the-credential-size-limited-and-selectively-disclosable)                                                       | Portrait embedded in the credential, size-limited (40 KB) and selectively disclosable                                                | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-03, NFR-06, NFR-08, FR-WAL-06                             |
 | [021](#decision-021-pre-authorised-code-kept-only-in-portal-memory-qr-never-re-shown)                                                                   | Pre-authorised code kept only in portal memory; QR never re-shown; tx_code deferred                                                  | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
+| [022](#decision-022-expo-router--expo-go-for-sprint-2-development-build-when-push-notifications-or-os-level-offer-links-are-needed)                     | Expo Router + Expo Go for Sprint 2; development build when push notifications or OS-level offer links are needed                     | Fri 27 Nov 2026 | S2                       | Draft – review | NFR-05, NFR-06                                                |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -1934,3 +1935,98 @@ And, independently, for the offer itself:
 - **Offer lifetime reduced from 10 to 5 minutes (26 Nov 2026):** enough time for the holder to
   scan and accept, and a shorter window for an intercepted QR code to be misused.
   (`CREDENTIAL_OFFER_TTL_SECONDS` default 600 → 300.)
+
+## Decision 022: Expo Router + Expo Go for Sprint 2; development build when push notifications or OS-level offer links are needed
+
+- **Date:** Fri 27 Nov 2026
+- **Sprint:** S2
+- **Status:** Draft – review
+- **Requirements:** NFR-05, NFR-06
+- **Related:** Decision 001 (TypeScript), Decision 006 (`@sd-jwt/core`), Decision 007 (ES256
+  holder keys), Decision 015 (portal stack and shared portal-ui),
+  [mobile-wallet.md](../frontend/mobile-wallet.md), [wallet/README.md](../../wallet/README.md),
+  [SD-JWT spike](../spikes/sd-jwt/README.md) §3.2 and §5
+- **Evidence:** `wallet/` (`npm run doctor`: 20/20 checks; `npm run test:coverage`: 68 tests);
+  Metro bundle of `index.ts` for Android without errors (1,545 modules);
+  [s2-wallet-init-guide.md](evidence/s2-wallet-init-guide.md)
+
+### Context
+
+Sprint 2 builds the holder's wallet. It must run on a real phone during development and in the
+supervisor demos, reuse the shared TypeScript crypto code (`@univault/crypto-core`, pure JS on
+Hermes per the SD-JWT spike), and be cheap to iterate on for a solo developer on Windows (no
+Mac). Later features need native capabilities that differ in how they can be run: camera QR
+scanning and secure storage (available in Expo Go), push notifications for revocation and
+OS-level handling of `openid-credential-offer://` links (not available in Expo Go).
+
+### Options considered
+
+1. **Bare React Native** (React Native CLI, own `android/` and `ios/` projects): full native
+   control from day one, but every change to native dependencies needs Android Studio / Xcode
+   builds; no iOS builds at all on Windows; more setup to maintain.
+2. **Expo Go only:** scan a QR code and run, with fast refresh; no native build tools. But some
+   features can never work in Expo Go: push notifications (removed from Expo Go on Android),
+   the app's own URL schemes and intent filters (Expo Go owns the links), Face ID on iOS, own
+   icon and name.
+3. **EAS development build from the start:** a custom dev client with any native module; needs
+   an Expo account, a cloud or local build per native change, and installing the build on each
+   test phone; slower first days.
+4. **Expo Go now, development build when needed (chosen):** Expo Router and only Expo
+   Go-compatible modules in Sprint 2; switch to an EAS development build when a feature needs
+   one. Expo's Continuous Native Generation (`npx expo prebuild`) means the switch adds a build
+   step, not a rewrite.
+
+### Decision
+
+**Option 4.** The wallet is an Expo **SDK 58** app with **Expo Router** (file-based routes:
+a root Stack, JavaScript bottom tabs) that runs in **Expo Go** for Sprint 2. An EAS
+**development build** is introduced when the first of these is needed: **push notifications**
+(revocation alerts) or **OS-level offer links** (opening the wallet from an
+`openid-credential-offer://` link or the `univault://` scheme), and in any case for the Android
+release build in Sprint 5. Until then, only modules that work in Expo Go are added.
+
+Identifiers are fixed now so the later builds keep them: `lk.univault.wallet` (Android package
+and iOS bundle id), scheme `univault`.
+
+### Reason
+
+- **Iteration speed and demos (NFR-05):** Expo Go loads the project from a QR code over Wi-Fi or
+  a tunnel, with fast refresh; nothing to install per change. This already worked for the SD-JWT
+  spike on a real phone (Sprint 1, Issue 1).
+- **Everything Sprint 2 needs runs in Expo Go:** SD-JWT decoding and presentation (pure JS,
+  proven on Hermes), random bytes and digests (`expo-crypto`), camera QR scanning, secure
+  storage. The spike's limitation L1 (no native RSA/ECDSA in Expo Go) is covered by Decision
+  007 (ES256 via `@noble/curves`).
+- **Security (NFR-06):** the same audited, shared crypto code runs in the wallet as on the
+  backend (`@univault/crypto-core`, universal entry only; Metro refuses the Node entry), and no
+  secret goes into the app (`EXPO_PUBLIC_*` is public by design; the app config has no secrets).
+- **Expo Router** gives file-based navigation and deep-link URLs for free, which the offer
+  links will use once a development build exists.
+- **No lock-in:** prebuild generates the native projects from `app.config.ts`, so moving to a
+  development build (or even to bare React Native) keeps the code.
+
+### Consequences
+
+- **TypeScript 6.0.3 in `wallet/` only.** Expo's version registry, `npx expo install --check`
+  and expo-doctor all check against `typescript ~6.0.3` for SDK 58, and Expo Go runs only the
+  current SDK, so staying on an older SDK for TypeScript 5.9 is not an option. All other
+  packages stay on 5.9.3 (upgrading them to 6 is a separate decision); never TypeScript 7
+  (typescript-eslint does not support it). Root lint already uses TypeScript 6.0.3 with
+  typescript-eslint 8.73.0 (supports < 6.1.0) and no type-aware rules, so 5.9.3 and 6.0.3
+  packages lint cleanly together. CLAUDE.md records the rule.
+- **Expo Go owns the SDK version:** when Expo releases SDK 59, the store's Expo Go stops opening
+  this project until it is upgraded (`npx expo install expo@latest --fix` + tests). Planned
+  around sprint boundaries, never mid-demo.
+- **Design tokens shared without a package dependency:** the wallet imports
+  `@univault/portal-ui/tokens`, mapped to the source file `portal-ui/src/tokens.ts` by Metro,
+  TypeScript and Jest (no portal-ui build needed), because a `file:` link to portal-ui exposed its development React copy to expo-doctor's
+  duplicate check. `portal-ui/src/tokens.ts` is the single source; `theme.css` is generated.
+- **Not available until the development build:** push notifications, OS-level offer links,
+  Face ID on iOS, the UniVault icon and name on the home screen (Expo Go shows its own). The
+  redemption flow in Sprint 2 therefore starts from the in-app Scan tab.
+- **The backend must be reachable from the phone:** LAN IP or tunnel in
+  `EXPO_PUBLIC_API_BASE_URL`, Windows Firewall rules for 4000 and 8081; the backend already
+  listens on all interfaces. Once offers are redeemed from the phone, `PUBLIC_BASE_URL` must use
+  the same address.
+- **Backlog:** EAS account and development build (`expo-dev-client`) when the first trigger
+  feature is scheduled; persisted language choice with the wallet storage.

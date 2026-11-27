@@ -9,7 +9,7 @@ in [decisions.md](decisions.md).
 | Sprint | Dates (2026)           | Review             | Focus                                             | Log                        |
 | ------ | ---------------------- | ------------------ | ------------------------------------------------- | -------------------------- |
 | S1     | Mon 16 – Sat 21 Nov    | Sun 22 Nov         | Foundations, cryptographic core and issuer portal | [sprint-1.md](sprint-1.md) |
-| S2     | Mon 23 – Sat 28 Nov    | Sun 29 Nov         | Mobile wallet and credential issuance             | sprint-2.md (to be added)  |
+| S2     | Mon 23 – Sat 28 Nov    | Sun 29 Nov         | Mobile wallet and credential issuance             | [sprint-2.md](sprint-2.md) |
 | S3     | Mon 30 Nov – Sat 5 Dec | Sun 6 Dec          | Verifier portal and selective disclosure          | sprint-3.md (to be added)  |
 | S4     | Mon 7 – Sat 12 Dec     | Sun 13 Dec         | AI anomaly detection and additional features      | sprint-4.md (to be added)  |
 | S5     | Mon 14 – Sat 19 Dec    | Sun 20 Dec (final) | Testing, security hardening and release           | sprint-5.md (to be added)  |

@@ -1,10 +1,11 @@
 # Development Setup
 
 How to get a UniVault development environment running and which shared tooling the repository
-uses. `crypto-core/` and `backend/` exist and have their own READMEs
-([crypto-core/README.md](../crypto-core/README.md), [backend/README.md](../backend/README.md)).
-The portals, wallet and AI service are scaffolded in later sprints; each app's own README will
-add app-specific steps.
+uses. Each package has its own README with app-specific steps:
+[crypto-core](../crypto-core/README.md), [backend](../backend/README.md),
+[portal-ui](../portal-ui/README.md), [issuer-portal](../issuer-portal/README.md) and the
+mobile [wallet](../wallet/README.md) (Expo). The verifier portal and AI service are scaffolded
+in later sprints.
 
 ## Prerequisites
 
@@ -14,10 +15,13 @@ add app-specific steps.
 | npm                | 10 or newer    | Package management (ships with Node.js)                                                                          |
 | Git                | Any recent     | Version control                                                                                                  |
 | Python             | 3.10 or newer  | AI anomaly detection service                                                                                     |
-| Expo Go            | Latest (phone) | Running the wallet on a physical device                                                                          |
+| Expo Go            | Latest (phone) | Running the wallet on a physical device; must support Expo SDK 58 (Expo Go runs only the current SDK)            |
 | VS Code (optional) | Latest         | Install the ESLint, Prettier and EditorConfig extensions                                                         |
 
-For wallet testing on a phone, the phone and the laptop must be on the same Wi-Fi network.
+For wallet testing on a phone, the phone and the laptop must be on the same Wi-Fi network
+(Windows network profile **Private**), and Windows Firewall must allow inbound TCP **4000**
+(backend) and **8081** (Metro); see [wallet/README.md](../wallet/README.md). On networks that
+block device-to-device traffic, use `npm run start:tunnel` in `wallet/` (ngrok).
 
 ## Ports
 
@@ -58,10 +62,12 @@ For wallet testing on a phone, the phone and the laptop must be on the same Wi-F
      `docs/security/issuer-key-management.md`). Leave
      `DATABASE_URL` empty to use the embedded development database (PGlite in
      `backend/.data/`); set a `postgres://` URL only for a real PostgreSQL server.
-   - `wallet/.env`: set `EXPO_PUBLIC_API_BASE_URL` to the laptop's **LAN IP**
-     (e.g. `http://192.168.1.20:4000`), not `localhost`. On a phone, `localhost` is the phone.
-     Find the IP with `ipconfig` (Windows) or `ipconfig getifaddr en0` (macOS).
-     Set the backend's `PUBLIC_BASE_URL` to the same address so QR codes point to it.
+   - `wallet/.env`: set `EXPO_PUBLIC_API_BASE_URL` to the laptop's **LAN IP** including
+     `/api/v1` (e.g. `http://192.168.1.20:4000/api/v1`), not `localhost`. On a phone,
+     `localhost` is the phone. Find the IP with `ipconfig` (Windows) or
+     `ipconfig getifaddr en0` (macOS). The backend already listens on all network interfaces.
+     Once offers are redeemed from the phone, set the backend's `PUBLIC_BASE_URL` to the same
+     address (e.g. `http://192.168.1.20:4000`) so QR codes point to it.
 
 4. Set up the Python environment for the AI service (inside `ai-service/`):
 
@@ -135,9 +141,14 @@ Run these from the repository root.
 | `npm run seed:generate` | Regenerates the synthetic data in `backend/seed-data/` and formats it                                                               |
 
 Package tests run inside each package: `cd crypto-core && npm test`,
-`cd backend && npm test`, `cd portal-ui && npm test` and `cd issuer-portal && npm test`
-(the portal's Playwright test: `npm run test:e2e`, not part of `npm test`). **On Windows, run them from PowerShell or cmd, not Git Bash**:
-under Git Bash, Vitest fails in every test file because of how the drive path is reported.
+`cd backend && npm test`, `cd portal-ui && npm test`, `cd issuer-portal && npm test`
+(the portal's Playwright test: `npm run test:e2e`, not part of `npm test`) and
+`cd wallet && npm test` (Jest; also `npm run doctor` for expo-doctor). **On Windows, run them
+from PowerShell or cmd, not Git Bash**: under Git Bash, Vitest fails in every test file because
+of how the drive path is reported.
+
+**TypeScript versions:** 5.9.3 in every package except `wallet/`, which uses 6.0.3 because
+Expo SDK 58 requires it (Decision 022). Never TypeScript 7.
 
 Python (run inside `ai-service/` with the virtual environment active):
 
@@ -149,12 +160,12 @@ Python (run inside `ai-service/` with the virtual environment active):
 
 ## Shared configuration files
 
-| File                        | Purpose                                                                                                              |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `eslint.config.js`          | ESLint rules: Node globals for `backend/`, `crypto-core/`; browser globals for the portals; wallet rules to be added |
-| `.prettierrc`               | Prettier style: single quotes, semicolons, 100 columns, trailing commas                                              |
-| `.prettierignore`           | Files Prettier skips (build output, `ai-service/`, lock files)                                                       |
-| `.editorconfig`             | Editor defaults: UTF-8, LF, 2-space indent (4 for Python)                                                            |
-| `.gitattributes`            | Forces LF line endings in Git on every OS                                                                            |
-| `ai-service/pyproject.toml` | Ruff config: line length 100, rule sets E, F, I, B                                                                   |
-| `scripts/check-secrets.js`  | Cross-platform secrets check used by `npm run check:secrets`                                                         |
+| File                        | Purpose                                                                                                                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `eslint.config.js`          | ESLint rules: Node globals for `backend/`, `crypto-core/`; browser + React rules for the portals; React Native, react-hooks and Expo rules for `wallet/` |
+| `.prettierrc`               | Prettier style: single quotes, semicolons, 100 columns, trailing commas                                                                                  |
+| `.prettierignore`           | Files Prettier skips (build output, `ai-service/`, lock files)                                                                                           |
+| `.editorconfig`             | Editor defaults: UTF-8, LF, 2-space indent (4 for Python)                                                                                                |
+| `.gitattributes`            | Forces LF line endings in Git on every OS                                                                                                                |
+| `ai-service/pyproject.toml` | Ruff config: line length 100, rule sets E, F, I, B                                                                                                       |
+| `scripts/check-secrets.js`  | Cross-platform secrets check used by `npm run check:secrets`                                                                                             |

@@ -104,10 +104,28 @@ portal-ui/        @univault/portal-ui: shared, app-agnostic layout (AppShell, Si
                   ErrorSummary, StatusBadge, Toast, ConfirmDialog, Tooltip, Select, Stepper,
                   CredentialCardPreview, QrCode (qrcode 1.5.4 matrix → SVG), Countdown,
                   FullscreenOverlay, Dialog, ActionMenu, FilterTabs, CopyButton,
-                  shadcn-style primitives, theme.css tokens). Built with tsc to dist; the verifier portal
+                  shadcn-style primitives). Built with tsc to dist; the verifier portal
                   will use it in Sprint 3
+  src/tokens.ts     THE design tokens (plain data, no imports): theme.css is GENERATED from it by
+                    `npm run build` (src/theme-css.ts + scripts/generate-theme-css.mjs; a test
+                    checks they match); exported as @univault/portal-ui/tokens for the wallet
 verifier-portal/  React (Vite) – Sprint 3
-wallet/                            React Native (Expo) – Sprint 2
+wallet/           React Native, Expo SDK 58 + Expo Router (Decision 022; docs/frontend/mobile-wallet.md)
+  index.ts          entry: src/lib/crypto-setup FIRST (Hermes polyfills), then expo-router/entry
+  app.config.ts     name, version, scheme univault, lk.univault.wallet, permission texts, splash
+  metro.config.js   crypto-core symlink (watchFolders, nodeModulesPaths), tokens → portal-ui/src/tokens.ts, guards
+  jest.config.js    jest-expo + .mjs transform + tokens mapping + thresholds
+  app/              routes: _layout (providers), (tabs)/ Credentials · Scan · History · Settings,
+                    settings/diagnostics (dev only), +not-found
+  src/components/   Screen, Button, Card, StatusBadge, EmptyState, ErrorBoundary, AppText
+  src/theme/        theme from @univault/portal-ui/tokens (rem → pt, light/dark), useTheme()
+  src/i18n/         i18next + expo-localization; locales/en.ts, si.ts (needs native-speaker review)
+  src/lib/          crypto-setup.ts, crypto-check.ts (Diagnostics); storage later
+  src/services/     api-client.ts (EXPO_PUBLIC_API_BASE_URL, GET /health)
+  src/config/       env.ts (API URL rules), app-info.ts (versions, __DEV__ gate)
+  src/fixtures/     synthetic SD-JWT for Diagnostics (npm run fixture:diagnostics; no keys)
+  assets/           placeholder icon/splash (npm run art:placeholder), fonts/NotoSansSinhala-OFL.txt
+  test/             Jest + React Native Testing Library
 ai-service/                        Python Flask + scikit-learn – Sprint 4
 docs/
   schemas/          credential JSON Schemas (single source of truth) + credential-schemas.md
@@ -123,10 +141,13 @@ scripts/          check-secrets.js, generate-synthetic-data.mjs
 
 **Language:** TypeScript (Decision 001), ESM (`"type": "module"`).
 
-**TypeScript 5.9.3:** pinned in `crypto-core`, `backend`, `portal-ui` and
-`issuer-portal`. Do NOT upgrade to 7,
-because `typescript-eslint` doesn't support it yet. (The root `package.json`,
-which holds the lint tooling, currently lists `typescript` `^6.0.3`.)
+**TypeScript:** 5.9.3 in all packages except `wallet/`, which uses the TypeScript version
+Expo SDK 58 requires (6.0.3). Never TypeScript 7 (typescript-eslint does not support it).
+Upgrading the other packages to 6 is a separate decision. (Decision 022: Expo's version
+registry, `expo install --check` and expo-doctor check against `~6.0.3`, and Expo Go runs only
+the current SDK. The root `package.json`, which holds the lint tooling, has `typescript` 6.0.3
+with typescript-eslint 8.73.0 (supports < 6.1.0) and no type-aware rules, so both versions lint
+cleanly.)
 
 **Exact pinned versions (`--save-exact`):**
 
@@ -142,7 +163,15 @@ which holds the lint tooling, currently lists `typescript` `^6.0.3`.)
   zod 4.6.7, lucide-react 1.79.0, msw 3.0.7, @playwright/test 1.65.1, jsdom 31.0.1,
   @testing-library/react 16.3.3, qrcode 1.5.4 (portal-ui; @types/qrcode 1.5.6), jsqr 1.4.0
   and pngjs 7.0.0 (test decoding only). Root lint: eslint-plugin-react-hooks 7.1.1,
-  eslint-plugin-jsx-a11y 6.10.2, eslint-plugin-react-refresh 0.5.8.
+  eslint-plugin-jsx-a11y 6.10.2, eslint-plugin-react-refresh 0.5.8, eslint-plugin-react 7.37.5,
+  eslint-plugin-react-native 5.0.0, eslint-plugin-expo 1.2.1 (wallet).
+- Wallet (Decision 022): expo 58.1.0, react-native 0.88.1, react / react-dom 19.3.0, expo-router
+  58.0.33 and the other Expo packages at the versions `npx expo install` chose for SDK 58
+  (exact), typescript 6.0.3, i18next 27.2.7, react-i18next 18.0.3,
+  @expo-google-fonts/noto-sans-sinhala 0.4.2, @expo/vector-icons 15.1.1, jest 30.5.2, jest-expo
+  58.0.16, @testing-library/react-native 14.1.0, test-renderer 1.3.1, @expo/ngrok 4.1.3. Add
+  Expo-managed packages ONLY with `npx expo install <pkg>`, then pin the installed version
+  exactly; `npm run doctor` must stay 20/20.
 
 **Database:** PostgreSQL (Decision 008).
 
@@ -175,7 +204,10 @@ migrations by hand.
 ```
 cd crypto-core && npm test                  # crypto-core tests (158) + coverage: npm run test:coverage
 cd claims-validation && npm test | test:coverage | build | typecheck   # shared claim validation (23 tests)
-cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (74 tests)
+cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (80 tests); build regenerates theme.css
+cd wallet && npm start                      # Metro :8081 (LAN), scan with Expo Go; start:tunnel = ngrok
+cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 68 tests; doctor = expo-doctor (20/20)
+cd wallet && npm run android | ios | fixture:diagnostics | art:placeholder
 cd issuer-portal && npm run dev             # http://localhost:5173 (backend: npm run dev in backend/)
 cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 396 tests; build also checks the bundle
 cd issuer-portal && npm run test:e2e        # Playwright (10 tests), Chromium; own backend on :4100 + portal on :5180
@@ -273,6 +305,37 @@ of `D:/...`. See Sprint 1, Issue 6.
     public: never put a secret in one.
   - **Lint:** react-hooks 7 (React Compiler rules: no refs read during render),
     jsx-a11y and react-refresh (portal apps only) are on for the portal packages.
+- **Wallet (Expo, Decision 022; docs/frontend/mobile-wallet.md):**
+  - **Expo Go compatible modules only** until the development build (push notifications or
+    OS-level offer links). Add Expo packages with `npx expo install`, pin exactly, keep
+    `npm run doctor` at 20/20. Never commit `android/` or `ios/` (generated by prebuild).
+  - **crypto-core: universal entry only** (`@univault/crypto-core`); Metro refuses `/node`.
+    `index.ts` imports `src/lib/crypto-setup` before anything else (getRandomValues polyfill,
+    TextEncoder/TextDecoder/BigInt checks). No `crypto.subtle`, no `Buffer` in app code.
+  - **Design tokens:** only from `@univault/portal-ui/tokens`, mapped to the SOURCE file
+    `portal-ui/src/tokens.ts` by Metro, tsconfig `paths` and Jest (`app.config.ts` imports it as
+    `../portal-ui/src/tokens.ts`), so portal-ui never needs building first; portal-ui is NOT an npm
+    dependency of the wallet: a `file:` link fails expo-doctor's duplicate React check). No hex
+    colours or copied sizes in `src/` / `app/` (a test and `react-native/no-color-literals`
+    enforce it). Change a value in `portal-ui/src/tokens.ts`: the wallet follows at once; rebuild
+    portal-ui to regenerate `theme.css` for the portals. Keep tokens.ts import-free and plain
+    (Expo's config loader and Node type stripping load it directly). A portal's Tailwind `@source` of portal-ui/src must
+    exclude `tokens.ts` and `theme-css.ts` (`@source not`), or words in them become utilities.
+  - **Imports are extensionless** in the wallet (Metro/bundler resolution), unlike the NodeNext
+    packages' `.js` rule.
+  - **All UI strings and accessibility labels through `t()`**; keys in both `en.ts` and `si.ts`
+    (a test checks parity, Sinhala script, placeholders). Touch targets ≥ 44 pt
+    (`MIN_TOUCH_TARGET`), roles and labels on interactive elements, `minHeight` not `height`
+    (dynamic type).
+  - **`EXPO_PUBLIC_*` is public** (compiled into the app). Read it as
+    `process.env.EXPO_PUBLIC_NAME` in full (eslint-plugin-expo). `EXPO_PUBLIC_API_BASE_URL`
+    includes `/api/v1` and must be the PC's LAN IP or a tunnel, never localhost. No secrets or
+    `extra` in `app.config.ts`.
+  - **Diagnostics is dev-only** (`diagnosticsEnabled()` = `__DEV__`); its fixture is synthetic
+    and keyless (regenerate with `npm run fixture:diagnostics`). Never show or log claim values,
+    request/response bodies or error messages (ErrorBoundary reports error names only).
+  - **Jest:** `render()` from RNTL 14 is async (`await renderWithProviders(...)`); Expo Router
+    tests use `renderRouter` from `expo-router/testing-library`. See Testing → Wallet tests.
 - **Privacy (PDPA):** never log claims, names, NIC numbers, passwords, tokens,
   private keys, pre-authorised codes or revocation/reissue notes. Log IDs,
   `action` and `reason` only (`note` paths are in `REDACT_PATHS`).
@@ -500,7 +563,24 @@ n/n`. `/health` has `keys: { status, activeKeys, loaded }` (counts only) and is
 
 ## Testing
 
-**Framework:** Vitest. HTTP tests use supertest. Database tests use
+**Wallet tests (Jest, not Vitest):** `wallet/test/setup.ts` **fails a test on any unexpected
+`console.error` or `console.warn`** (listed after the test; `CONSOLE_ALLOW_LIST` is for
+documented, unavoidable third-party noise only and is empty). Fix the cause, never silence it:
+
+- **`renderRouter` route maps must match `app/`.** A partial map under a layout that declares
+  screens gives expo-router "Too many screens defined" / "No route named …". To test the root
+  layout, render the REAL tree: `renderRouter(join(__dirname, '..', 'app'), { initialUrl })`.
+- **One render per test,** and await every update (`await user.press(...)`, `findBy*`,
+  `waitFor`); two renders or un-awaited updates in one test give React's "overlapping act()
+  calls".
+- A test that expects an error (ErrorBoundary) mocks `console.error` itself. `clearMocks` is on
+  (fresh call counts per test).
+- With parallel workers and piped output Jest hides per-file console output, so the guard (not
+  the log) is what keeps the suite silent; `npx jest --runInBand` shows the messages.
+- Run Jest **and Metro / `expo export`** from PowerShell or cmd: under Git Bash, Metro cannot
+  resolve the linked `@univault/crypto-core` (the same drive-path issue as Vitest).
+
+**Framework (all other packages):** Vitest. HTTP tests use supertest. Database tests use
 `freshDatabase()`, an in-memory PGlite (`test/db/helpers.ts`).
 
 **Authenticated tests:** `authedTestApp(overrides?, logger?)` in
@@ -564,7 +644,12 @@ secrets or personal data may appear in responses or logs.
   package, then reinstall. The Windows bindings are pinned in
   `optionalDependencies`: rolldown and esbuild (backend); rolldown, lightningcss
   and the Tailwind oxide engine (issuer-portal); rolldown and lightningcss
-  (portal-ui).
+  (portal-ui); lightningcss, @parcel/watcher, @unrs/resolver-binding,
+  @expo/modules-macros, @noxcturnal/noxcturnal (Expo's transform runtime) and
+  @expo/ngrok-bin (wallet).
+- **Wallet on a phone:** phone and PC on the same Wi-Fi (network profile Private), Windows
+  Firewall inbound TCP 4000 (backend) and 8081 (Metro); otherwise `npm run start:tunnel`
+  (ngrok, no Expo login). The backend already listens on all interfaces.
 - **Lock files:** never commit a lock file generated on another operating
   system.
 - **Tests:** run Vitest from PowerShell or cmd, not Git Bash (see Commands).
@@ -580,43 +665,46 @@ secrets or personal data may appear in responses or logs.
   top). Add a new numbered decision for any significant design choice; never
   renumber existing ones.
 
-  | #   | Decision                                                              | Status         |
-  | --- | --------------------------------------------------------------------- | -------------- |
-  | 001 | TypeScript for all JavaScript components                              | Accepted       |
-  | 002 | Root-level ESLint 9 and Prettier; Ruff for ai-service                 | Accepted       |
-  | 003 | SD-JWT VC flat claim layout instead of JSON-LD                        | Accepted       |
-  | 004 | Data minimisation in credential schemas                               | Accepted       |
-  | 005 | Derived age_over_18 claim and under-18 handling                       | Accepted       |
-  | 006 | SD-JWT library selection (@sd-jwt/core 0.25.0)                        | Accepted       |
-  | 007 | ES256 for holder key binding (issuer stays RS256)                     | Proposed       |
-  | 008 | PostgreSQL, with embedded PGlite and hand-written migrations          | Draft – review |
-  | 009 | Issuer staff authentication (JWT, database re-check and lockout)      | Draft – review |
-  | 010 | Credential signing deferred to wallet redemption                      | Draft – review |
-  | 011 | OpenID4VCI pre-authorised code offer format                           | Draft – review |
-  | 012 | Reissue supersedes immediately; status changes as append-only events  | Draft – review |
-  | 013 | Per-credential status endpoint; IETF Token Status List as future work | Draft – review |
-  | 014 | Encrypted key file or env bundle, one key store; KMS/HSM future work  | Draft – review |
-  | 015 | Frontend stack: React + Vite + TS, TanStack Query, shared portal-ui   | Draft – review |
-  | 016 | Staff token in memory + sessionStorage, never localStorage            | Draft – review |
-  | 017 | Dashboard demo data via real services; dev-only append-only reset     | Draft – review |
-  | 018 | Shared claims-validation package; portal precompiles the schemas      | Draft – review |
-  | 019 | Issuance form read-only, previewed server-side; schema by issuer type | Draft – review |
-  | 020 | Portrait embedded, size-limited (40 KB), selectively disclosable      | Draft – review |
-  | 021 | Offer code only in portal memory; QR never re-shown; tx_code deferred | Draft – review |
+  | #   | Decision                                                                  | Status         |
+  | --- | ------------------------------------------------------------------------- | -------------- |
+  | 001 | TypeScript for all JavaScript components                                  | Accepted       |
+  | 002 | Root-level ESLint 9 and Prettier; Ruff for ai-service                     | Accepted       |
+  | 003 | SD-JWT VC flat claim layout instead of JSON-LD                            | Accepted       |
+  | 004 | Data minimisation in credential schemas                                   | Accepted       |
+  | 005 | Derived age_over_18 claim and under-18 handling                           | Accepted       |
+  | 006 | SD-JWT library selection (@sd-jwt/core 0.25.0)                            | Accepted       |
+  | 007 | ES256 for holder key binding (issuer stays RS256)                         | Proposed       |
+  | 008 | PostgreSQL, with embedded PGlite and hand-written migrations              | Draft – review |
+  | 009 | Issuer staff authentication (JWT, database re-check and lockout)          | Draft – review |
+  | 010 | Credential signing deferred to wallet redemption                          | Draft – review |
+  | 011 | OpenID4VCI pre-authorised code offer format                               | Draft – review |
+  | 012 | Reissue supersedes immediately; status changes as append-only events      | Draft – review |
+  | 013 | Per-credential status endpoint; IETF Token Status List as future work     | Draft – review |
+  | 014 | Encrypted key file or env bundle, one key store; KMS/HSM future work      | Draft – review |
+  | 015 | Frontend stack: React + Vite + TS, TanStack Query, shared portal-ui       | Draft – review |
+  | 016 | Staff token in memory + sessionStorage, never localStorage                | Draft – review |
+  | 017 | Dashboard demo data via real services; dev-only append-only reset         | Draft – review |
+  | 018 | Shared claims-validation package; portal precompiles the schemas          | Draft – review |
+  | 019 | Issuance form read-only, previewed server-side; schema by issuer type     | Draft – review |
+  | 020 | Portrait embedded, size-limited (40 KB), selectively disclosable          | Draft – review |
+  | 021 | Offer code only in portal memory; QR never re-shown; tx_code deferred     | Draft – review |
+  | 022 | Expo Router + Expo Go for S2; development build for push / OS offer links | Draft – review |
 
 - **Evidence screenshots:** `docs/dev-log/evidence/s<sprint>-<YYYY-MM-DD>-<feature>-<what>.png`.
 - **Commits:** include the Jira key, e.g. `SCRUM-XX: <summary>`.
 
-## Done so far (Sprint 1)
+## Done so far (Sprint 1, and Sprint 2 from 27 Nov)
 
-Test totals (26 Nov 2026, credentials table follow-up): **crypto-core 158 tests** (6 files; 97.63%
+Test totals (27 Nov 2026, wallet initialised): **crypto-core 158 tests** (6 files; 97.63%
 statements, 93.89% branches, 100% functions, 99.14% lines), **backend
 571 tests** (23 files in two Vitest projects; 90.74% statements, 88.08% branches, 94.52% functions,
 91.13% lines; thresholds 90 / 86 / 93 / 90), **issuer-portal 396 tests** (17
 files; 97.56% statements, 92.11% branches, 98.01% functions, 98.56% lines;
-thresholds 96 / 91 / 97 / 98) plus **10 Playwright e2e tests**, **portal-ui 74
-tests** (7 files; 100% statements, 98.65% branches, 100% functions, 100% lines;
-thresholds 99 / 94 / 99 / 99) and **claims-validation 23 tests** (1 file; 98.63%
+thresholds 96 / 91 / 97 / 98) plus **10 Playwright e2e tests**, **portal-ui 80
+tests** (8 files; 100% statements, 98.7% branches, 100% functions, 100% lines;
+thresholds 99 / 94 / 99 / 99), **wallet 68 tests** (8 files, Jest + RNTL; 98.61% statements,
+93.71% branches, 96.96% functions, 100% lines; thresholds 98 / 93 / 96 / 99) and
+**claims-validation 23 tests** (1 file; 98.63%
 statements, 90.47% branches, 100% functions, 98.57% lines; thresholds 98 / 89 / 100 / 98),
 all passing.
 
@@ -724,5 +812,13 @@ replaces }`.
   dialog, `/credentials/:id/reissue` (Current vs Replacement, changes highlighted, confirmation,
   → the replacement's offer), credential page with status timeline and Replaces / Replaced by,
   409 messages + refresh; portal-ui `Dialog`, `ActionMenu`, `FilterTabs`, `CopyButton`.
+- **Mobile wallet initialised** (27 Nov, Sprint 2, `docs/frontend/mobile-wallet.md`, Decision 022):
+  Expo SDK 58 + Expo Router (four placeholder tabs, Settings with English / Sinhala and app
+  version, dev-only Diagnostics: versions, Hermes, API URL, crypto-core check on a synthetic
+  SD-JWT, `GET /health`), TypeScript 6.0.3 (wallet only), crypto-core via `file:` + Metro config,
+  Hermes polyfills, themed accessible components, Noto Sans Sinhala (OFL) bundled,
+  `lk.univault.wallet`, scheme `univault`, placeholder icon/splash from the tokens, root ESLint
+  for the wallet. portal-ui: `src/tokens.ts` single source, `theme.css` generated (issuer portal
+  CSS byte-identical). Backend unchanged (already binds all interfaces).
 - **Planned routes (return `501` until built):** wallet redemption
   (`/credential-offers/token`, `/credential`), verifications.
