@@ -21,7 +21,9 @@ import {
 import { renderRouter } from 'expo-router/testing-library';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AccessibilityInfo, BackHandler, StyleSheet } from 'react-native';
+import { Animated, AccessibilityInfo, BackHandler, StyleSheet } from 'react-native';
+import { FADE_IN_MS } from '../src/onboarding/OnboardingStep';
+import { fontFamily } from '@univault/portal-ui/tokens';
 import { ConfirmDialog } from '../src/components';
 import * as appInfo from '../src/config/app-info';
 import { i18n } from '../src/i18n';
@@ -558,6 +560,109 @@ describe('screen readers: "Step X of Y"', () => {
   });
 });
 
+describe('onboarding visual language', () => {
+  it.each(ONBOARDING_STEPS.map((s) => [s.id, s.route] as const))(
+    '%s: one brand-soft illustration (radius-lg, the same size), a centred h2 hero, centred lead',
+    async (id, route) => {
+      await freshInstall();
+      await openApp(route);
+      const step = await screen.findByTestId(`onboarding-${id}`);
+      const panels = within(step).getAllByTestId('onboarding-illustration');
+      expect(panels).toHaveLength(1);
+      expect(panels[0]).toHaveStyle({ backgroundColor: lightColors.brandSoft, borderRadius: 16 });
+      const hero = within(step).getAllByRole('header')[0]!;
+      expect(hero).toHaveStyle({ fontSize: 20, textAlign: 'center' });
+      for (const lead of within(step).getAllByTestId('onboarding-lead')) {
+        expect(lead).toHaveStyle({ textAlign: 'center', maxWidth: 320 });
+      }
+    },
+  );
+
+  it('How it works: the three-figure drawing with labels, then three numbered rows', async () => {
+    await freshInstall();
+    await openApp(ROUTES.onboardingHowItWorks);
+    const step = await screen.findByTestId('onboarding-howItWorks');
+    expect(
+      within(step)
+        .getAllByTestId('illustration-label')
+        .map((l) => l.props.children),
+    ).toEqual([
+      en.onboarding.howItWorks.issuer,
+      en.onboarding.howItWorks.holder,
+      en.onboarding.howItWorks.verifier,
+    ]);
+    const rows = [1, 2, 3].map((n) => within(step).getByTestId(`onboarding-numbered-${n}`));
+    expect(rows[0]!.props.accessibilityLabel).toBe(
+      `1. ${en.onboarding.howItWorks.receiveTitle}. ${en.onboarding.howItWorks.receive}`,
+    );
+    for (const row of rows) {
+      const [number, title, body] = within(row).getAllByText(/./, { includeHiddenElements: true });
+      expect(number!.parent?.props.style).toEqual(
+        expect.arrayContaining([expect.objectContaining({ backgroundColor: lightColors.accent })]),
+      );
+      expect(title).toHaveStyle({ fontSize: 16, fontFamily: fontFamily.sansSemiBold });
+      expect(body).toHaveStyle({ fontSize: 14, color: lightColors.textMuted });
+    }
+  });
+
+  it('Welcome: two short centred sentences', async () => {
+    await freshInstall();
+    await openApp(ROUTES.onboardingWelcome);
+    const step = await screen.findByTestId('onboarding-welcome');
+    expect(
+      within(step)
+        .getAllByTestId('onboarding-lead')
+        .map((l) => l.props.children),
+    ).toEqual([en.onboarding.welcome.body, en.onboarding.welcome.body2]);
+  });
+
+  it('Language: calm: h2, the note 14 muted, options 16 in 56 pt rows', async () => {
+    await freshInstall();
+    await openApp(ROUTES.onboardingLanguage);
+    const step = await screen.findByTestId('onboarding-language');
+    expect(within(step).getAllByRole('header')[0]).toHaveStyle({ fontSize: 20 });
+    expect(within(step).getByTestId('onboarding-lead')).toHaveStyle({
+      fontSize: 14,
+      color: lightColors.textMuted,
+    });
+    for (const option of within(step).getAllByRole('radio')) {
+      expect(option).toHaveStyle({ minHeight: 56 });
+      expect(within(option).getByText(/./)).toHaveStyle({ fontSize: 16 });
+    }
+  });
+
+  it('the content fades in when reduce motion is off', async () => {
+    const timing = jest.spyOn(Animated, 'timing');
+    await freshInstall();
+    await openApp(ROUTES.onboardingWelcome);
+    await screen.findByTestId('onboarding-welcome');
+    expect(timing).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ toValue: 1, duration: FADE_IN_MS }),
+    );
+  });
+
+  it('no fade with reduce motion on: the content is fully visible at once', async () => {
+    (AccessibilityInfo.isReduceMotionEnabled as jest.Mock).mockResolvedValue(true);
+    const timing = jest.spyOn(Animated, 'timing');
+    await freshInstall();
+    await openApp(ROUTES.onboardingLanguage);
+    await screen.findByTestId('onboarding-language');
+    await act(async () => undefined);
+    // the setting is known now (and cached): the next step starts at full opacity, no fade
+    timing.mockClear();
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId('onboarding-next'));
+    const welcome = await screen.findByTestId('onboarding-welcome');
+    expect(within(welcome).getByTestId('onboarding-content')).toHaveStyle({ opacity: 1 });
+    expect(timing).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ duration: FADE_IN_MS }),
+    );
+    (AccessibilityInfo.isReduceMotionEnabled as jest.Mock).mockResolvedValue(false);
+  });
+});
+
 describe('reduce motion', () => {
   it('turns stack transitions off, and follows the setting live', async () => {
     (AccessibilityInfo.isReduceMotionEnabled as jest.Mock).mockResolvedValueOnce(true);
@@ -612,7 +717,7 @@ describe('design: dark theme, large text, one primary action', () => {
       const root = await screen.findByTestId(`onboarding-${id}`);
       expect(flat(root.props.style).backgroundColor).toBe(darkColors.bg);
       expect(screen.getByTestId('onboarding-illustration')).toHaveStyle({
-        backgroundColor: darkColors.brand,
+        backgroundColor: darkColors.brandSoft,
       });
       expect(screen.getByTestId('onboarding-next')).toHaveStyle({
         backgroundColor: darkColors.accent,
@@ -672,6 +777,7 @@ describe('Diagnostics → Reset onboarding (development builds only)', () => {
     // the PIN verifier and the attempt record are gone from the secure store
     expect(secureStore.has(PIN_VERIFIER_KEY)).toBe(false);
     expect(secureStore.has(PIN_ATTEMPTS_KEY)).toBe(false);
+    expect(secureStore.has('univault.biometricUnlockSecret')).toBe(false);
     expect(await AsyncStorage.getItem(PREFERENCE_KEYS.language)).toBe('en');
     expect(await AsyncStorage.getItem(PREFERENCE_KEYS.appearance)).toBe('dark');
     expect(flat(screen.getByTestId('onboarding-language').props.style).backgroundColor).toBe(

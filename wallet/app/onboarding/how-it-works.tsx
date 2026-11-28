@@ -1,14 +1,20 @@
 import { useTranslation } from 'react-i18next';
 import { HowItWorksIllustration } from '../../src/onboarding/illustrations';
-import { OnboardingPoint, OnboardingStep } from '../../src/onboarding/OnboardingStep';
+import { OnboardingNumberedStep, OnboardingStep } from '../../src/onboarding/OnboardingStep';
 
-/** Step 3: issuer → holder → verifier in three plain sentences. */
+const STEPS = ['receive', 'keep', 'show'] as const;
+
+/**
+ * Step 3: issuer → holder → verifier: the three-figure drawing with role names, then the same
+ * three steps as numbered rows (number, one-line title, one short sentence).
+ */
 export default function OnboardingHowItWorksScreen() {
   const { t } = useTranslation();
   return (
     <OnboardingStep
       step="howItWorks"
       title={t('onboarding.howItWorks.title')}
+      lead={t('onboarding.howItWorks.lead')}
       illustration={
         <HowItWorksIllustration
           labels={[
@@ -19,11 +25,14 @@ export default function OnboardingHowItWorksScreen() {
         />
       }
     >
-      <OnboardingPoint icon="business-outline">{t('onboarding.howItWorks.issue')}</OnboardingPoint>
-      <OnboardingPoint icon="phone-portrait-outline">
-        {t('onboarding.howItWorks.keep')}
-      </OnboardingPoint>
-      <OnboardingPoint icon="search-outline">{t('onboarding.howItWorks.show')}</OnboardingPoint>
+      {STEPS.map((step, i) => (
+        <OnboardingNumberedStep
+          key={step}
+          number={i + 1}
+          title={t(`onboarding.howItWorks.${step}Title`)}
+          body={t(`onboarding.howItWorks.${step}`)}
+        />
+      ))}
     </OnboardingStep>
   );
 }

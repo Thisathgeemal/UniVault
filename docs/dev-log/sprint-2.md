@@ -263,6 +263,157 @@ lockedUntil }` record with helpers for app lock. The PIN is cleared from state a
   (24), `design-system.test.tsx` (38, typography per route),
   [s2-wallet-pin-guide.md](evidence/s2-wallet-pin-guide.md) (screenshots to be taken).
 
+### Sat 28 Nov (follow-up: Appearance option "Automatic")
+
+- **Done:** Settings → Appearance: "Use device setting" renamed **"Automatic"** (Sinhala
+  ස්වයංක්‍රීය), with the helper line "Matches your phone's light or dark mode." (ඔබේ දුරකථනයේ ආලෝකමත්
+  හෝ අඳුරු ආකාරයට ගැලපේ.) under it on the Appearance screen only (`ChoiceList` gained an optional
+  `description`: 14, text-muted, on-accent when selected, read as the option's hint). Sinhala
+  "Light" is now ආලෝකමත් (was ආලෝක; also in the UI kit's light-mode intro). Order Automatic,
+  Light, Dark; Automatic stays the default; the stored value stays `system`, so saved choices keep
+  working (new test). The Settings row shows "Automatic" / ස්වයංක්‍රීය. Wallet tests 599 → **603**.
+  Docs: mobile-wallet.md §7 and the preference keys table, design-system.md, CLAUDE.md, README,
+  evidence guides.
+- **Next:** Native-speaker review of ස්වයංක්‍රීය, ආලෝකමත් and the helper line.
+- **Blockers:** None.
+- **Evidence:** `wallet/test/appearance.test.tsx` (23).
+
+### Sat 28 Nov (wallet UI refinements: header, onboarding visuals, Appearance, PIN states)
+
+- **Done:** **Appearance**: exactly Automatic / Light / Dark (ස්වයංක්‍රීය / ආලෝකමත් / අඳුරු), no
+  helper line (the one added earlier today was removed; `ChoiceList` lost its `description` and
+  `size` options); stored `system` unchanged and tested. **Header and headings** (final sizes):
+  the header bar is taller (space-4 above / space-3 below the title on tab roots, space-2 / space-2
+  on detail screens, side padding space-4); every heading one step smaller than this morning:
+  header titles h2 20 on roots and h3 16 on detail screens, screen titles h2, onboarding and setup
+  heroes h2 (incl. "PIN set"), empty / error state and dialog titles h3; body text unchanged
+  (16 / 26, secondary 14, captions 12); weight 600 in both scripts. **Onboarding**: one visual
+  language on all six steps: one illustration in a brand-soft area (radius-lg, same size), centred
+  h2 hero and centred short lead text (≤ 320 pt), then numbered rows (How it works: accent number
+  circle, bold title, short muted sentence) or icon rows (security, privacy); new original
+  drawings in text outlines, surface fills, small navy details and accent arrows, readable in both
+  themes (How it works: building → phone with a credential card → person at a counter, with role
+  labels); calm language step (h2, 14 muted note, 16 pt options in 56 pt rows); welcome text
+  centred; a 220 ms fade-in only with reduce motion off (the setting is now cached so a new step
+  never starts a forbidden fade). **PIN pad**: the position left of 0 is an invisible spacer (no
+  border, the old style had lost its transparent border colour and drew a black outline; not
+  focusable or announced). **PIN processing state**: on a match the confirm screen stays, keypad
+  disabled, spinner + "Saving your PIN…" announced, at least 600 ms, UI drawn before scrypt starts
+  (`yieldToUi`, `withMinimumDuration`, `ProcessingState`); "PIN set" only after the save; a failed
+  save shows the error with Try again. `PinCheck` (the PIN prompt for app lock) uses the same
+  pattern with "Checking your PIN…". Contrast: 87 pairs light / 86 dark (new illustration and row
+  pairs), all pass. Wallet tests 603 → **631**; coverage 99.58 / 96.54 / 99.47 / 99.9.
+- **Next:** Screenshots of the new onboarding (light, dark, Sinhala, largest text) and of the
+  saving state; native-speaker review of the new Sinhala strings; wire `PinCheck` into app lock.
+- **Blockers:** None.
+- **Evidence:** `wallet/test/onboarding.test.tsx` (91), `pin-flow.test.tsx` (31),
+  `design-system.test.tsx` (40), `appearance.test.tsx` (23).
+
+### Sat 28 Nov (biometric unlock with PIN fallback)
+
+- **Done:** Decision 026 (draft), [wallet-authentication.md](../security/wallet-authentication.md).
+  `expo-local-authentication` 58.0.3 (`npx expo install`, pinned). **Capability**
+  (`src/security/biometrics.ts`): available-strong / available-weak-only / not-enrolled /
+  no-hardware / unsupported-in-expo-go (iOS Expo Go), named "fingerprint", "face recognition" or
+  "fingerprint or face"; only strong may be enabled. **OS-enforced unlock:** enabling stores a
+  random 32-byte secret in expo-secure-store with `requireAuthentication: true` and this-device-only
+  (plus a separate `biometricEnabled` flag); unlock = the OS releasing it (checked in
+  expo-secure-store's native code: Android BiometricPrompt BIOMETRIC_STRONG + Keystore CryptoObject,
+  iOS Keychain `.biometryCurrentSet`; no device passcode on either); `authenticateAsync()` is never
+  used as proof; a null read (key invalidated) or no strong biometric any more turns it off with
+  "Your fingerprint settings changed…". **`authenticate({ reason })`** with an
+  `AuthenticationProvider` in the root layout: one OS prompt, then a full-screen PIN prompt
+  (PinCheck, one "Use fingerprint" retry, Cancel), attempt limits on the secure-store record (4
+  free, then 30 s, 1 min, 5 min, 15 min, 1 h; survives restarts; reset on success; countdown
+  announced at most every 10 s). **Setup step** `/setup/biometrics` ("Use fingerprint to unlock?",
+  Turn on / Not now) only for strong phones; otherwise "PIN set" says why. **Settings → Security**
+  replaces the placeholder: a token-styled `Toggle` (RN's Switch logged a native-command error in
+  Jest when a cancelled change snapped back), status line, Test unlock (every build), Change PIN
+  "Coming soon". Onboarding privacy gained "Your fingerprint or face data never leaves your
+  phone."; Reset onboarding also removes the unlock secret. Contrast 91 / 90 pairs (Toggle).
+  Wallet tests 631 → **687** (21 files); coverage 99.39 / 96.42 / 99.31 / 99.77.
+- **Next:** Test on an Android phone in Expo Go (fingerprint on, Test unlock, cancel → PIN, add a
+  fingerprint → invalidation message, lockout) and on an iPhone with a development build;
+  native-speaker review of about 50 new Sinhala strings; app lock calls `authenticate()`.
+- **Blockers:** None.
+- **Evidence:** `wallet/test/biometrics.test.tsx` (48),
+  [s2-wallet-biometrics-guide.md](evidence/s2-wallet-biometrics-guide.md) (screenshots to be taken).
+
+### Sat 28 Nov (follow-up: shared-biometrics notice)
+
+- **Done:** The platform limitation stated in the UI: the setup step "Use fingerprint to unlock?"
+  shows "Anyone whose fingerprint is saved on this phone will be able to unlock UniVault. Only turn
+  this on if every fingerprint on this phone is yours." above the buttons (face and
+  fingerprint-or-face wordings too; Turn on and Not now equally full width); Settings → Security
+  shows it under the switch with "You can always use your PIN only." (`SharedBiometricNotice`,
+  brand-soft panel). Sinhala lockout messages now "වැරදි උත්සාහ වැඩියි. තත්පර {{seconds}} කින් නැවත
+  උත්සාහ කරන්න." with minute and new hour variants (English gained "Try again in 1 hour."; the
+  placeholders are `{{seconds}}` / `{{minutes}}` / `{{hours}}` in both languages).
+  wallet-authentication.md §8 "Known limitations"; Decision 026 consequence. Wallet tests 687 →
+  **692**.
+- **Next:** Native-speaker review of the notice and lockout wording.
+- **Blockers:** None.
+- **Evidence:** `wallet/test/biometrics.test.tsx` (53).
+
+### Sat 28 Nov (follow-up: weak face unlock message)
+
+- **Done:** On weak-only phones with face unlock, Settings → Security and "PIN set" now say
+  "This phone's face unlock uses the camera and isn't secure enough for UniVault. You can use your
+  PIN." ("…your fingerprint or your PIN." when a strong fingerprint is enrolled; Sinhala for
+  review). `BiometricCapability` gained `fingerprintEnrolled` (a fingerprint at the strong level:
+  expo-local-authentication reports only the strongest enrolled class, so on a weak-only phone the
+  PIN wording is the one that appears); `unavailableMessageKey()` picks the line. A strong vs weak
+  table in wallet-authentication.md §2. Wallet tests 692 → **697**.
+- **Next:** Check the message on a phone with 2D face unlock only.
+- **Blockers:** None.
+- **Evidence:** `wallet/test/biometrics.test.tsx` (58).
+
+### Sat 28 Nov (automatic wallet lock and re-authentication)
+
+- **Done:** `LockProvider` (`src/security/app-lock.tsx`) in the root layout around the navigator:
+  the locked state in memory only, locked on app start once setup is complete (never in
+  onboarding or setup), `lock(reason)` / `unlock()` (= `authenticate()`, ok only), `onLock`
+  listeners (for the vault), `lastLockReason` in Diagnostics. **AppState rule:** only 'background'
+  arms the lock (never 'inactive'); on 'active' it locks when away ≥ "Lock after leaving the app"
+  (Immediately default, 30 s, 1 min, 5 min; `univault.lockDelay` preference), when the clock went
+  backwards or the time is unknown; our own prompts never arm it (`withAuthActivity` around
+  `authenticate()` and biometric enrolment). **Privacy cover** (navy + mark) whenever the app is
+  not active, in every build. **Lock screen** above the mounted navigator (hidden from
+  accessibility, no touches): "UniVault is locked" / "Unlock to continue", Unlock (primary), Use
+  PIN (only with biometric unlock), one automatic prompt per lock (no loops), the PIN lockout
+  countdown, Android back leaves the app, deep links shown after unlock. Settings → Security:
+  "Lock after leaving the app" (choice screen) and "Lock now". Test seam: `lockOnAppStart`
+  (other test files start unlocked). Wallet tests 697 → **720** (22 files); coverage 99.4 / 96.43 /
+  99.19 / 99.8.
+- **Next:** Check on Android and iOS: app switcher preview (cover), shade does not lock, delay
+  timing, the fingerprint prompt not re-locking; native-speaker review of the lock strings.
+- **Blockers:** None.
+- **Evidence:** `wallet/test/app-lock.test.tsx` (23),
+  [s2-wallet-applock-guide.md](evidence/s2-wallet-applock-guide.md) (screenshots to be taken).
+
+### Sat 28 Nov (follow-up: app lock exemption window and the recents snapshot)
+
+- **Done:** **Security fix:** the "authentication in progress" exemption now applies only to
+  absences of at most `authExemptionMs(delay)` = min(lock delay, 30 s), measured from
+  `'background'` (30 s for Immediately). After a longer absence the app locks and the open
+  prompt is dismissed (`useAuthControl().dismissPrompts()` in `AuthenticationProvider`: resolved
+  as cancelled, no PIN checked so no failed attempt; an authentication at its OS biometric step
+  or still loading resolves as cancelled too). Every prompt that resolves re-checks
+  (`onAuthActivityEnd` in `auth-activity.ts`), so a cancel while the app is still away never
+  reveals the wallet; the lock screen's own prompt is left alone. **Recents snapshot:** release
+  builds block screen capture for the whole wallet (`useAppScreenCaptureBlock()`, key
+  `univault-app`; Android `FLAG_SECURE` blanks the recents card even when the snapshot comes
+  before `'background'`); Diagnostics (dev) → "Screen capture" → "Block screenshots and recents
+  preview" (off by default, memory only); iOS keeps the navy cover. The `expo-screen-capture`
+  Jest mock moved into `test/setup.ts` (setup now loads `screen-capture.ts`, so a per-file mock
+  came too late). Wallet tests 720 → **730** (app-lock 23 → 33); coverage 99.31 / 96.42 / 99.22 /
+  99.8 (thresholds 99 / 96 / 99 / 99).
+- **Next:** On an Android release build: recents card blank, screenshots refused; on Android Expo
+  Go: the switch blanks the card; a fingerprint sheet that reports `'background'` does not lock;
+  native-speaker review of the three new Sinhala strings (Diagnostics, dev only).
+- **Blockers:** None.
+- **Evidence:** `wallet/test/app-lock.test.tsx` (33).
+
 ## Backlog
 
 - **Sample data in the release bundle:** `src/fixtures/sample-data.ts` (synthetic, never shown
@@ -282,8 +433,14 @@ lockedUntil }` record with helpers for app lock. The PIN is cleared from state a
 - **Native-speaker review** of `wallet/src/i18n/locales/si.ts` (27 Nov: about 110 new strings
   for the shell, UI kit included; 28 Nov: about 70 more for onboarding, setup, Appearance and
   Reset onboarding, including "Step X of Y" = "පියවර Y න් X වැන්න").
-- **"Change PIN"** in Settings → Security (requires the current PIN; then `savePin()` with a
-  new salt; clears the attempt record).
+- **"Change PIN"** in Settings → Security (shown as "Coming soon"; requires the current PIN via
+  `authenticate({ pinOnly: true })`, then `savePin()` with a new salt; clears the attempt record).
+- **Auto-lock after inactivity while the app stays open** (no touches for N minutes in the
+  foreground); today the app locks only after leaving it, on start, or with Lock now.
+- **Wipe after N failed PINs** (Decision 026 future work): needs a recovery story (re-issuance)
+  first.
+- **"Use PIN" label on the OS prompt:** expo-secure-store's prompt has a fixed system Cancel
+  button; revisit if a later version exposes the negative-button text.
 - **KDF parameters on a real phone:** record Diagnostics → PIN hashing time on a mid-range Android
   (and an iPhone if available) and tune `DEFAULT_KDF_PARAMS` (wallet-pin.md §5); consider re-hashing
   old verifiers after a successful unlock (app-lock task).
@@ -297,14 +454,17 @@ Record the tests that show the sprint goal is met, with links to output in `evid
 
 | Test / check                         | Type (unit / integration / manual)           | Result         | Evidence                                                                          |
 | ------------------------------------ | -------------------------------------------- | -------------- | --------------------------------------------------------------------------------- |
-| Wallet unit and component tests      | unit / component (Jest + RNTL)               | 599 passed     | `wallet/test/`                                                                    |
+| Wallet unit and component tests      | unit / component (Jest + RNTL)               | 730 passed     |
+| App lock and re-authentication       | component (mocked AppState, fake clock)      | 33 passed      | `wallet/test/app-lock.test.tsx`                                                   |
+| Biometric unlock and PIN fallback    | unit / component (mocked OS prompt)          | 58 passed      | `wallet/test/biometrics.test.tsx`                                                 |
+| Biometrics on real phones            | manual (Android Expo Go; iOS dev build)      | to be recorded | [s2-wallet-biometrics-guide.md](evidence/s2-wallet-biometrics-guide.md)           | `wallet/test/` |
 | Onboarding gate and flows            | component (real `app/` tree)                 | 83 passed      | `wallet/test/onboarding.test.tsx`                                                 |
-| Appearance setting and status bar    | component (simulated system changes)         | 19 passed      | `wallet/test/appearance.test.tsx`                                                 |
+| Appearance setting and status bar    | component (simulated system changes)         | 23 passed      | `wallet/test/appearance.test.tsx`                                                 |
 | Onboarding on the phone              | manual (Expo Go)                             | to be recorded | [s2-wallet-onboarding-guide.md](evidence/s2-wallet-onboarding-guide.md)           |
 | PIN rules, verifier, flow, secrecy   | unit / component (Jest + RNTL)               | 105 passed     | `wallet/test/pin-rules.test.ts`, `pin.test.ts`, `pin-flow.test.tsx`               |
 | PIN hashing time on a phone          | manual (Diagnostics, dev build)              | to be recorded | [s2-wallet-pin-guide.md](evidence/s2-wallet-pin-guide.md)                         |
 | Wallet status words = issuer portal  | unit (parity test, en + si)                  | passed         | `wallet/test/status.test.tsx`                                                     |
-| WCAG AA contrast, light and dark     | unit (83 / 82 design + component pairs)      | passed         | `wallet/test/contrast.test.ts`                                                    |
+| WCAG AA contrast, light and dark     | unit (91 / 90 design + component pairs)      | passed         | `wallet/test/contrast.test.ts`                                                    |
 | One primary action per page / screen | component (portal and wallet)                | passed         | `issuer-portal/test/design-system.test.tsx`, `wallet/test/design-system.test.tsx` |
 | No hex colour outside tokens.ts      | unit (scans every app's source)              | passed         | `portal-ui/test/tokens.test.ts`                                                   |
 | theme.css generated from tokens.ts   | unit (replaces the byte-identical CSS check) | passed         | `portal-ui/test/tokens.test.ts`                                                   |
@@ -537,3 +697,18 @@ utf8`, the unrelated health-check test failed: its expected text "server status 
   read in render. The colour keyword `'transparent'` moved to a theme constant (`TRANSPARENT`) for
   `react-native/no-color-literals`.
 - **Lesson:** Prefer a lazy `useState` for values that are created once and never replaced.
+
+### Issue 15: expo-router's renderRouter runs tests on fake timers (28 Nov 2026)
+
+- **Task:** PIN processing state tests
+- **Symptom:** A test that held the PIN save open and then waited with
+  `await new Promise((r) => setTimeout(r, 700))` (or the same inside `act`) never finished; the
+  app itself worked (a probe test reached "Saving your PIN…").
+- **Cause:** After `renderRouter(...)` a plain `setTimeout` never fires: expo-router's testing
+  library runs the test on Jest's fake timers. RNTL's `findBy*` / `waitFor` advance them, so every
+  earlier test passed; a bare timer waits forever.
+- **Resolution:** Move the clock explicitly: `await act(async () => {
+jest.advanceTimersByTime(PROCESSING_MIN_MS + 100); })`; otherwise wait with `findBy*` /
+  `waitFor`. Noted for future tests.
+- **Lesson:** In router tests, never wait on a real timer; advance the fake clock or use
+  `waitFor`.

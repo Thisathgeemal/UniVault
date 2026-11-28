@@ -20,17 +20,15 @@ import { PIN_KEY_MIN_SIZE, PinPad } from '../src/components';
 import * as appInfo from '../src/config/app-info';
 import { en } from '../src/i18n/locales/en';
 import { ROUTES } from '../src/navigation/routes';
+import * as pinModule from '../src/security/pin';
 import { PIN_VERIFIER_KEY, PinStoreError, savePin, verifyPin } from '../src/security/pin';
+import { PinCheck } from '../src/security/PinCheck';
+import { PROCESSING_MIN_MS } from '../src/lib/timing';
 import { PIN_SCREEN_CAPTURE_KEY } from '../src/security/screen-capture';
 import * as setupFlow from '../src/security/setup-flow';
 import { lightColors } from '../src/theme';
 import { Providers, renderWithProviders } from './render';
 import { secureStore, seedOnboardedWithoutSecurity, TEST_PIN } from './setup-state';
-
-jest.mock('expo-screen-capture', () => ({
-  preventScreenCaptureAsync: jest.fn(async () => undefined),
-  allowScreenCaptureAsync: jest.fn(async () => undefined),
-}));
 
 const APP_DIR = join(__dirname, '..', 'app');
 const flat = (style: unknown) => StyleSheet.flatten(style as never) as Record<string, unknown>;
@@ -90,6 +88,26 @@ describe('PinPad', () => {
       expect(style.minWidth).toBeGreaterThanOrEqual(56);
     }
     expect(PIN_KEY_MIN_SIZE).toBe(56);
+  });
+
+  it('the empty position left of 0 is invisible: no border or fill, not focusable or announced', async () => {
+    await renderWithProviders(<Harness onComplete={() => undefined} />);
+    expect(screen.queryByTestId('pin-pad-spacer')).toBeNull(); // hidden from screen readers
+    const spacer = screen.getByTestId('pin-pad-spacer', { includeHiddenElements: true });
+    const style = flat(spacer.props.style);
+    expect(style.borderWidth).toBeUndefined();
+    expect(style.borderColor).toBeUndefined();
+    expect(style.backgroundColor).toBeUndefined();
+    expect(spacer.props.accessible).toBe(false);
+    expect(spacer.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(spacer.props.accessibilityElementsHidden).toBe(true);
+    expect(spacer.props.pointerEvents).toBe('none');
+    expect(spacer.props.accessibilityRole).toBeUndefined();
+    // it keeps the layout: the same size as a key, so 0 stays under 8
+    expect(style.minWidth).toBe(56);
+    expect(style.minHeight).toBe(56);
+    expect(style.flex).toBe(1);
+    expect(screen.getAllByRole('button')).toHaveLength(11);
   });
 
   it('dots announce how many digits are entered, never which', async () => {
@@ -257,22 +275,100 @@ describe('PIN setup flow', () => {
     expect(title()).toHaveTextContent(en.setup.create.title);
   });
 
-  it('a failed save sends the holder back to create with a message', async () => {
+  it('while saving: stays on confirm, keypad disabled, "Saving your PIN…" announced; "PIN set" only after the save', async () => {
+    const setItem = SecureStore.setItemAsync as jest.Mock;
+    const real = setItem.getMockImplementation() as (k: string, v: string) => Promise<void>;
+    let release: () => void = () => undefined;
+    setItem.mockImplementationOnce(
+      (k: string, v: string) =>
+        new Promise<void>((resolve) => {
+          release = () => void real(k, v).then(resolve);
+        }),
+    );
+    const u = user();
+    await openSetup();
+    await u.press(screen.getByTestId('setup-start'));
+    await typePin(NEW_PIN, u);
+    await typePin(NEW_PIN, u);
+    const saving = await screen.findByTestId('setup-saving');
+    expect(saving.props.accessibilityLabel).toBe(en.setup.saving);
+    expect(saving.props.accessibilityRole).toBe('progressbar');
+    expect(saving.props.accessibilityState).toEqual({ busy: true });
+    expect(saving.props.accessibilityLiveRegion).toBe('polite');
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(en.setup.saving);
+    expect(title()).toHaveTextContent(en.setup.confirm.title); // still the confirm screen
+    expect(screen.getByTestId('pin-pad-key-5')).toBeDisabled();
+    expect(screen.queryByTestId('setup-actions')).toBeNull();
+    // the hash has run and is waiting on the store: no success yet, however long it takes
+    await waitFor(() => expect(setItem).toHaveBeenCalled());
+    // renderRouter runs on Jest's fake timers: move the clock past the minimum display time
+    await act(async () => {
+      jest.advanceTimersByTime(PROCESSING_MIN_MS + 100);
+    });
+    expect(screen.queryByText(en.setup.success.title)).toBeNull();
+
+    release(); // findByText waits (inside act) for the save to finish
+    expect(
+      await screen.findByText(en.setup.success.title, {}, { timeout: 3000 }),
+    ).toBeOnTheScreen();
+    expect(screen.queryByTestId('setup-saving')).toBeNull();
+  });
+
+  it('the processing state is shown for at least 600 ms, even when saving is instant', async () => {
+    jest.spyOn(pinModule, 'savePin').mockResolvedValue(undefined);
+    const u = user();
+    await openSetup();
+    await u.press(screen.getByTestId('setup-start'));
+    await typePin(NEW_PIN, u);
+    await typePin(NEW_PIN.slice(0, 5), u);
+    const start = Date.now();
+    await u.press(screen.getByTestId(`pin-pad-key-${NEW_PIN.slice(5)}`));
+    await screen.findByTestId('setup-saving');
+    await screen.findByText(en.setup.success.title, {}, { timeout: 3000 });
+    expect(Date.now() - start).toBeGreaterThanOrEqual(PROCESSING_MIN_MS);
+    expect(PROCESSING_MIN_MS).toBe(600);
+  });
+
+  it('a failed save shows the error with Try again (not "PIN set"); Try again saves it', async () => {
     (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(new Error('keystore'));
     const u = user();
     await openSetup();
     await u.press(screen.getByTestId('setup-start'));
     await typePin(NEW_PIN, u);
     await typePin(NEW_PIN, u);
-    await waitFor(() => expect(message()).toHaveTextContent(en.setup.saveFailed));
-    expect(title()).toHaveTextContent(en.setup.create.title);
+    await waitFor(() => expect(message()).toHaveTextContent(en.setup.saveFailed), {
+      timeout: 3000,
+    });
+    expect(message()?.props.accessibilityRole).toBe('alert');
+    expect(screen.queryByText(en.setup.success.title)).toBeNull();
+    expect(title()).toHaveTextContent(en.setup.confirm.title);
+    expect(screen.queryByTestId('pin-pad')).toBeNull(); // no keypad: the PIN is already confirmed
     expect(secureStore.has(PIN_VERIFIER_KEY)).toBe(false);
+
+    await u.press(screen.getByRole('button', { name: en.common.tryAgain }));
+    expect(await screen.findByTestId('setup-saving')).toBeOnTheScreen();
+    expect(
+      await screen.findByText(en.setup.success.title, {}, { timeout: 3000 }),
+    ).toBeOnTheScreen();
+    expect(await verifyPin(NEW_PIN)).toBe(true);
+  });
+
+  it('after a failed save, Start again goes back to create', async () => {
+    (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(new Error('keystore'));
+    const u = user();
+    await openSetup();
+    await u.press(screen.getByTestId('setup-start'));
+    await typePin(NEW_PIN, u);
+    await typePin(NEW_PIN, u);
+    await screen.findByTestId('setup-try-again', {}, { timeout: 3000 });
+    await u.press(screen.getByTestId('setup-start-again'));
+    expect(title()).toHaveTextContent(en.setup.create.title);
   });
 
   it('the biometric hook: a further step after "PIN set" is opened instead of the tabs', async () => {
     jest
       .spyOn(setupFlow, 'stepAfterPinCreated')
-      .mockReturnValue({ kind: 'route', href: '/no-such-screen' });
+      .mockResolvedValue({ kind: 'route', href: '/no-such-screen' });
     const u = user();
     await openSetup();
     await u.press(screen.getByTestId('setup-start'));
@@ -321,6 +417,33 @@ describe('PIN setup flow', () => {
     expect(await pressBack()).toBe(false);
   });
 
+  it('Android back cannot interrupt a save; after a failed save it starts again', async () => {
+    const listeners: Parameters<typeof BackHandler.addEventListener>[1][] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((event, listener) => {
+      if (event === 'hardwareBackPress') listeners.push(listener);
+      return { remove: () => listeners.splice(listeners.indexOf(listener), 1) && undefined };
+    });
+    const pressBack = async () => {
+      let handled = false;
+      await act(async () => {
+        handled = [...listeners].reverse().some((l) => l({} as never) === true);
+      });
+      return handled;
+    };
+    (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(new Error('keystore'));
+    const u = user();
+    await openSetup();
+    await u.press(screen.getByTestId('setup-start'));
+    await typePin(NEW_PIN, u);
+    await typePin(NEW_PIN, u);
+    await screen.findByTestId('setup-saving');
+    expect(await pressBack()).toBe(true); // swallowed: still saving
+    expect(screen.getByTestId('setup-saving')).toBeOnTheScreen();
+    await screen.findByTestId('setup-try-again', {}, { timeout: 3000 });
+    expect(await pressBack()).toBe(true);
+    expect(title()).toHaveTextContent(en.setup.create.title);
+  });
+
   it('one primary button on the intro and success steps, full width at the bottom', async () => {
     const u = user();
     await openSetup();
@@ -335,6 +458,46 @@ describe('PIN setup flow', () => {
     expect(flat(start.parent?.props.style).flexDirection).toBeUndefined();
     await u.press(start);
     expect(screen.queryByTestId('setup-actions')).toBeNull(); // the keypad step has no footer
+  });
+});
+
+describe('PinCheck (the PIN prompt for unlocking)', () => {
+  it('"Checking your PIN…" with the keypad disabled while verifyPin runs, then the result', async () => {
+    let finish: (ok: boolean) => void = () => undefined;
+    const verify = jest.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const onResult = jest.fn();
+    const u = user();
+    await renderWithProviders(<PinCheck verify={verify} onResult={onResult} />);
+    await typePin(TEST_PIN, u);
+    const checking = await screen.findByTestId('pin-check-checking');
+    expect(checking.props.accessibilityLabel).toBe(en.pin.checking);
+    expect(en.pin.checking).toBe('Checking your PIN…');
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(en.pin.checking);
+    expect(screen.getByTestId('pin-pad-key-1')).toBeDisabled();
+    expect(dotsLabel()).toBe('0 of 6 digits entered'); // the entry left state at once
+    await waitFor(() => expect(verify).toHaveBeenCalledWith(TEST_PIN));
+    expect(onResult).not.toHaveBeenCalled();
+    await act(async () => finish(true));
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(true), { timeout: 3000 });
+    expect(screen.queryByTestId('pin-check-checking')).toBeNull();
+    expect(screen.getByTestId('pin-pad-key-1')).toBeEnabled();
+  });
+
+  it('checks against the stored verifier by default; a wrong PIN reports false and shakes', async () => {
+    const sequence = jest.spyOn(Animated, 'sequence');
+    const onResult = jest.fn();
+    const u = user();
+    await renderWithProviders(<PinCheck onResult={onResult} />);
+    await typePin('582048', u);
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(false), { timeout: 3000 });
+    expect(sequence).toHaveBeenCalled();
+    await typePin(TEST_PIN, u);
+    await waitFor(() => expect(onResult).toHaveBeenLastCalledWith(true), { timeout: 3000 });
   });
 });
 

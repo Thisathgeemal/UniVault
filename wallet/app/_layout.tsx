@@ -6,7 +6,10 @@
  * - safe areas, the appearance (theme: Settings → Appearance or the phone), the setup state for
  *   the gate (src/onboarding/gate.ts), the status bar (follows the theme and the navy header),
  *   Noto Sans and Noto Sans Sinhala (bundled, expo-font), the navigation theme
- * - toasts (ToastProvider) and an ErrorBoundary around the navigator
+ * - toasts (ToastProvider), authenticate() with its PIN prompt (AuthenticationProvider), the app
+ *   lock (LockProvider: lock screen and privacy cover above the navigator) and an ErrorBoundary
+ *   around the navigator. EVERY protected screen sits behind the LockProvider; the unlocked
+ *   state is never persisted.
  * The splash screen stays up until the fonts (or their failure: system font) AND the saved state
  * are ready.
  *
@@ -34,6 +37,8 @@ import { useNavigationTheme } from '../src/navigation/navigation-theme';
 import { useStackScreenOptions } from '../src/navigation/stack-options';
 import { StatusBarProvider } from '../src/navigation/status-bar';
 import { SetupProvider } from '../src/onboarding/SetupProvider';
+import { LockProvider } from '../src/security/app-lock';
+import { AuthenticationProvider } from '../src/security/authenticate';
 import { AppearanceProvider } from '../src/theme/appearance';
 
 setupI18n();
@@ -94,9 +99,13 @@ export default function RootLayout() {
         <SetupProvider initial={restored.setup}>
           <StatusBarProvider>
             <ToastProvider>
-              <ErrorBoundary>
-                <RootNavigator />
-              </ErrorBoundary>
+              <AuthenticationProvider>
+                <LockProvider initialDelay={restored.lockDelay}>
+                  <ErrorBoundary>
+                    <RootNavigator />
+                  </ErrorBoundary>
+                </LockProvider>
+              </AuthenticationProvider>
             </ToastProvider>
           </StatusBarProvider>
         </SetupProvider>

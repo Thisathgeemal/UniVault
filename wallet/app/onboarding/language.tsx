@@ -1,10 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { AppText, ChoiceList, useToast } from '../../src/components';
+import { ChoiceList, useToast } from '../../src/components';
 import { chooseLanguage, isLanguage, SUPPORTED_LANGUAGES, type Language } from '../../src/i18n';
 import { LanguageIllustration } from '../../src/onboarding/illustrations';
 import { OnboardingStep } from '../../src/onboarding/OnboardingStep';
 
-/** Step 1: English / සිංහල, big and clear; applies at once (and is saved, as in Settings). */
+/**
+ * Step 1: English / සිංහල, applied at once (and saved, as in Settings). Calm on purpose: the h2
+ * hero heading, the note in 14 text-muted and the options at body size in 56 pt rows.
+ */
 export default function OnboardingLanguageScreen() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -20,11 +23,11 @@ export default function OnboardingLanguageScreen() {
     <OnboardingStep
       step="language"
       title={t('onboarding.language.title')}
+      lead={t('onboarding.language.body')}
+      leadTone="muted"
       illustration={<LanguageIllustration />}
     >
-      <AppText tone="muted">{t('onboarding.language.body')}</AppText>
       <ChoiceList
-        size="large"
         testID="onboarding-language-choices"
         choices={SUPPORTED_LANGUAGES.map((language) => ({
           value: language,

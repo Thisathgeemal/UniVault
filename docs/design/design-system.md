@@ -39,11 +39,11 @@ A quick test: blur your eyes at any screen. You should see mostly light grey and
 - **10%:** the primary action on each screen ("Scan QR", "Accept credential", "Share"), and the active tab icon and label in the bottom bar.
 - **Disclosure screen:** show the verifier's name and logo in a `brand-soft` panel at the top, the attribute checkboxes on `surface`, and one `accent` "Share" button at the bottom. Biometric or PIN confirmation follows.
 - **Offline notice:** a `status-expired-bg` banner with `status-expired-text`, saying when the status was last checked ("Status last checked 2 hours ago").
-- **Onboarding illustrations:** simple original line drawings (no stock art, no logos, no text inside) on a `brand` panel with `radius-lg`, in `on-brand` lines, `on-brand-muted` details and `brand-hover` / `role-tag-bg` fills only; never azure or a status colour on navy. One `accent` button per step ("Next", last: "Set up security"); Back and Skip are secondary and text buttons.
+- **Onboarding illustrations:** simple original flat drawings (no stock art, no logos, no gradients, no text inside) on a `brand-soft` panel with `radius-lg`, the same size on every step: `text` outlines on every shape (navy on brand-soft is only 1.08:1 in dark, so shapes are drawn by their outline), `surface` fills, small `brand` details with `on-brand` marks, `accent` arrows and ticks (`on-accent` inside accent circles), `text-muted` secondary lines; never a status colour. One `accent` button per step ("Next", last: "Set up security"); Back and Skip are secondary and text buttons. See "Onboarding visual pattern" below.
 
 ### Dark theme (wallet only)
 
-The portals stay light, because they run on office desktops. The wallet follows the phone's system setting by default; its Appearance setting (wallet only) can fix it to light or dark instead ("Use device setting", "Light", "Dark"). Use the `dark` value of every token. The same names work in both themes, so components don't change.
+The portals stay light, because they run on office desktops. The wallet follows the phone's system setting by default; its Appearance setting (wallet only) can fix it to light or dark instead ("Automatic", "Light", "Dark"). Use the `dark` value of every token. The same names work in both themes, so components don't change.
 
 - In dark theme, `brand` (#16335C) is lighter than `bg` (#0A1628), so credential cards still stand out.
 - In dark theme, `accent` becomes a lighter azure (#60A5FA) with a deep navy label (`on-accent`). This is the one place azure may sit on navy.
@@ -103,12 +103,22 @@ Every wallet screen follows these rules (values from `portal-ui/src/tokens.ts`; 
 
 - **Type:** body 16 / 26 for what people read; secondary text (hints, subtitles, field names,
   trailing values) `body-sm` 14 in `text-muted`; `caption` 12 only for metadata (dates, versions,
-  "Step 2 of 6", durations); headings `h1` 24, `h2` 20, `h3` 16, all weight 600 (Noto Sans
-  Sinhala SemiBold in Sinhala). No other sizes (`mono` 13 only on developer screens). Text-muted
-  is never larger than 14.
-- **Alignment:** body text, lists and forms are left-aligned. Centre only the hero heading of an
-  onboarding or setup screen, illustrations (and the labels inside them) and the PIN dots and
-  keypad. Empty, error and loading states are left-aligned too.
+  "Step 2 of 6", durations). Text-muted is never larger than 14. `mono` 13 only on developer
+  screens.
+- **Headings (final sizes, 28 Nov 2026):** only `h2` 20 and `h3` 16, weight 600 (Noto Sans
+  Sinhala SemiBold in Sinhala). `h2`: the title in the header of a tab's root screen, screen
+  titles, and every onboarding and setup hero heading (including "PIN set"). `h3`: the header
+  title of a detail screen (a screen with Back), section headings, card titles, empty / error
+  state titles and dialog titles. `display` 32 and `h1` 24 are not used for headings in the
+  wallet (the PIN keypad's digits use the 24 size; they are not headings).
+- **Top header:** a taller bar: `space-4` above and `space-3` below the title on root screens,
+  `space-2` above and below on detail screens, plus the safe-area inset; the title starts at
+  `space-4` like the screen content (after the Back button on detail screens), wraps at large
+  text sizes, and keeps the status-bar rule (light content on the navy home header).
+- **Alignment:** body text, lists and forms are left-aligned. Centre only: the hero heading of
+  an onboarding or setup screen and the short supporting text under it on onboarding screens
+  (at most 320 pt wide, so centred lines stay short), illustrations and the labels under them,
+  and the PIN dots and keypad. Empty, error and loading states are left-aligned.
 - **Spacing:** `space-4` at the sides (and top) of every phone screen, `space-6` between
   sections and at the bottom; a section's heading (`h3`) sits `space-2` above its content; inside
   a card `space-2` between lines and `space-3` between groups. List rows are at least 56 pt high.
@@ -117,7 +127,34 @@ Every wallet screen follows these rules (values from `portal-ui/src/tokens.ts`; 
   stacked at the bottom in one `surface` footer (border top, `space-4` padding plus the safe-area
   inset), the primary first and Back or another secondary below it. One primary per screen.
 - **PIN entry:** six dots (filled = entered, outlined = empty: shape, not only colour) and a
-  0–9 pad in the phone layout with Delete, keys at least 56 pt, centred, at most 360 pt wide.
+  0–9 pad in the phone layout with Delete, keys at least 56 pt, centred, at most 360 pt wide. The
+  position left of 0 is empty space: no border, no fill, not focusable, not announced.
+
+### Onboarding visual pattern
+
+Every onboarding step has the same structure, so the six screens feel like one flow:
+
+1. Skip (text button, top right; explanation steps only).
+2. ONE illustration in a `brand-soft` area with `radius-lg`, the same height on every step
+   (palette under "Holder wallet" above).
+3. The hero heading, `h2`, centred; under it one or two short sentences, centred, at most 320 pt
+   wide (the language step's note is 14 `text-muted`).
+4. List-like content as rows, left-aligned: **numbered rows** for a sequence (a small `accent`
+   circle with the `on-accent` number, a bold one-line title 16 / 600, one short `text-muted`
+   sentence 14) or **icon rows** for points (the icon in a small `brand-soft` circle in
+   `accent-text-on-soft`, one sentence in body text).
+5. The footer: progress dots ("Step X of 6") and the full-width buttons.
+
+The content fades in briefly (220 ms) only while the phone's reduce-motion setting is off.
+
+### Processing state
+
+When the holder waits for slow work they started (hashing or saving the PIN, checking the PIN):
+stay on the same screen, disable the controls, and show an indeterminate spinner with what is
+happening ("Saving your PIN…", "Checking your PIN…") as one busy progress element announced to
+screen readers. Keep it up for at least 600 ms so it never flickers, let the UI draw before the
+work starts, and move on only when the work has finished. A failure replaces it with the error
+and "Try again" (never the success screen).
 
 ## Do and don't
 

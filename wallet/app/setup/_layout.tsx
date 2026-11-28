@@ -20,6 +20,7 @@ export default function SetupLayout() {
   return (
     <Stack screenOptions={screenOptions}>
       <Stack.Screen name="security" options={{ title: t('setup.title') }} />
+      <Stack.Screen name="biometrics" options={{ title: t('setup.title') }} />
     </Stack>
   );
 }

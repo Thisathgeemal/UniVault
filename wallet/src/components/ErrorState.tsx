@@ -27,7 +27,7 @@ export function ErrorState({ title, message, onRetry, retryLabel, testID }: Erro
     >
       <StateIcon name="alert-circle-outline" danger />
       <View accessible accessibilityRole="alert" style={{ gap: theme.space(2) }}>
-        <AppText variant="h2">{title ?? t('errors.title')}</AppText>
+        <AppText variant="h3">{title ?? t('errors.title')}</AppText>
         <AppText tone="muted">{message}</AppText>
       </View>
       {onRetry ? <Button label={retryLabel ?? t('common.tryAgain')} onPress={onRetry} /> : null}

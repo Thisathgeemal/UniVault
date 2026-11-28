@@ -1,19 +1,22 @@
 /**
- * Settings → Appearance (theme): "Use device setting" (default), "Light", "Dark".
+ * Settings → Appearance (theme): "Automatic" (default, stored as `system`), "Light", "Dark".
+ * - exactly Automatic / Light / Dark, labels only (no helper text); a saved "system" still
+ *   shows as Automatic;
  * - each choice applies at once, app-wide (screens, header, tab bar, dialogs), and is saved;
  * - the saved choice is applied before the first frame after a restart (no flash);
- * - "Use device setting" follows a (simulated) live system change; Light and Dark ignore it;
+ * - "Automatic" follows a (simulated) live system change; Light and Dark ignore it;
  * - the status bar follows the effective theme, with light content on the navy header;
  * - native UI gets the same scheme (Appearance.setColorScheme).
  * Contrast in both themes: test/contrast.test.ts (unchanged rule, new onboarding pairs).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, renderHook, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, renderHook, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 import * as SystemUI from 'expo-system-ui';
 import { renderRouter } from 'expo-router/testing-library';
 import { join } from 'node:path';
 import { Appearance, StyleSheet } from 'react-native';
 import { en } from '../src/i18n/locales/en';
+import { si } from '../src/i18n/locales/si';
 import { PREFERENCE_KEYS, saveAppearancePreference } from '../src/lib/preferences';
 import { ROUTES } from '../src/navigation/routes';
 import { statusBarStyleFor } from '../src/navigation/status-bar';
@@ -80,7 +83,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe('effective scheme', () => {
-  it('is the choice, or the phone for "Use device setting" (light when unknown)', () => {
+  it('is the choice, or the phone for "Automatic" (light when unknown)', () => {
     expect(effectiveScheme('light', 'dark')).toBe('light');
     expect(effectiveScheme('dark', 'light')).toBe('dark');
     expect(effectiveScheme('system', 'dark')).toBe('dark');
@@ -126,7 +129,7 @@ describe('root view colour', () => {
 });
 
 describe('Settings → Appearance', () => {
-  it('sits below Language and shows the current value ("Use device setting" by default)', async () => {
+  it('sits below Language and shows the current value ("Automatic" by default)', async () => {
     await renderRouter(APP_DIR, { initialUrl: ROUTES.settings });
     await screen.findByTestId('settings-screen');
     const rows = screen.getAllByRole('button').map((el) => el.props.testID as string | undefined);
@@ -134,6 +137,65 @@ describe('Settings → Appearance', () => {
     expect(screen.getByTestId('settings-appearance').props.accessibilityLabel).toBe(
       `${en.settings.appearance}, ${en.appearance.system}`,
     );
+  });
+
+  it('offers exactly Automatic, Light, Dark, in that order, with no helper text', async () => {
+    await renderRouter(APP_DIR, { initialUrl: ROUTES.appearance });
+    const root = await screen.findByTestId('appearance-screen');
+    const radios = screen.getAllByRole('radio');
+    expect(radios.map((r) => r.props.accessibilityLabel)).toEqual(['Automatic', 'Light', 'Dark']);
+    for (const radio of radios) {
+      // the option's only text is its label: no description line, no hint
+      expect(
+        within(radio)
+          .getAllByText(/./)
+          .map((el) => el.props.children),
+      ).toEqual([radio.props.accessibilityLabel]);
+      expect(radio.props.accessibilityHint).toBeUndefined();
+    }
+    // on the screen: the one hint above the options, nothing about the phone's mode
+    expect(within(root).queryByText(/phone/i)).toBeNull();
+    expect(Object.keys(en.appearance)).toEqual(['system', 'light', 'dark']);
+  });
+
+  it('a saved "system" value shows as Automatic (row and screen); the stored value is unchanged', async () => {
+    await AsyncStorage.setItem(PREFERENCE_KEYS.appearance, 'system');
+    const user = userEvent.setup();
+    await renderRouter(APP_DIR, { initialUrl: ROUTES.settings });
+    const row = await screen.findByTestId('settings-appearance');
+    expect(row.props.accessibilityLabel).toBe(`${en.settings.appearance}, Automatic`);
+    await user.press(row);
+    expect(await screen.findByRole('radio', { name: 'Automatic' })).toBeChecked();
+    expect(await AsyncStorage.getItem(PREFERENCE_KEYS.appearance)).toBe('system');
+  });
+
+  it('the Settings row shows the selected label: Light, Dark', async () => {
+    const user = userEvent.setup();
+    await renderRouter(APP_DIR, { initialUrl: ROUTES.appearance });
+    await user.press(await screen.findByTestId('appearance-light'));
+    await user.press(screen.getByTestId('stack-header-back'));
+    expect(screen.getByTestId('settings-appearance').props.accessibilityLabel).toBe(
+      `${en.settings.appearance}, Light`,
+    );
+    await user.press(screen.getByTestId('settings-appearance'));
+    await user.press(await screen.findByTestId('appearance-dark'));
+    await user.press(screen.getByTestId('stack-header-back'));
+    expect(screen.getByTestId('settings-appearance').props.accessibilityLabel).toBe(
+      `${en.settings.appearance}, Dark`,
+    );
+  });
+
+  it('in Sinhala: ස්වයංක්‍රීය, ආලෝකමත්, අඳුරු, no helper text', async () => {
+    await AsyncStorage.setItem(PREFERENCE_KEYS.language, 'si');
+    const user = userEvent.setup();
+    await renderRouter(APP_DIR, { initialUrl: ROUTES.settings });
+    const row = await screen.findByTestId('settings-appearance');
+    expect(row.props.accessibilityLabel).toBe(`${si.settings.appearance}, ස්වයංක්‍රීය`);
+    await user.press(row);
+    await screen.findByTestId('appearance-screen');
+    const radios = screen.getAllByRole('radio');
+    expect(radios.map((r) => r.props.accessibilityLabel)).toEqual(['ස්වයංක්‍රීය', 'ආලෝකමත්', 'අඳුරු']);
+    for (const radio of radios) expect(within(radio).getAllByText(/./)).toHaveLength(1);
   });
 
   it.each([
@@ -241,7 +303,7 @@ describe('simulated restart', () => {
 });
 
 describe('live system changes', () => {
-  it('"Use device setting" follows the phone while the app runs', async () => {
+  it('"Automatic" follows the phone while the app runs', async () => {
     await renderRouter(APP_DIR, { initialUrl: ROUTES.settings });
     await screen.findByTestId('settings-screen');
     expect(bgOf('settings-screen')).toBe(lightColors.bg);

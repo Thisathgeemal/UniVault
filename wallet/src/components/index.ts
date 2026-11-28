@@ -16,6 +16,8 @@ export { ListItem, type ListItemProps } from './ListItem';
 export { LoadingState, type LoadingStateProps } from './LoadingState';
 export { OfflineNotice, type OfflineNoticeProps } from './OfflineNotice';
 export { PIN_KEY_MIN_SIZE, PinPad, type PinPadProps } from './PinPad';
+export { ProcessingState, type ProcessingStateProps } from './ProcessingState';
+export { Toggle, type ToggleProps } from './Toggle';
 export { Screen, type ScreenProps } from './Screen';
 export { Section, SectionHeader, type SectionHeaderProps } from './SectionHeader';
 export { StatusBadge, type StatusBadgeProps } from './StatusBadge';

@@ -9,7 +9,7 @@ export interface BottomActionsProps {
   children: ReactNode;
   /** Shown above the buttons (e.g. the onboarding progress). */
   above?: ReactNode;
-  testID?: string;
+  testID: string;
 }
 
 /**
@@ -18,7 +18,7 @@ export interface BottomActionsProps {
  * with space-2 (primary first), space-4 padding plus the bottom safe-area inset on every screen,
  * centred at most MAX_READABLE_WIDTH wide on tablets.
  */
-export function BottomActions({ children, above, testID = 'bottom-actions' }: BottomActionsProps) {
+export function BottomActions({ children, above, testID }: BottomActionsProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   return (

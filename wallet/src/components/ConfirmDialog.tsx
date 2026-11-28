@@ -73,7 +73,7 @@ export function ConfirmDialog({
             },
           ]}
         >
-          <AppText variant="h2" accessibilityRole="header">
+          <AppText variant="h3" accessibilityRole="header">
             {title}
           </AppText>
           <AppText>{message}</AppText>

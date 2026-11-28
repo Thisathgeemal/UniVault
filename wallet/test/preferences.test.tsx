@@ -25,6 +25,7 @@ import {
   saveLanguagePreference,
   saveOnboardingCompleted,
   SETUP_PROGRESS_KEYS,
+  saveLockDelayPreference,
 } from '../src/lib/preferences';
 import { ROUTES } from '../src/navigation/routes';
 import * as SecureStore from 'expo-secure-store';
@@ -160,8 +161,9 @@ describe('appearance and onboarding preferences', () => {
   });
 
   it('restoreAppState reads everything together and never rejects', async () => {
-    // four AsyncStorage reads (language, appearance, the two onboarding keys) and the PIN verifier
-    for (let i = 0; i < 4; i++) getItem.mockRejectedValueOnce(new Error('disk'));
+    // five AsyncStorage reads (language, appearance, the two onboarding keys, the lock delay) and
+    // the PIN verifier
+    for (let i = 0; i < 5; i++) getItem.mockRejectedValueOnce(new Error('disk'));
     (SecureStore.getItemAsync as jest.Mock).mockRejectedValueOnce(new Error('keystore'));
     expect(await restoreAppState()).toEqual({
       language: 'en',
@@ -171,6 +173,7 @@ describe('appearance and onboarding preferences', () => {
         privacyAcknowledgement: null,
         securitySetupComplete: false,
       },
+      lockDelay: 'immediately',
     });
   });
 });
@@ -181,6 +184,7 @@ const ALLOWED_VALUES: Record<string, (value: string) => boolean> = {
   'univault.appearance': (v) => ['system', 'light', 'dark'].includes(v),
   'univault.onboardingCompleted': (v) => v === 'true',
   'univault.privacyAcknowledgedAt': (v) => parsePrivacyAcknowledgement(v) !== null,
+  'univault.lockDelay': (v) => ['immediately', '30s', '1m', '5m'].includes(v),
 };
 
 describe('storage rule: preferences only', () => {
@@ -189,13 +193,15 @@ describe('storage rule: preferences only', () => {
     await chooseLanguage('en');
     for (const value of ['dark', 'light', 'system'] as const) await saveAppearancePreference(value);
     await saveOnboardingCompleted({ at: new Date().toISOString(), version: 'privacy-v1' });
+    for (const value of ['30s', '1m', '5m', 'immediately'] as const)
+      await saveLockDelayPreference(value);
 
     const writes: [string, string][] = [
       ...(setItem.mock.calls as [string, string][]),
       ...(multiSet.mock.calls as [[string, string][]][]).flatMap(([pairs]) => pairs),
     ];
     // (the official mock's setItem goes through multiSet, so a write can appear in both lists)
-    expect(new Set(writes.map(([key]) => key)).size).toBe(4);
+    expect(new Set(writes.map(([key]) => key)).size).toBe(5);
     for (const [key, value] of writes) {
       expect([key, ALLOWED_VALUES[key]?.(value) ?? 'not a preference key']).toEqual([key, true]);
     }

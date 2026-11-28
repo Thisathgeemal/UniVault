@@ -7,7 +7,7 @@
  *   - otherwise: dark content on the light theme, light content on the dark theme.
  *
  * The style is computed, never set imperatively, so a theme change (including a live system
- * change under "Use device setting") cannot leave dark icons on navy. The same provider gives the
+ * change under "Automatic") cannot leave dark icons on navy. The same provider gives the
  * phone's root view the theme's `bg` (expo-system-ui), so nothing light shows behind a dark app
  * during transitions.
  */
@@ -72,4 +72,10 @@ export function useBrandStatusBar(): void {
   const api = useContext(BrandStatusBarContext);
   // without a StatusBarProvider (a screen rendered on its own) there is no status bar to set
   useFocusEffect(useCallback(() => api?.enter(), [api]));
+}
+
+/** Outside the navigator (the lock screen, the privacy cover): light content while `active`. */
+export function useBrandStatusBarWhile(active: boolean): void {
+  const api = useContext(BrandStatusBarContext);
+  useEffect(() => (active && api ? api.enter() : undefined), [active, api]);
 }

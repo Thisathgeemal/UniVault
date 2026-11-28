@@ -1,6 +1,9 @@
 /**
- * The frame of every onboarding step (app/onboarding/*): an optional Skip (explanation steps
- * only, goes to Privacy), the illustration on a navy panel, the title and the step's text, and a
+ * The frame of every onboarding step (app/onboarding/*), one visual language for all six: an
+ * optional Skip (explanation steps only, goes to Privacy), ONE illustration at the top in a
+ * brand-soft area (radius-lg, the same size on every step), the centred hero heading (h2 20)
+ * and centred short supporting text (≤ 320 pt), then left-aligned icon rows
+ * or numbered rows for list-like content; the content fades in (not with reduce motion); a
  * BottomActions footer: the progress dots ("Step X of Y" for screen readers), then Next (full
  * width, the primary) above Back.
  *
@@ -15,9 +18,10 @@
  *   - With "reduce motion" on, steps change without animation (useStackScreenOptions).
  */
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Animated,
   BackHandler,
   ScrollView,
   StyleSheet,
@@ -29,7 +33,8 @@ import { AppText } from '../components/AppText';
 import { BottomActions } from '../components/BottomActions';
 import { Button } from '../components/Button';
 import { Icon, type IconName } from '../components/Icon';
-import { MAX_READABLE_WIDTH } from '../theme';
+import { MAX_READABLE_WIDTH, space } from '../theme';
+import { useReduceMotion } from '../theme/reduce-motion';
 import { useTheme } from '../theme/use-theme';
 import {
   canSkip,
@@ -44,6 +49,12 @@ import {
 /** A swipe: at least this far sideways (points) and mostly horizontal. */
 export const SWIPE_DISTANCE = 60;
 
+/** Centred supporting text stops at this width, so centred lines stay short (≈ 320 pt). */
+export const LEAD_MAX_WIDTH = space(80);
+
+/** The fade-in of a step's content (only while reduce motion is off). */
+export const FADE_IN_MS = 220;
+
 export interface OnboardingPrimary {
   label: string;
   onPress: () => void;
@@ -54,8 +65,12 @@ export interface OnboardingPrimary {
 export interface OnboardingStepProps {
   step: OnboardingStepId;
   title: string;
+  /** Short supporting text under the heading, centred (≤ LEAD_MAX_WIDTH); one or two sentences. */
+  lead: string | readonly string[];
+  /** muted: the lead in 14 text-muted (the language step); default: body 16. */
+  leadTone?: 'default' | 'muted';
   illustration?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   /** Replaces "Next" (Privacy: "Set up security"). Without it, Next goes to the next step. */
   primary?: OnboardingPrimary;
 }
@@ -100,12 +115,30 @@ function ProgressDots({ current, label }: { current: number; label: string }) {
 export function OnboardingStep({
   step,
   title,
+  lead,
+  leadTone = 'default',
   illustration,
   children,
   primary,
 }: OnboardingStepProps) {
   const { t } = useTranslation();
   const theme = useTheme();
+  const reduceMotion = useReduceMotion();
+  // a subtle fade-in of the content; none (fully visible at once) with reduce motion on
+  const [opacity] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
+  useEffect(() => {
+    if (reduceMotion) {
+      opacity.setValue(1);
+      return undefined;
+    }
+    const fade = Animated.timing(opacity, {
+      toValue: 1,
+      duration: FADE_IN_MS,
+      useNativeDriver: true,
+    });
+    fade.start();
+    return () => fade.stop();
+  }, [reduceMotion, opacity]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const next = nextStep(step);
@@ -169,7 +202,7 @@ export function OnboardingStep({
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { padding: theme.space(4), paddingBottom: theme.space(6), gap: theme.space(4) },
+          { padding: theme.space(4), paddingBottom: theme.space(6), gap: theme.space(6) },
         ]}
       >
         {canSkip(step) ? (
@@ -183,23 +216,37 @@ export function OnboardingStep({
             />
           </View>
         ) : null}
-        {illustration ? (
-          <View
-            testID="onboarding-illustration"
-            style={{
-              backgroundColor: theme.colors.brand,
-              borderRadius: theme.radius.lg,
-              padding: theme.space(4),
-            }}
-          >
-            {illustration}
+        <Animated.View testID="onboarding-content" style={{ opacity, gap: theme.space(6) }}>
+          {illustration ? (
+            <View
+              testID="onboarding-illustration"
+              style={{
+                backgroundColor: theme.colors.brandSoft,
+                borderRadius: theme.radius.lg,
+                padding: theme.space(4),
+              }}
+            >
+              {illustration}
+            </View>
+          ) : null}
+          {/* hero: centred heading and centred short supporting text (onboarding only) */}
+          <View style={[styles.hero, { gap: theme.space(2) }]}>
+            <AppText variant="h2" accessibilityRole="header" style={styles.centre}>
+              {title}
+            </AppText>
+            {(typeof lead === 'string' ? [lead] : lead).map((line) => (
+              <AppText
+                key={line}
+                testID="onboarding-lead"
+                tone={leadTone === 'muted' ? 'muted' : 'default'}
+                style={[styles.centre, styles.lead]}
+              >
+                {line}
+              </AppText>
+            ))}
           </View>
-        ) : null}
-        {/* the hero heading is the one centred text; the step's sentences stay left-aligned */}
-        <AppText variant="h1" accessibilityRole="header" style={styles.heroTitle}>
-          {title}
-        </AppText>
-        {children}
+          {children ? <View style={{ gap: theme.space(4) }}>{children}</View> : null}
+        </Animated.View>
       </ScrollView>
 
       <BottomActions
@@ -228,7 +275,10 @@ export function OnboardingStep({
   );
 }
 
-/** One key point of a step: a decorative icon (text-muted, like list icons) and a sentence. */
+/**
+ * An icon row for list-like content: a decorative icon in a small brand-soft circle
+ * (`accent-text-on-soft`) and one sentence in body text, left-aligned.
+ */
 export function OnboardingPoint({
   icon,
   children,
@@ -240,9 +290,56 @@ export function OnboardingPoint({
 }) {
   const theme = useTheme();
   return (
-    <View testID={testID} style={[styles.point, { gap: theme.space(3) }]}>
-      <Icon name={icon} color={theme.colors.textMuted} />
-      <AppText style={styles.pointText}>{children}</AppText>
+    <View testID={testID} style={[styles.row, { gap: theme.space(3) }]}>
+      <View
+        testID="onboarding-point-icon"
+        style={[
+          styles.badge,
+          { backgroundColor: theme.colors.brandSoft, borderRadius: theme.radius.pill },
+        ]}
+      >
+        <Icon name={icon} size={20} color={theme.colors.accentTextOnSoft} />
+      </View>
+      <AppText style={styles.rowText}>{children}</AppText>
+    </View>
+  );
+}
+
+/**
+ * A numbered step row (How it works): a small accent circle with the number, a bold one-line
+ * title (16 / 600) and one short sentence (14, muted). The number is part of the spoken label.
+ */
+export function OnboardingNumberedStep({
+  number,
+  title,
+  body,
+}: {
+  number: number;
+  title: string;
+  body: string;
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      testID={`onboarding-numbered-${number}`}
+      accessible
+      accessibilityLabel={`${number}. ${title}. ${body}`}
+      style={[styles.row, { gap: theme.space(3) }]}
+    >
+      <View
+        style={[
+          styles.badge,
+          { backgroundColor: theme.colors.accent, borderRadius: theme.radius.pill },
+        ]}
+      >
+        <AppText variant="h3" style={{ color: theme.colors.onAccent }}>
+          {String(number)}
+        </AppText>
+      </View>
+      <View style={styles.rowText}>
+        <AppText variant="h3">{title}</AppText>
+        <AppText tone="muted">{body}</AppText>
+      </View>
     </View>
   );
 }
@@ -250,10 +347,19 @@ export function OnboardingPoint({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flexGrow: 1, width: '100%', maxWidth: MAX_READABLE_WIDTH, alignSelf: 'center' },
-  heroTitle: { textAlign: 'center' },
+  hero: { alignItems: 'center' },
+  centre: { textAlign: 'center' },
+  lead: { maxWidth: LEAD_MAX_WIDTH },
   skip: { alignItems: 'flex-end' },
   progress: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   dots: { flexDirection: 'row', alignItems: 'center' },
-  point: { flexDirection: 'row', alignItems: 'flex-start' },
-  pointText: { flex: 1, flexShrink: 1 },
+  row: { flexDirection: 'row', alignItems: 'flex-start' },
+  rowText: { flex: 1, flexShrink: 1, gap: 2 },
+  // min sizes (not fixed): the number grows with the OS text size
+  badge: {
+    minWidth: space(9),
+    minHeight: space(9),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

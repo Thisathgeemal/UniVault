@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import { LIST_ROW_MIN_HEIGHT, MIN_TOUCH_TARGET } from '../theme';
+import { LIST_ROW_MIN_HEIGHT } from '../theme';
 import { useTheme } from '../theme/use-theme';
 import { AppText } from './AppText';
 import { Icon } from './Icon';
@@ -17,31 +17,24 @@ export interface ChoiceListProps<T extends string> {
   choices: readonly Choice<T>[];
   selected: T;
   onSelect: (value: T) => void;
-  /** large: the first-start language choice (bigger targets and text). */
-  size?: 'normal' | 'large';
   testID?: string;
 }
 
 /**
  * A single choice as a radio group (Settings → Language and Appearance, onboarding language):
  * each option is a `radio` with `checked`, a filled / empty radio icon (never colour alone) and
- * the selected one in the accent fill. At least 44 pt (large: 64 pt), text wraps.
+ * the selected one in the accent fill. Body text (16), rows at least 56 pt, text wraps; the
+ * label only (no helper lines).
  */
 export function ChoiceList<T extends string>({
   choices,
   selected,
   onSelect,
-  size = 'normal',
   testID,
 }: ChoiceListProps<T>) {
   const theme = useTheme();
-  const large = size === 'large';
   return (
-    <View
-      accessibilityRole="radiogroup"
-      testID={testID}
-      style={{ gap: theme.space(large ? 3 : 2) }}
-    >
+    <View accessibilityRole="radiogroup" testID={testID} style={{ gap: theme.space(2) }}>
       {choices.map((choice) => {
         const isSelected = choice.value === selected;
         return (
@@ -58,23 +51,20 @@ export function ChoiceList<T extends string>({
             style={[
               styles.option,
               {
-                minHeight: large ? MIN_TOUCH_TARGET + theme.space(5) : LIST_ROW_MIN_HEIGHT,
                 borderRadius: theme.radius.md,
                 borderColor: isSelected ? theme.colors.accent : theme.colors.borderStrong,
                 backgroundColor: isSelected ? theme.colors.accent : theme.colors.surface,
                 paddingHorizontal: theme.space(4),
-                paddingVertical: theme.space(large ? 3 : 2),
+                paddingVertical: theme.space(2),
                 gap: theme.space(3),
               },
             ]}
           >
             <Icon
               name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-              size={large ? 28 : 24}
               color={isSelected ? theme.colors.onAccent : theme.colors.accentText}
             />
             <AppText
-              variant={large ? 'h2' : 'body'}
               style={[
                 styles.label,
                 { color: isSelected ? theme.colors.onAccent : theme.colors.text },
@@ -90,6 +80,11 @@ export function ChoiceList<T extends string>({
 }
 
 const styles = StyleSheet.create({
-  option: { borderWidth: 1, flexDirection: 'row', alignItems: 'center' },
-  label: { flexShrink: 1 },
+  option: {
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: LIST_ROW_MIN_HEIGHT,
+  },
+  label: { flex: 1, flexShrink: 1 },
 });

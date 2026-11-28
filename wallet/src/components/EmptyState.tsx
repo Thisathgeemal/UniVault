@@ -14,7 +14,7 @@ export interface EmptyStateProps {
 }
 
 /**
- * "Nothing here yet" panel: decorative icon (hidden from screen readers), title (h2), explanation
+ * "Nothing here yet" panel: decorative icon (hidden from screen readers), title (h3), explanation
  * (14, muted). Left-aligned like the rest of the screen (only hero headings are centred).
  */
 export function EmptyState({ icon, title, message, action, testID }: EmptyStateProps) {
@@ -25,7 +25,7 @@ export function EmptyState({ icon, title, message, action, testID }: EmptyStateP
       style={[styles.root, { gap: theme.space(3), paddingVertical: theme.space(6) }]}
     >
       <StateIcon name={icon} />
-      <AppText variant="h2" accessibilityRole="header">
+      <AppText variant="h3" accessibilityRole="header">
         {title}
       </AppText>
       <AppText tone="muted">{message}</AppText>

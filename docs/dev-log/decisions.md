@@ -39,6 +39,7 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 | [023](#decision-023-wallet-storage-tiers-secure-store-for-keys-and-credential-secrets-encrypted-vault-for-credentials-asyncstorage-only-for-non-secret-preferences) | Wallet storage tiers: secure store for keys and credential secrets, encrypted vault for credentials, AsyncStorage only for non-secret preferences | Fri 27 Nov 2026 | S2                       | Draft – review | FR-WAL-03, NFR-08                                             |
 | [024](#decision-024-one-shared-navy-and-azure-palette-for-all-three-apps-portals-distinguished-by-a-role-tag)                                                       | One shared 'Navy and azure' palette for all three apps, portals distinguished by a role tag                                                       | Fri 27 Nov 2026 | S2                       | Draft – review | NFR-05, NFR-04                                                |
 | [025](#decision-025-wallet-pin-6-digits-salted-slow-kdf-verifier-in-the-secure-store-this-device-only-attempt-limits-in-app-lock)                                   | Wallet PIN: 6 digits, salted slow KDF verifier in the secure store (this device only), attempt limits in app lock                                 | Sat 28 Nov 2026 | S2                       | Draft – review | FR-WAL-07, FR-WAL-03, NFR-08                                  |
+| [026](#decision-026-biometric-unlock-via-a-secure-store-secret-released-only-after-os-biometric-authentication-strong-biometrics-only-app-pin-as-the-only-fallback) | Biometric unlock via a secure-store secret released only after OS biometric authentication; strong biometrics only; app PIN as the only fallback  | Sat 28 Nov 2026 | S2                       | Draft – review | FR-WAL-07, FR-WAL-03, NFR-08                                  |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -2296,3 +2297,95 @@ has 1,000,000 values, so no KDF can make an extracted verifier strong by itself.
 - The PIN string must never be logged, put in route params, errors or storage; tests enforce it.
 - The weak-PIN list was compiled from the patterns in published PIN studies, not copied from a
   table: check it against them before release.
+
+## Decision 026: Biometric unlock via a secure-store secret released only after OS biometric authentication; strong biometrics only; app PIN as the only fallback
+
+- **Date:** Sat 28 Nov 2026
+- **Sprint:** S2
+- **Status:** Draft – review
+- **Requirements:** FR-WAL-07, FR-WAL-03, NFR-08
+- **Related:** Decision 022 (Expo Go in Sprint 2), Decision 023 (storage tiers), Decision 025
+  (PIN verifier and attempt record), [wallet-authentication.md](../security/wallet-authentication.md)
+- **Evidence:** `wallet/src/security/biometrics.ts`, `authenticate.tsx`, `pin-attempts.ts`,
+  `wallet/test/biometrics.test.tsx` (enable stores the secret with `requireAuthentication` and this
+  device only; unlock only when the secret is released; a boolean success is never accepted;
+  invalidation; lockout schedule and restart persistence; nothing secret in logs, results or
+  storage); expo-secure-store 58.0.3 native source (Android BiometricPrompt BIOMETRIC_STRONG with
+  a CryptoObject, iOS `.biometryCurrentSet`)
+
+### Context
+
+The PIN (Decision 025) is the base factor, but typing it before every share is slow; holders
+expect fingerprint or face unlock. A biometric check must not become a weaker door than the PIN:
+JavaScript cannot verify a fingerprint, it can only trust what the OS reports, and the phone's
+passcode is often known to family members. Sprint 2 runs in Expo Go (Decision 022).
+
+### Options considered
+
+1. **Boolean check:** `LocalAuthentication.authenticateAsync()` returns `success: true`, the app
+   lets the holder in. Simple and works in Expo Go everywhere, but nothing is bound to the result:
+   any code in the app can produce `true`, so it is no proof.
+2. **OS-enforced secret (chosen):** a random secret in expo-secure-store with
+   `requireAuthentication: true`; the OS releases it only after its own biometric check (Android
+   Keystore key bound to BiometricPrompt with BIOMETRIC_STRONG; iOS Keychain `.biometryCurrentSet`).
+   Unlock = the read succeeds.
+3. **Device passcode fallback:** let the OS prompt fall back to the phone's passcode. Convenient,
+   but the passcode then opens the wallet, bypassing the wallet PIN and its attempt limits.
+
+### Decision
+
+**Option 2**, with the app PIN as the only fallback:
+
+- Only `available-strong` capability may be enabled; weak biometrics, iOS Expo Go
+  (`unsupported-in-expo-go`: no `NSFaceIDUsageDescription` there) and no enrolment use the PIN.
+- `authenticate({ reason })` is the one entry point: one OS prompt, then the PIN prompt (one
+  "Use fingerprint" retry, no automatic repeats); the device passcode is never accepted.
+- Biometrics changed (the item invalidated, or no strong biometric enrolled any more): delete the
+  secret, turn biometric unlock off, require the PIN and say why.
+- PIN attempt limits: 4 free, then 30 s, 1 min, 5 min, 15 min and 1 h for every further wrong PIN;
+  stored in the secure store (survives restarts); a correct PIN resets; no wipe yet.
+
+### Reason
+
+- **Proof, not a flag:** the OS releasing a key-protected value cannot be faked by app code; a
+  boolean can.
+- **Strong only:** weak (2D) face unlock can be fooled by a photo; Android cannot bind keys to it
+  anyway.
+- **One fallback the holder controls:** the wallet PIN with its own limits, not the phone's
+  passcode.
+- **Privacy (NFR-08):** biometric data never leaves the phone's secure hardware; UniVault never
+  sees it, only "released / not released".
+
+### Consequences
+
+- iOS Expo Go: PIN only; Face ID / Touch ID unlock needs a development build (Decision 022's
+  switch criterion now includes this for iOS testing).
+- The OS prompt's cancel button keeps its system label ("Cancel"), not "Use PIN": expo-secure-store
+  does not expose it; the PIN prompt follows a cancel.
+- Every sensitive action must use `authenticate()`; CLAUDE.md records the rule.
+- A wipe after N failed PINs and "Change PIN" are backlog.
+- **App lock (added 28 Nov; wallet-authentication.md §9):** the locked state is in memory only,
+  never persisted; the app starts locked once setup is complete; only `AppState` 'background'
+  arms the lock (never 'inactive'); "Lock after leaving the app" Immediately (default) / 30 s /
+  1 min / 5 min as a non-secret preference; a clock that went backwards or an unknown time
+  locks; the wallet's own authentication flows never arm it; a privacy cover hides the
+  recent-apps snapshot in every build; one automatic prompt per lock, no loops; `onLock`
+  listeners for the vault.
+- **App lock follow-up (28 Nov; wallet-authentication.md §9):** the exemption for our own
+  prompts is limited to min(lock delay, 30 s) from the moment the app went to the background
+  (30 s for Immediately, so the biometric sheet itself never locks); after a longer absence the
+  app locks and the open prompt is dismissed as cancelled (no failed PIN attempt; no late
+  biometric success), and every prompt that resolves re-checks the lock, so a cancel never
+  reveals the wallet. The lock screen's own prompt is not dismissed. Release builds block screen
+  capture for the whole wallet (Android `FLAG_SECURE`: blank recents card even when the snapshot
+  is taken before `'background'` reaches JavaScript); development builds allow it unless the
+  dev-only Diagnostics switch "Block screenshots and recents preview" is on; iOS keeps the navy
+  cover, drawn on `'inactive'` when iOS takes its snapshot. Consequence: no screenshots of the
+  wallet in release builds (support and evidence screenshots come from development builds).
+- **Known limitation (added 28 Nov):** the OS reports only that SOME enrolled biometric matched,
+  never whose. Anyone whose fingerprint or face was already enrolled on the phone when biometric
+  unlock was turned on can unlock the wallet. Mitigated: later enrolments invalidate the key, the
+  phone passcode is never accepted, and adding a biometric needs the phone's passcode. Not
+  mitigated: biometrics of other people enrolled before; the setup step and Settings → Security
+  therefore tell the holder to turn it on only if every enrolled fingerprint / face is theirs
+  (wallet-authentication.md §8).

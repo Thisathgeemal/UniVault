@@ -1,7 +1,7 @@
 /**
- * Appearance (Settings → Appearance): "Use device setting" (default), "Light" or "Dark".
+ * Appearance (Settings → Appearance): "Automatic" (default; stored as `system`), "Light" or "Dark".
  *
- * The EFFECTIVE colour scheme is the choice, or the phone's scheme while "Use device setting" is
+ * The EFFECTIVE colour scheme is the choice, or the phone's scheme while "Automatic" is
  * selected; only then do live system changes apply (useColorScheme() is read on every render).
  * Every themed thing reads it through useTheme() (screens, Header, tab bar, dialogs, toasts),
  * the navigation container gets a matching theme (app/_layout.tsx) and the status bar follows it

@@ -134,7 +134,9 @@ wallet/           React Native, Expo SDK 58 + Expo Router (Decision 022; docs/fr
                     OnboardingStep (frame: Skip, Back/Next, swipe, Android back, progress),
                     illustrations (react-native-svg, tokens only)
   src/security/     pin.ts (scrypt verifier in the secure store, verifyPin, attempt record),
-                    pin-rules.ts, constant-time.ts, screen-capture.ts, setup-flow.ts (biometric hook)
+                    pin-rules.ts, constant-time.ts, screen-capture.ts, setup-flow.ts (biometric step),
+                    biometrics.ts (capability, OS-released unlock secret), pin-attempts.ts (limits),
+                    authenticate.tsx (authenticate(), AuthenticationProvider, PinPrompt), PinCheck
   src/credentials/  status.ts: walletStatusFromBackend() = THE backend → wallet status mapping
   src/navigation/   routes.ts = THE route table (ROUTES, ROUTE_FILES), tabs.ts, TabStack, stack-options,
                     status-bar.tsx (the ONE computed StatusBar), navigation-theme.ts
@@ -196,7 +198,8 @@ cleanly.)
   @expo-google-fonts/noto-sans 0.4.2 and noto-sans-sinhala 0.4.2 (imported per weight: 5 font files),
   @expo/vector-icons 15.1.1,
   @react-native-async-storage/async-storage 2.2.0, react-native-svg 15.16.0, expo-secure-store
-  58.0.3, expo-screen-capture 58.0.6, @noble/hashes 2.4.0 (as crypto-core), jest 30.5.2, jest-expo
+  58.0.3, expo-screen-capture 58.0.6, expo-local-authentication 58.0.3, @noble/hashes 2.4.0 (as
+  crypto-core), jest 30.5.2, jest-expo
   58.0.16, @testing-library/react-native 14.1.0, test-renderer 1.3.1, @expo/ngrok 4.1.3. Add
   Expo-managed packages ONLY with `npx expo install <pkg>`, then pin the installed version
   exactly; `npm run doctor` must stay 20/20.
@@ -234,7 +237,7 @@ cd crypto-core && npm test                  # crypto-core tests (158) + coverage
 cd claims-validation && npm test | test:coverage | build | typecheck   # shared claim validation (23 tests)
 cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (97 tests); build regenerates theme.css
 cd wallet && npm start                      # Metro :8081 (LAN), scan with Expo Go; start:tunnel = ngrok
-cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 599 tests; doctor = expo-doctor (20/20)
+cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 730 tests; doctor = expo-doctor (20/20)
 cd wallet && npm run android | ios | fixture:diagnostics | art:placeholder
 cd issuer-portal && npm run dev             # http://localhost:5173 (backend: npm run dev in backend/)
 cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 424 tests; build also checks the bundle
@@ -377,7 +380,8 @@ of `D:/...`. See Sprint 1, Issue 6.
     `PREFERENCE_KEYS` (`src/lib/preferences.ts`; test-enforced: only these keys, each only with its
     allowed values): `univault.language` (`en`|`si`), `univault.appearance`
     (`system`|`light`|`dark`), `univault.onboardingCompleted` (`true`),
-    `univault.privacyAcknowledgedAt` (JSON `{ at: ISO instant, version: "privacy-v1" }`). Keys,
+    `univault.privacyAcknowledgedAt` (JSON `{ at: ISO instant, version: "privacy-v1" }`),
+    `univault.lockDelay` (`immediately`|`30s`|`1m`|`5m`). Keys,
     credentials, SD-JWTs, claims, tokens, PIN material and anything personal go in secure storage
     (`expo-secure-store`), never AsyncStorage: today `univault.pinVerifier` and
     `univault.pinAttempts` (Decision 025). All of it is
@@ -407,9 +411,32 @@ hash }` (scrypt N 2^12 r 8 p 1, 16-byte `expo-crypto` salt) via `savePin()` in
     (blocks capture in release builds only). Biometrics plug in at `stepAfterPinCreated()`
     (`src/security/setup-flow.ts`). Tune the KDF only after Diagnostics → PIN hashing time on a
     real phone; old verifiers keep their stored parameters.
+  - **Authentication (Decision 026, `docs/security/wallet-authentication.md`): every sensitive
+    action uses `authenticate({ reason })` (`useAuthenticate()`); never a bare biometric boolean**
+    (`LocalAuthentication.authenticateAsync` is not proof and is not used). Biometric unlock =
+    the OS releasing the `univault.biometricUnlockSecret` item (`requireAuthentication: true`,
+    this device only); only `available-strong` may be enabled; no device-passcode fallback, the
+    app PIN is the only fallback; changed biometrics (null read, or no strong biometric any more)
+    → delete the secret, `biometricEnabled` false, PIN + message. PIN attempts go through
+    `checkPinWithLimits()` (4 free, then 30 s / 1 min / 5 min / 15 min / 1 h, stored in the secure
+    store). Turning biometric unlock off needs `pinOnly`. iOS Expo Go: PIN only. Wherever
+    biometric unlock can be turned on, show `SharedBiometricNotice` (the OS cannot tell whose
+    enrolled biometric matched).
+  - **App lock (`src/security/app-lock.tsx`): every protected screen sits behind the
+    LockProvider; never persist the unlocked state.** It starts locked once setup is complete,
+    locks only on AppState 'background' (never 'inactive') after the "Lock after leaving the app"
+    delay (clock backwards / unknown time → lock), ignores our own auth flows
+    (`withAuthActivity`) ONLY for absences ≤ min(delay, 30 s) (`authExemptionMs`; longer → lock +
+    `dismissPrompts()`, resolved as cancelled, never a failed attempt; every prompt end
+    re-checks via `onAuthActivityEnd`), blocks screen capture for the whole wallet in release
+    builds (`useAppScreenCaptureBlock()`; dev: Diagnostics switch, memory only), shows the
+    privacy cover whenever the app is not active, and calls
+    `onLock` listeners on every lock (the vault must clear decrypted data there). Unlock only via
+    `unlock()` (= authenticate()). Tests of other features start unlocked (`lockOnAppStart`
+    mocked in test/setup.ts).
   - **Theme:** `useTheme()` uses the EFFECTIVE scheme (`src/theme/appearance.tsx`): Settings →
-    Appearance ("Use device setting" default, Light, Dark), or the phone's scheme (live) for
-    "Use device setting". Never call `useColorScheme()` in a component. The status bar is ONE
+    Appearance ("Automatic" default, stored as `system`; Light; Dark), or the phone's scheme (live)
+    for Automatic. Never call `useColorScheme()` in a component. The status bar is ONE
     computed `<StatusBar>` (`src/navigation/status-bar.tsx`): navy-header screens call
     `useBrandStatusBar()`; never `setStatusBarStyle()`. Stacks use `useStackScreenOptions()`
     (reduce motion → `animation: 'none'`).
@@ -474,8 +501,12 @@ primary (azure) action per screen. The verifier portal uses the same AppShell wi
 portal' role tag. **Wallet typography and layout** (design-system.md section of that name, tested
 on every route by `wallet/test/design-system.test.tsx`): body 16/26; secondary text 14 in
 text-muted (`<AppText tone="muted">` is 14 by default); captions 12 for metadata only; headings
-h1 24 / h2 20 / h3 16 at 600, no other sizes; left-align text, lists and forms (centre only
-onboarding/setup hero headings, illustrations and the PIN pad); `Screen` gives space-4 sides,
+only h2 20 (tab-root header titles, screen titles, onboarding/setup heroes incl. "PIN set") and h3
+16 (detail-screen header titles, sections, cards, states, dialogs) at 600, no h1 / display; left-
+align text, lists and forms (centre only onboarding/setup hero headings, the short onboarding
+lead text ≤ 320 pt, illustrations and the PIN pad); onboarding steps follow the "Onboarding
+visual pattern" (brand-soft illustration, centred h2 + lead, numbered or icon rows); slow PIN work
+uses the "Processing state" pattern (`ProcessingState`, `withMinimumDuration`, `yieldToUi`); `Screen` gives space-4 sides,
 space-6 between sections and a 560 pt max width; group a heading with its content in `Section`;
 list rows ≥ 56 pt; buttons 16 / 600; onboarding/setup buttons full width in `BottomActions`.
 
@@ -818,33 +849,34 @@ secrets or personal data may appear in responses or logs.
   top). Add a new numbered decision for any significant design choice; never
   renumber existing ones.
 
-  | #   | Decision                                                                  | Status         |
-  | --- | ------------------------------------------------------------------------- | -------------- |
-  | 001 | TypeScript for all JavaScript components                                  | Accepted       |
-  | 002 | Root-level ESLint 9 and Prettier; Ruff for ai-service                     | Accepted       |
-  | 003 | SD-JWT VC flat claim layout instead of JSON-LD                            | Accepted       |
-  | 004 | Data minimisation in credential schemas                                   | Accepted       |
-  | 005 | Derived age_over_18 claim and under-18 handling                           | Accepted       |
-  | 006 | SD-JWT library selection (@sd-jwt/core 0.25.0)                            | Accepted       |
-  | 007 | ES256 for holder key binding (issuer stays RS256)                         | Proposed       |
-  | 008 | PostgreSQL, with embedded PGlite and hand-written migrations              | Draft – review |
-  | 009 | Issuer staff authentication (JWT, database re-check and lockout)          | Draft – review |
-  | 010 | Credential signing deferred to wallet redemption                          | Draft – review |
-  | 011 | OpenID4VCI pre-authorised code offer format                               | Draft – review |
-  | 012 | Reissue supersedes immediately; status changes as append-only events      | Draft – review |
-  | 013 | Per-credential status endpoint; IETF Token Status List as future work     | Draft – review |
-  | 014 | Encrypted key file or env bundle, one key store; KMS/HSM future work      | Draft – review |
-  | 015 | Frontend stack: React + Vite + TS, TanStack Query, shared portal-ui       | Draft – review |
-  | 016 | Staff token in memory + sessionStorage, never localStorage                | Draft – review |
-  | 017 | Dashboard demo data via real services; dev-only append-only reset         | Draft – review |
-  | 018 | Shared claims-validation package; portal precompiles the schemas          | Draft – review |
-  | 019 | Issuance form read-only, previewed server-side; schema by issuer type     | Draft – review |
-  | 020 | Portrait embedded, size-limited (40 KB), selectively disclosable          | Draft – review |
-  | 021 | Offer code only in portal memory; QR never re-shown; tx_code deferred     | Draft – review |
-  | 022 | Expo Router + Expo Go for S2; development build for push / OS offer links | Draft – review |
-  | 023 | Wallet storage tiers: secure store, encrypted vault, AsyncStorage prefs   | Draft – review |
-  | 024 | One shared "Navy and azure" palette, portals told apart by a role tag     | Draft – review |
-  | 025 | Wallet PIN: salted scrypt verifier in the secure store, attempt limits    | Draft – review |
+  | #   | Decision                                                                      | Status         |
+  | --- | ----------------------------------------------------------------------------- | -------------- |
+  | 001 | TypeScript for all JavaScript components                                      | Accepted       |
+  | 002 | Root-level ESLint 9 and Prettier; Ruff for ai-service                         | Accepted       |
+  | 003 | SD-JWT VC flat claim layout instead of JSON-LD                                | Accepted       |
+  | 004 | Data minimisation in credential schemas                                       | Accepted       |
+  | 005 | Derived age_over_18 claim and under-18 handling                               | Accepted       |
+  | 006 | SD-JWT library selection (@sd-jwt/core 0.25.0)                                | Accepted       |
+  | 007 | ES256 for holder key binding (issuer stays RS256)                             | Proposed       |
+  | 008 | PostgreSQL, with embedded PGlite and hand-written migrations                  | Draft – review |
+  | 009 | Issuer staff authentication (JWT, database re-check and lockout)              | Draft – review |
+  | 010 | Credential signing deferred to wallet redemption                              | Draft – review |
+  | 011 | OpenID4VCI pre-authorised code offer format                                   | Draft – review |
+  | 012 | Reissue supersedes immediately; status changes as append-only events          | Draft – review |
+  | 013 | Per-credential status endpoint; IETF Token Status List as future work         | Draft – review |
+  | 014 | Encrypted key file or env bundle, one key store; KMS/HSM future work          | Draft – review |
+  | 015 | Frontend stack: React + Vite + TS, TanStack Query, shared portal-ui           | Draft – review |
+  | 016 | Staff token in memory + sessionStorage, never localStorage                    | Draft – review |
+  | 017 | Dashboard demo data via real services; dev-only append-only reset             | Draft – review |
+  | 018 | Shared claims-validation package; portal precompiles the schemas              | Draft – review |
+  | 019 | Issuance form read-only, previewed server-side; schema by issuer type         | Draft – review |
+  | 020 | Portrait embedded, size-limited (40 KB), selectively disclosable              | Draft – review |
+  | 021 | Offer code only in portal memory; QR never re-shown; tx_code deferred         | Draft – review |
+  | 022 | Expo Router + Expo Go for S2; development build for push / OS offer links     | Draft – review |
+  | 023 | Wallet storage tiers: secure store, encrypted vault, AsyncStorage prefs       | Draft – review |
+  | 024 | One shared "Navy and azure" palette, portals told apart by a role tag         | Draft – review |
+  | 025 | Wallet PIN: salted scrypt verifier in the secure store, attempt limits        | Draft – review |
+  | 026 | Biometric unlock = OS-released secure-store secret; strong only; PIN fallback | Draft – review |
 
 - **Evidence screenshots:** `docs/dev-log/evidence/s<sprint>-<YYYY-MM-DD>-<feature>-<what>.png`.
 - **Commits:** include the Jira key, e.g. `SCRUM-XX: <summary>`.
@@ -858,8 +890,8 @@ statements, 93.89% branches, 100% functions, 99.14% lines), **backend
 files; 97.56% statements, 92.2% branches, 98.02% functions, 98.57% lines;
 thresholds 96 / 91 / 97 / 98) plus **10 Playwright e2e tests**, **portal-ui 97
 tests** (8 files; 100% statements, 98.73% branches, 100% functions, 100% lines;
-thresholds 99 / 94 / 99 / 99), **wallet 599 tests** (20 files, Jest + RNTL; 99.56% statements,
-96.27% branches, 99.43% functions, 99.9% lines; thresholds 99 / 96 / 99 / 99) and
+thresholds 99 / 94 / 99 / 99), **wallet 730 tests** (22 files, Jest + RNTL; 99.31% statements,
+96.42% branches, 99.22% functions, 99.8% lines; thresholds 99 / 96 / 99 / 99) and
 **claims-validation 23 tests** (1 file; 98.63%
 statements, 90.47% branches, 100% functions, 98.57% lines; thresholds 98 / 89 / 100 / 98),
 all passing.
@@ -1003,8 +1035,8 @@ replaces }`.
   tiers) and the portal's "Replaced" wording everywhere.
 - **Wallet onboarding, the security gate and Appearance** (28 Nov, Sprint 2,
   `docs/frontend/mobile-wallet.md` §7, §9, §15, Decision 023 consequences): Settings → Appearance
-  (Use device setting / Light / Dark, saved, restored before the first frame, live system changes
-  only for "Use device setting", app-wide incl. navigation theme, dialogs and the root view;
+  (Automatic / Light / Dark, saved, restored before the first frame, live system changes
+  only for Automatic, app-wide incl. navigation theme, dialogs and the root view;
   one computed status bar, light on the navy header); onboarding stack (language, welcome, how it
   works, selective disclosure, security, privacy + "I understand" + Privacy details) with Next /
   Back / swipe / Skip-to-Privacy, "Step X of 6" for screen readers, Android back (exit on step 1),
@@ -1021,5 +1053,20 @@ replaces }`.
   the gate checks for the verifier (placeholder preference and dev Continue removed); release-only
   screen-capture blocking; Diagnostics → PIN hashing time, Reset onboarding deletes the PIN. Wallet
   typography and layout rules in the design system, applied to every screen and tested per route.
+- **Biometric unlock with PIN fallback** (28 Nov, Sprint 2, `docs/security/wallet-authentication.md`,
+  Decision 026, `docs/frontend/mobile-wallet.md` §18): capability detection (strong / weak only /
+  not enrolled / no hardware / iOS Expo Go); an OS-released secure-store secret as the only
+  biometric proof; `authenticate()` with the PIN prompt (one biometric try, one retry, lockout
+  schedule with countdown, restart-proof); setup step "Use fingerprint to unlock?"; Settings →
+  Security (switch, status, Test unlock, Change PIN coming soon); `Toggle`; privacy line.
+- **App lock** (28 Nov, Sprint 2, `docs/security/wallet-authentication.md` §9,
+  `docs/frontend/mobile-wallet.md` §19): in-memory lock state, background-only rule with the
+  Immediately / 30 s / 1 min / 5 min delay and the clock rule, privacy cover in every build, lock
+  screen above the mounted navigator (one auto prompt, Unlock / Use PIN, lockout countdown,
+  Android back leaves, deep links after unlock), `onLock` hook, Settings → Security "Lock after
+  leaving the app" + "Lock now", Diagnostics last lock reason. Follow-up: prompt exemption
+  limited to min(delay, 30 s) (longer → lock, prompt dismissed as cancelled, re-check on every
+  prompt end); whole-wallet screen-capture block in release builds (blank Android recents card),
+  dev-only Diagnostics switch.
 - **Planned routes (return `501` until built):** wallet redemption
   (`/credential-offers/token`, `/credential`), verifications.

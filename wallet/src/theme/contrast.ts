@@ -240,23 +240,35 @@ export function colorPairs(c: ThemeColors, scheme: 'light' | 'dark'): ColorPair[
     { use: 'avatar initial', fg: c.onBrand, bg: c.roleTagBg, under: c.brand, kind: 'text' },
     // Toast: inverted (text colour as the background)
     { use: 'toast', fg: c.bg, bg: c.text, kind: 'text' },
-    // Onboarding (src/onboarding): illustration lines on the navy panel and on its fills, role
-    // labels under the drawing, progress dots on the footer, the "I understand" checkbox
-    { use: 'illustration line on brand', fg: c.onBrand, bg: c.brand, kind: 'icon' },
-    { use: 'illustration detail on brand', fg: c.onBrandMuted, bg: c.brand, kind: 'icon' },
-    { use: 'illustration line on brand-hover fill', fg: c.onBrand, bg: c.brandHover, kind: 'icon' },
+    // Onboarding (src/onboarding/illustrations.tsx): drawings on the brand-soft panel: text
+    // outlines (navy alone is 1.08:1 on dark brand-soft), accent arrows and marks, text-muted
+    // details, on-brand marks on navy fills, on-accent ticks in accent circles, outlines against
+    // surface fills; role labels under the drawing
+    { use: 'illustration outline on brand-soft', fg: c.text, bg: c.brandSoft, kind: 'icon' },
+    { use: 'illustration arrow on brand-soft', fg: c.accent, bg: c.brandSoft, kind: 'icon' },
+    { use: 'illustration detail on brand-soft', fg: c.textMuted, bg: c.brandSoft, kind: 'icon' },
+    { use: 'illustration outline on surface fill', fg: c.text, bg: c.surface, kind: 'icon' },
+    { use: 'illustration mark on navy fill', fg: c.onBrand, bg: c.brand, kind: 'icon' },
+    { use: 'illustration tick in accent circle', fg: c.onAccent, bg: c.accent, kind: 'icon' },
+    { use: 'illustration label on brand-soft', fg: c.text, bg: c.brandSoft, kind: 'text' },
+    // Onboarding rows: icon rows (icon in a brand-soft circle), numbered rows (accent circle on
+    // bg with an on-accent number), progress dots on the footer, the "I understand" checkbox
     {
-      use: 'illustration line on role-tag-bg fill',
-      fg: c.onBrand,
-      bg: c.roleTagBg,
-      under: c.brand,
+      use: 'icon row icon in brand-soft circle',
+      fg: c.accentTextOnSoft,
+      bg: c.brandSoft,
       kind: 'icon',
     },
-    { use: 'illustration label on brand', fg: c.onBrand, bg: c.brand, kind: 'text' },
+    { use: 'numbered row circle on bg', fg: c.accent, bg: c.bg, kind: 'icon' },
+    { use: 'numbered row number on accent', fg: c.onAccent, bg: c.accent, kind: 'text' },
     { use: 'progress dot (done) on surface', fg: c.accent, bg: c.surface, kind: 'icon' },
     { use: 'progress dot (to do) on surface', fg: c.borderStrong, bg: c.surface, kind: 'border' },
     { use: 'checkbox on bg', fg: c.accentText, bg: c.bg, kind: 'icon' },
-    { use: 'point icon on bg', fg: c.textMuted, bg: c.bg, kind: 'icon' },
+    // Toggle (Settings → Security): the track against the card, the thumb against the track
+    { use: 'toggle track (on) on surface', fg: c.accent, bg: c.surface, kind: 'border' },
+    { use: 'toggle track (off) on surface', fg: c.borderStrong, bg: c.surface, kind: 'border' },
+    { use: 'toggle thumb on the on track', fg: c.surface, bg: c.accent, kind: 'icon' },
+    { use: 'toggle thumb on the off track', fg: c.surface, bg: c.borderStrong, kind: 'icon' },
   );
   return pairs;
 }

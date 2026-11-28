@@ -230,7 +230,12 @@ describe('Header', () => {
     expect(share).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeOnTheScreen();
     // safe-area aware: padded below the status bar / notch
-    expect(screen.getByTestId('h')).toHaveStyle({ paddingTop: TEST_SAFE_AREA.insets.top + 4 });
+    // a header with Back is a detail header: space-2 above and below the title, h3 16
+    expect(screen.getByTestId('h')).toHaveStyle({
+      paddingTop: TEST_SAFE_AREA.insets.top + 8,
+      paddingBottom: 8,
+    });
+    expect(screen.getByRole('header')).toHaveStyle({ fontSize: 16 });
   });
 
   it('has no back button without onBack', async () => {

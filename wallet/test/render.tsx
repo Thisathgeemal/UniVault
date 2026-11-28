@@ -4,6 +4,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '../src/components';
 import type { AppearancePreference } from '../src/lib/preferences';
 import { SetupProvider } from '../src/onboarding/SetupProvider';
+import { LockProvider } from '../src/security/app-lock';
+import { AuthenticationProvider } from '../src/security/authenticate';
 import type { SetupState } from '../src/onboarding/gate';
 import { AppearanceProvider } from '../src/theme/appearance';
 import { COMPLETED_SETUP } from './setup-state';
@@ -21,7 +23,7 @@ export interface ProviderOptions {
 
 /**
  * The providers app/_layout.tsx puts around every screen (safe areas, appearance, setup state,
- * toasts). Default: "Use device setting" and a holder who finished setup.
+ * toasts). Default: "Automatic" (system) and a holder who finished setup.
  */
 export function Providers({
   children,
@@ -32,7 +34,11 @@ export function Providers({
     <SafeAreaProvider initialMetrics={TEST_SAFE_AREA}>
       <AppearanceProvider initial={appearance}>
         <SetupProvider initial={setup}>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <AuthenticationProvider>
+              <LockProvider>{children}</LockProvider>
+            </AuthenticationProvider>
+          </ToastProvider>
         </SetupProvider>
       </AppearanceProvider>
     </SafeAreaProvider>

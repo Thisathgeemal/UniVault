@@ -20,7 +20,7 @@ export const en = {
   },
   /** Settings → Appearance (theme). */
   appearance: {
-    system: 'Use device setting',
+    system: 'Automatic',
     light: 'Light',
     dark: 'Dark',
   },
@@ -128,9 +128,115 @@ export const en = {
   },
   security: {
     title: 'Security',
-    placeholderTitle: 'Security settings are coming soon',
-    placeholderMessage:
-      'Here you will choose how the wallet is locked (device passcode, fingerprint or face) before anything is shown or shared. Your keys will be kept in the phone’s secure storage.',
+    unlockSection: 'Unlock',
+    testSection: 'Test',
+    testHint: 'Try how you unlock UniVault. Nothing is changed or shared.',
+    testButton: 'Test unlock',
+    testReason: 'Test unlock',
+    testOkBiometric: 'Unlocked with {{kind}}.',
+    testOkPin: 'Unlocked with your PIN.',
+    testFailed: {
+      cancelled: 'Not unlocked: you cancelled.',
+      'locked-out': 'Not unlocked: too many wrong PINs. Wait and try again.',
+      'no-pin': 'Not unlocked: no PIN is set up.',
+    },
+    lockSection: 'Lock',
+    lockNow: 'Lock now',
+    pinSection: 'PIN',
+    changePin: 'Change PIN',
+    comingSoon: 'Coming soon',
+  },
+  /** Biometric unlock (src/security/biometrics.ts). {{kind}} is one of biometrics.kind. */
+  biometrics: {
+    kind: {
+      fingerprint: 'fingerprint',
+      face: 'face recognition',
+      fingerprintOrFace: 'fingerprint or face',
+    },
+    supported: 'This phone supports unlock with {{kind}}.',
+    unavailable: {
+      'no-hardware': 'Fingerprint and face unlock aren’t available on this phone.',
+      'not-enrolled':
+        'No fingerprint or face is set up on this phone. Add one in the phone’s settings to use it here.',
+      'available-weak-only':
+        'This phone’s {{kind}} unlock isn’t secure enough for UniVault. Use your PIN.',
+      'unsupported-in-expo-go': 'Unlock with {{kind}} needs the full UniVault app, not Expo Go.',
+    },
+    /** The platform limitation: any enrolled biometric unlocks (docs: Known limitations). */
+    sharedNotice: {
+      fingerprint:
+        'Anyone whose fingerprint is saved on this phone will be able to unlock UniVault. Only turn this on if every fingerprint on this phone is yours.',
+      face: 'Anyone whose face is saved on this phone will be able to unlock UniVault. Only turn this on if every face saved on this phone is yours.',
+      fingerprintOrFace:
+        'Anyone whose fingerprint or face is saved on this phone will be able to unlock UniVault. Only turn this on if every fingerprint and face on this phone is yours.',
+    },
+    pinOnlyOption: 'You can always use your PIN only.',
+    /** Weak-only phones with camera face unlock (Settings → Security, "PIN set"). */
+    weakFace: {
+      fingerprint:
+        'This phone’s face unlock uses the camera and isn’t secure enough for UniVault. You can use your fingerprint or your PIN.',
+      pin: 'This phone’s face unlock uses the camera and isn’t secure enough for UniVault. You can use your PIN.',
+    },
+    switchLabel: 'Unlock with {{kind}}',
+    switchUnavailable: 'Not available on this phone',
+    enablePrompt: 'Turn on unlock with {{kind}}',
+    turnedOn: 'Unlock with {{kind}} is on',
+    turnedOff: 'Unlock with {{kind}} is off',
+    enableFailed: 'Unlock with {{kind}} is still off. Try again.',
+    disableReason: 'Turn off unlock with {{kind}}',
+  },
+  /** After "PIN set", when the phone has strong biometrics (app/setup/biometrics.tsx). */
+  setupBiometrics: {
+    title: {
+      fingerprint: 'Use fingerprint to unlock?',
+      face: 'Use face recognition to unlock?',
+      fingerprintOrFace: 'Use fingerprint or face to unlock?',
+    },
+    body: {
+      fingerprint: 'Your fingerprint stays on this phone. UniVault never sees it.',
+      face: 'Your face data stays on this phone. UniVault never sees it.',
+      fingerprintOrFace:
+        'Your fingerprint and face data stay on this phone. UniVault never sees them.',
+    },
+    pinStill: 'You can always use your PIN instead.',
+    turnOn: 'Turn on',
+    notNow: 'Not now',
+    waiting: 'Waiting for your phone…',
+    failed: 'Unlock with {{kind}} is off. You can turn it on later in Settings.',
+  },
+  /** The app lock (src/security/app-lock.tsx). */
+  lock: {
+    title: 'UniVault is locked',
+    subtitle: 'Unlock to continue',
+    unlock: 'Unlock',
+    usePin: 'Use PIN',
+    reason: 'Unlock UniVault',
+  },
+  lockDelay: {
+    title: 'Lock after leaving the app',
+    hint: 'How soon UniVault locks after you switch to another app or the screen turns off.',
+    options: {
+      immediately: 'Immediately',
+      '30s': '30 seconds',
+      '1m': '1 minute',
+      '5m': '5 minutes',
+    },
+    saved: 'Lock setting changed',
+    notSaved: 'Lock setting changed, but it could not be saved for next time.',
+  },
+  /** The PIN prompt of authenticate() (src/security/authenticate.tsx). */
+  auth: {
+    title: 'Enter your PIN',
+    wrong: 'Wrong PIN. Try again.',
+    lockedSeconds_one: 'Too many attempts. Try again in {{seconds}} second.',
+    lockedSeconds_other: 'Too many attempts. Try again in {{seconds}} seconds.',
+    lockedMinutes_one: 'Too many attempts. Try again in {{minutes}} minute.',
+    lockedMinutes_other: 'Too many attempts. Try again in {{minutes}} minutes.',
+    lockedHours_one: 'Too many attempts. Try again in {{hours}} hour.',
+    lockedHours_other: 'Too many attempts. Try again in {{hours}} hours.',
+    useBiometric: 'Use {{kind}}',
+    invalidated:
+      'Your {{kind}} settings changed. Unlock with your PIN, then turn {{kind}} unlock on again in Settings.',
   },
   /** First start (app/onboarding). Short sentences, plain words (NFR-04). */
   onboarding: {
@@ -149,9 +255,13 @@ export const en = {
     },
     howItWorks: {
       title: 'How it works',
-      issue: 'An organisation, such as your employer or bank, gives you a credential.',
-      keep: 'You keep it in this wallet.',
-      show: 'You show it to someone who needs to check it.',
+      lead: 'Three simple steps.',
+      receiveTitle: 'You receive it',
+      receive: 'An employer or bank gives you a credential.',
+      keepTitle: 'You keep it',
+      keep: 'It stays in this wallet on your phone.',
+      showTitle: 'You show it',
+      show: 'Show it to someone who needs to check it.',
       issuer: 'Organisation',
       holder: 'You',
       verifier: 'Checker',
@@ -164,15 +274,18 @@ export const en = {
     },
     security: {
       title: 'Your wallet is protected',
+      lead: 'Only you can use it.',
       pin: 'You use your PIN or fingerprint before every share.',
       encrypted: 'Your credentials are encrypted on this phone.',
       offline: 'It works without the internet.',
     },
     privacy: {
       title: 'Your privacy',
+      lead: 'You stay in control of your data.',
       stays: 'Your credentials stay on this phone.',
       shared: 'Something is shared only when you approve it. You choose what.',
       noUniVault: 'Nothing is sent to UniVault when you share.',
+      biometric: 'Your fingerprint or face data never leaves your phone.',
       detailsLink: 'Privacy details',
       understand: 'I understand',
       cta: 'Set up security',
@@ -219,7 +332,7 @@ export const en = {
     weak: 'This PIN is too easy to guess. Avoid repeated or consecutive numbers.',
     mismatch: 'The PINs don’t match. Enter your new PIN again.',
     restart: 'Let’s start again',
-    saveFailed: 'Your PIN could not be saved. Please create it again.',
+    saveFailed: 'Your PIN could not be saved. Please try again.',
     saving: 'Saving your PIN…',
     startAgain: 'Start again',
     notCompleted: 'Something went wrong. Please try again.',
@@ -228,6 +341,7 @@ export const en = {
   pin: {
     dots: '{{count}} of {{total}} digits entered',
     keypad: 'Number pad',
+    checking: 'Checking your PIN…',
     delete: 'Delete',
   },
   about: {
@@ -348,6 +462,17 @@ export const en = {
     reachable: 'Reachable: server status “{{status}}” (HTTP {{http}})',
     unreachable: 'Not reachable ({{code}})',
     notConfigured: 'Set the API base URL first.',
+    lastLock: 'Last lock reason',
+    captureTitle: 'Screen capture',
+    captureSwitch: 'Block screenshots and recents preview',
+    captureHint:
+      'Development builds only, off by default. Release builds always block screenshots and the recent-apps preview of the whole wallet.',
+    lockReason: {
+      'app-start': 'App start',
+      background: 'Left the app',
+      manual: 'Lock now',
+      none: 'Not locked yet',
+    },
     resetTitle: 'Onboarding',
     resetDescription:
       'Shows the first-start screens again. Clears the onboarding and privacy flags and deletes the PIN (verifier and attempt record); keeps the language and appearance.',

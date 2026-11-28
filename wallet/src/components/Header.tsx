@@ -22,6 +22,11 @@ export interface HeaderProps {
   actions?: readonly [] | readonly [HeaderAction] | readonly [HeaderAction, HeaderAction];
   /** surface (every stack screen) or brand (the Credentials home screen, design system). */
   tone?: 'surface' | 'brand';
+  /**
+   * root (a tab's first screen, or any screen without Back): taller, h2 20 title; detail (a
+   * screen with Back): h3 16. Default: detail with `onBack`, root without.
+   */
+  size?: 'root' | 'detail';
   testID?: string;
 }
 
@@ -58,14 +63,25 @@ function IconButton({
 
 /**
  * Screen header used by every stack (src/navigation/stack-options.tsx): surface, or brand navy
- * on the Credentials home screen; safe-area aware (it pads below the status bar / notch), the title wraps instead of being cut off at large text
- * sizes, back and action buttons are 44 pt targets with spoken labels.
+ * on the Credentials home screen; safe-area aware (it pads below the status bar / notch). Root
+ * screens: h2 20 title with space-4 above and space-3 below; detail screens: h3 16 with space-2
+ * above and below (weight 600 in both scripts). The title starts at space-4 like the screen content (after the Back button on
+ * detail screens) and wraps instead of being cut off at large text sizes; back and action
+ * buttons are 44 pt targets with spoken labels.
  */
-export function Header({ title, onBack, actions = [], tone = 'surface', testID }: HeaderProps) {
+export function Header({
+  title,
+  onBack,
+  actions = [],
+  tone = 'surface',
+  size = onBack ? 'detail' : 'root',
+  testID,
+}: HeaderProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const brand = tone === 'brand';
+  const root = size === 'root';
   const iconColour = brand ? theme.colors.onBrand : theme.colors.accentText;
   return (
     <View
@@ -73,10 +89,11 @@ export function Header({ title, onBack, actions = [], tone = 'surface', testID }
       style={[
         styles.root,
         {
-          paddingTop: insets.top + theme.space(1),
-          paddingBottom: theme.space(1),
+          paddingTop: insets.top + theme.space(root ? 4 : 2),
+          paddingBottom: theme.space(root ? 3 : 2),
           paddingLeft: insets.left + theme.space(onBack ? 1 : 4),
-          paddingRight: insets.right + theme.space(2),
+          // icon buttons carry their own 44 pt target; text alone keeps the space-4 edge
+          paddingRight: insets.right + theme.space(actions.length > 0 ? 2 : 4),
           backgroundColor: brand ? theme.colors.brand : theme.colors.surface,
           borderBottomColor: brand ? theme.colors.brand : theme.colors.border,
           gap: theme.space(1),
@@ -93,7 +110,7 @@ export function Header({ title, onBack, actions = [], tone = 'surface', testID }
         />
       ) : null}
       <AppText
-        variant="h2"
+        variant={root ? 'h2' : 'h3'}
         tone={brand ? 'onBrand' : 'default'}
         accessibilityRole="header"
         style={styles.title}

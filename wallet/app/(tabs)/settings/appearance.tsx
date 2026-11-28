@@ -4,7 +4,8 @@ import { APPEARANCE_PREFERENCES, type AppearancePreference } from '../../../src/
 import { useAppearance } from '../../../src/theme/appearance';
 
 /**
- * Appearance: "Use device setting" (default), "Light" or "Dark" as a radio group. The choice
+ * Appearance: "Automatic" (default: follows the phone), "Light" or "Dark" as a radio group, in
+ * that order, labels only. The stored values stay `system` / `light` / `dark`. The choice
  * changes the whole app at once (src/theme/appearance.tsx) and is saved (AsyncStorage,
  * preference only) so the next start opens in it.
  */

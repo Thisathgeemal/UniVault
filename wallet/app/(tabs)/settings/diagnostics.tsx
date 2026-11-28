@@ -17,6 +17,7 @@ import {
   Card,
   ConfirmDialog,
   Screen,
+  Toggle,
   useToast,
 } from '../../../src/components';
 import {
@@ -28,6 +29,11 @@ import { getApiConfig } from '../../../src/config/env';
 import { runCryptoCoreCheck, type CryptoCheckResult } from '../../../src/lib/crypto-check';
 import { DEFAULT_KDF_PARAMS, measurePinHashing } from '../../../src/security/pin';
 import { useSetup } from '../../../src/onboarding/SetupProvider';
+import { useLock } from '../../../src/security/app-lock';
+import {
+  setDevScreenCaptureBlock,
+  useDevScreenCaptureBlock,
+} from '../../../src/security/screen-capture';
 import { checkHealth, getApiClient, type HealthResult } from '../../../src/services/api-client';
 
 function Row({
@@ -112,6 +118,29 @@ function PinHashingCard() {
   );
 }
 
+/**
+ * "Block screenshots and recents preview" (development builds only, off by default, not saved):
+ * turns on the release builds' whole-wallet screen-capture block to try it in Expo Go.
+ */
+function ScreenCaptureCard() {
+  const { t } = useTranslation();
+  const on = useDevScreenCaptureBlock();
+  return (
+    <Card title={t('diagnostics.captureTitle')} testID="capture-block">
+      <View style={styles.switchRow}>
+        <AppText style={styles.switchLabel}>{t('diagnostics.captureSwitch')}</AppText>
+        <Toggle
+          testID="capture-block-switch"
+          label={t('diagnostics.captureSwitch')}
+          value={on}
+          onValueChange={setDevScreenCaptureBlock}
+        />
+      </View>
+      <AppText tone="muted">{t('diagnostics.captureHint')}</AppText>
+    </Card>
+  );
+}
+
 /** Reset onboarding (development builds only), behind a confirmation. */
 function ResetOnboardingCard() {
   const { t } = useTranslation();
@@ -157,6 +186,7 @@ function ResetOnboardingCard() {
 
 export default function DiagnosticsScreen() {
   const { t } = useTranslation();
+  const { lastLockReason } = useLock();
   const [crypto, setCrypto] = useState<CryptoCheckResult | null>(null);
   const [cryptoBusy, setCryptoBusy] = useState(false);
   const [health, setHealth] = useState<HealthResult | null>(null);
@@ -203,6 +233,11 @@ export default function DiagnosticsScreen() {
           label={t('diagnostics.hermes')}
           value={info.hermes ? t('diagnostics.on') : t('diagnostics.off')}
           testID="diag-hermes"
+        />
+        <Row
+          label={t('diagnostics.lastLock')}
+          value={t(`diagnostics.lockReason.${lastLockReason ?? 'none'}`)}
+          testID="diag-last-lock"
         />
         <Row
           label={t('diagnostics.apiBaseUrl')}
@@ -278,6 +313,8 @@ export default function DiagnosticsScreen() {
 
       <PinHashingCard />
 
+      <ScreenCaptureCard />
+
       {onboardingResetEnabled() ? <ResetOnboardingCard /> : null}
     </Screen>
   );
@@ -285,4 +322,6 @@ export default function DiagnosticsScreen() {
 
 const styles = StyleSheet.create({
   row: { gap: 2 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  switchLabel: { flex: 1, flexShrink: 1 },
 });

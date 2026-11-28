@@ -30,6 +30,7 @@ export default function OnboardingPrivacyScreen() {
     <OnboardingStep
       step="privacy"
       title={t('onboarding.privacy.title')}
+      lead={t('onboarding.privacy.lead')}
       illustration={<PrivacyIllustration />}
       primary={{
         label: t('onboarding.privacy.cta'),
@@ -44,6 +45,9 @@ export default function OnboardingPrivacyScreen() {
       <OnboardingPoint icon="hand-left-outline">{t('onboarding.privacy.shared')}</OnboardingPoint>
       <OnboardingPoint icon="cloud-offline-outline">
         {t('onboarding.privacy.noUniVault')}
+      </OnboardingPoint>
+      <OnboardingPoint icon="finger-print-outline">
+        {t('onboarding.privacy.biometric')}
       </OnboardingPoint>
       <View>
         <Button

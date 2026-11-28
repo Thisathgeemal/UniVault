@@ -12,6 +12,8 @@ import { ROUTES } from '../src/navigation/routes';
 import { ONBOARDING_STEPS } from '../src/onboarding/steps';
 import { lightColors } from '../src/theme';
 import { freshInstall, seedOnboardedWithoutSecurity } from './setup-state';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PREFERENCE_KEYS } from '../src/lib/preferences';
 
 const APP_DIR = join(__dirname, '..', 'app');
 const flat = (style: unknown) => StyleSheet.flatten(style as never) as Record<string, unknown>;
@@ -94,11 +96,9 @@ describe('wallet typography and layout', () => {
       if (style.color === lightColors.textMuted) {
         expect([text.props.children, size <= 14]).toEqual([text.props.children, true]);
       }
+      // headings are h2 20 or h3 16 (one step below the scale's h1; display unused)
       if (text.props.accessibilityRole === 'header') {
-        expect([text.props.children, [24, 20, 16].includes(size)]).toEqual([
-          text.props.children,
-          true,
-        ]);
+        expect([text.props.children, [20, 16].includes(size)]).toEqual([text.props.children, true]);
       }
       // button labels are centred inside their button (that is the button, not the text layout)
       if (!centreAllowed && !insideButton(text)) {
@@ -128,7 +128,7 @@ describe('wallet typography and layout', () => {
   });
 
   it.each(ONBOARDING_STEPS.map((s) => [s.id, s.route] as const))(
-    'onboarding %s: type scale; only the hero heading and drawing labels centred',
+    'onboarding %s: type scale; only the hero heading, its lead and drawing labels centred',
     async (id, route) => {
       await freshInstall();
       await renderRouter(APP_DIR, { initialUrl: route });
@@ -139,8 +139,12 @@ describe('wallet typography and layout', () => {
         .filter((el) => flat(el.props.style).textAlign === 'center');
       for (const el of centred.filter((e) => !insideButton(e))) {
         const isHero = el.props.accessibilityRole === 'header';
-        const isDrawingLabel = flat(el.props.style).color === lightColors.onBrand;
-        expect([el.props.children, isHero || isDrawingLabel]).toEqual([el.props.children, true]);
+        const isLead = el.props.testID === 'onboarding-lead';
+        const isDrawingLabel = el.props.testID === 'illustration-label';
+        expect([el.props.children, isHero || isLead || isDrawingLabel]).toEqual([
+          el.props.children,
+          true,
+        ]);
       }
       expect(within(root).getAllByRole('header')[0]).toHaveStyle({ textAlign: 'center' }); // the hero
     },
@@ -151,7 +155,34 @@ describe('wallet typography and layout', () => {
     await renderRouter(APP_DIR, { initialUrl: ROUTES.setupSecurity });
     const root = await screen.findByTestId('setup-security-screen');
     checkText(root, true);
-    expect(screen.getByTestId('setup-title')).toHaveStyle({ textAlign: 'center', fontSize: 24 });
+    expect(screen.getByTestId('setup-title')).toHaveStyle({ textAlign: 'center', fontSize: 20 });
+  });
+
+  it('top header: tab roots h2 20, detail screens h3 16; taller bar; side padding space-4', async () => {
+    const user = userEvent.setup();
+    await renderRouter(APP_DIR, { initialUrl: ROUTES.settings });
+    await screen.findByTestId('settings-screen');
+    const rootHeader = screen.getAllByTestId('stack-header').at(-1)!;
+    expect(within(rootHeader).getByRole('header')).toHaveStyle({
+      fontSize: 20,
+      fontFamily: fontFamily.sansSemiBold,
+    });
+    // (no top inset in the router test; Header's own test checks inset + padding)
+    // space-4 above and space-3 below the title; space-4 sides
+    expect(rootHeader).toHaveStyle({ paddingTop: 16, paddingBottom: 12, paddingLeft: 16 });
+    await user.press(screen.getByTestId('settings-about'));
+    await screen.findByTestId('about-screen');
+    const detailHeader = screen.getAllByTestId('stack-header').at(-1)!;
+    expect(within(detailHeader).getByRole('header')).toHaveStyle({ fontSize: 16 });
+    expect(detailHeader).toHaveStyle({ paddingTop: 8, paddingBottom: 8 });
+  });
+
+  it('headings keep weight 600 in Sinhala (Noto Sans Sinhala SemiBold)', async () => {
+    await AsyncStorage.setItem(PREFERENCE_KEYS.language, 'si');
+    await renderRouter(APP_DIR, { initialUrl: ROUTES.scan });
+    await screen.findByTestId('scan-screen');
+    const header = within(screen.getAllByTestId('stack-header').at(-1)!).getByRole('header');
+    expect(header).toHaveStyle({ fontSize: 20, fontFamily: fontFamily.sinhalaSemiBold });
   });
 
   it('buttons: label 16 / weight 600', async () => {

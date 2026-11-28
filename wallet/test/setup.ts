@@ -16,7 +16,18 @@
 import '../src/lib/crypto-setup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setupI18n, i18n } from '../src/i18n';
+import * as appInfo from '../src/config/app-info';
+import { resetAuthActivity } from '../src/security/auth-activity';
+import { resetDevScreenCaptureBlock } from '../src/security/screen-capture';
+import { resetReduceMotionCache } from '../src/theme/reduce-motion';
 import { seedCompletedSetup } from './setup-state';
+
+// expo-screen-capture: a native module; mocked for every test (src/security/screen-capture.ts is
+// loaded by this file, so a per-file mock would come too late). Tests read the jest.fns.
+jest.mock('expo-screen-capture', () => ({
+  preventScreenCaptureAsync: jest.fn(async () => undefined),
+  allowScreenCaptureAsync: jest.fn(async () => undefined),
+}));
 
 // AsyncStorage's official in-memory Jest mock; emptied before every test (no state leaks)
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -49,17 +60,67 @@ jest.mock('expo-splash-screen', () => ({
 // test; tests read `mockStore` and the options each call received.
 jest.mock('expo-secure-store', () => {
   const actual = jest.requireActual<Record<string, unknown>>('expo-secure-store');
+  const { Platform } = jest.requireActual<typeof import('react-native')>('react-native');
   const store = new Map<string, string>();
+  /** Keys stored with requireAuthentication: reading them is the OS biometric prompt. */
+  const authItems = new Set<string>();
+  /** What the next OS prompt does (tests set it; every prompt is counted). */
+  const auth: { outcome: string; prompts: string[] } = { outcome: 'success', prompts: [] };
+  const prompt = (text: string | undefined) => {
+    auth.prompts.push(text ?? '');
+    const errors: Record<string, string> = {
+      cancel: 'Could not authenticate the user: User canceled the authentication',
+      lockout: 'Could not authenticate the user: Lockout',
+      error: 'Could not authenticate the user: Unknown error (code: 99)',
+      unsupported: 'You must set `NSFaceIDUsageDescription` in your Info.plist file',
+    };
+    if (errors[auth.outcome]) throw new Error(errors[auth.outcome]);
+  };
+  type MockOptions = { requireAuthentication?: boolean; authenticationPrompt?: string };
   return {
     ...actual,
-    setItemAsync: jest.fn(async (key: string, value: string) => {
+    setItemAsync: jest.fn(async (key: string, value: string, options?: MockOptions) => {
+      // Android encrypts with the biometric-bound key: the prompt appears while storing
+      if (options?.requireAuthentication && Platform.OS === 'android')
+        prompt(options.authenticationPrompt);
       store.set(key, value);
+      if (options?.requireAuthentication) authItems.add(key);
+      else authItems.delete(key);
     }),
-    getItemAsync: jest.fn(async (key: string) => store.get(key) ?? null),
+    getItemAsync: jest.fn(async (key: string, options?: MockOptions) => {
+      if (authItems.has(key) && store.has(key)) {
+        prompt(options?.authenticationPrompt);
+        if (auth.outcome === 'invalidated') return null; // the OS dropped the key: null, as on device
+      }
+      return store.get(key) ?? null;
+    }),
     deleteItemAsync: jest.fn(async (key: string) => {
       store.delete(key);
+      authItems.delete(key);
     }),
+    canUseBiometricAuthentication: jest.fn(() => true),
     mockStore: store,
+    mockAuth: auth,
+    mockReset: () => {
+      store.clear();
+      authItems.clear();
+      auth.outcome = 'success';
+      auth.prompts.length = 0;
+    },
+  };
+});
+
+// expo-local-authentication: no biometric hardware by default (the PIN-only path every other
+// test expects); biometric tests set the answers (test/biometrics.test.ts)
+jest.mock('expo-local-authentication', () => {
+  const actual = jest.requireActual<Record<string, unknown>>('expo-local-authentication');
+  return {
+    ...actual,
+    hasHardwareAsync: jest.fn(async () => false),
+    isEnrolledAsync: jest.fn(async () => false),
+    supportedAuthenticationTypesAsync: jest.fn(async () => []),
+    getEnrolledLevelAsync: jest.fn(async () => 0),
+    authenticateAsync: jest.fn(async () => ({ success: true })),
   };
 });
 
@@ -82,6 +143,7 @@ jest.mock('expo-constants', () => {
   const appConfig = jest.requireActual('../app.config').default({ config: {} });
   return {
     __esModule: true,
+    ...actual, // ExecutionEnvironment and the other named exports
     default: { ...Constants, expoConfig: { ...appConfig, sdkVersion: '58.0.0' } },
   };
 });
@@ -109,6 +171,11 @@ beforeEach(async () => {
     };
   }
   if (i18n.language !== 'en') await i18n.changeLanguage('en');
+  resetReduceMotionCache();
+  resetAuthActivity();
+  resetDevScreenCaptureBlock();
+  // tests of other features start unlocked; test/app-lock.test.tsx turns the lock back on
+  jest.spyOn(appInfo, 'lockOnAppStart').mockReturnValue(false);
   await AsyncStorage.clear();
   await seedCompletedSetup();
 });

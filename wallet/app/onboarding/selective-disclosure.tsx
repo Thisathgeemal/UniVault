@@ -1,36 +1,21 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
-import { AppText } from '../../src/components';
+import { AppText, Card } from '../../src/components';
 import { SelectiveDisclosureIllustration } from '../../src/onboarding/illustrations';
 import { OnboardingStep } from '../../src/onboarding/OnboardingStep';
-import { useTheme } from '../../src/theme/use-theme';
 
-/** Step 4: you choose what to share, with the over-18 example on a brand-soft panel. */
+/** Step 4: you choose what to share, with the over-18 example in a card. */
 export default function OnboardingSelectiveDisclosureScreen() {
   const { t } = useTranslation();
-  const theme = useTheme();
   return (
     <OnboardingStep
       step="selectiveDisclosure"
       title={t('onboarding.selectiveDisclosure.title')}
+      lead={t('onboarding.selectiveDisclosure.body')}
       illustration={<SelectiveDisclosureIllustration />}
     >
-      <AppText>{t('onboarding.selectiveDisclosure.body')}</AppText>
-      <View
-        testID="onboarding-example"
-        style={{
-          backgroundColor: theme.colors.brandSoft,
-          borderRadius: theme.radius.md,
-          padding: theme.space(4),
-          gap: theme.space(1),
-        }}
-      >
-        <AppText variant="h3" accessibilityRole="header">
-          {t('onboarding.selectiveDisclosure.exampleTitle')}
-        </AppText>
-        {/* text on brand-soft is text or text-muted, never text-subtle (dark 4.04:1) */}
+      <Card title={t('onboarding.selectiveDisclosure.exampleTitle')} testID="onboarding-example">
         <AppText>{t('onboarding.selectiveDisclosure.example')}</AppText>
-      </View>
+      </Card>
     </OnboardingStep>
   );
 }

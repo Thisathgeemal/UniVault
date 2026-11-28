@@ -21,6 +21,7 @@ export const ROUTES = {
   language: '/settings/language',
   appearance: '/settings/appearance',
   security: '/settings/security',
+  lockDelay: '/settings/lock-delay',
   about: '/settings/about',
   diagnostics: '/settings/diagnostics',
   uiKit: '/settings/ui-kit',
@@ -34,6 +35,7 @@ export const ROUTES = {
   onboardingPrivacy: '/onboarding/privacy',
   onboardingPrivacyDetails: '/onboarding/privacy-details',
   setupSecurity: '/setup/security',
+  setupBiometrics: '/setup/biometrics',
 } as const;
 
 /**
@@ -58,6 +60,7 @@ export const ROUTE_FILES: readonly { file: string; pattern: string | null }[] = 
   { file: '(tabs)/settings/language.tsx', pattern: ROUTES.language },
   { file: '(tabs)/settings/appearance.tsx', pattern: ROUTES.appearance },
   { file: '(tabs)/settings/security.tsx', pattern: ROUTES.security },
+  { file: '(tabs)/settings/lock-delay.tsx', pattern: ROUTES.lockDelay },
   { file: '(tabs)/settings/about.tsx', pattern: ROUTES.about },
   { file: '(tabs)/settings/diagnostics.tsx', pattern: ROUTES.diagnostics },
   { file: '(tabs)/settings/ui-kit.tsx', pattern: ROUTES.uiKit },
@@ -71,4 +74,5 @@ export const ROUTE_FILES: readonly { file: string; pattern: string | null }[] = 
   { file: 'onboarding/privacy-details.tsx', pattern: ROUTES.onboardingPrivacyDetails },
   { file: 'setup/_layout.tsx', pattern: null },
   { file: 'setup/security.tsx', pattern: ROUTES.setupSecurity },
+  { file: 'setup/biometrics.tsx', pattern: ROUTES.setupBiometrics },
 ];

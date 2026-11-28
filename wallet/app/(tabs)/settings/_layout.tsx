@@ -13,6 +13,7 @@ export default function SettingsStack() {
         { name: 'language', title: t('settings.language') },
         { name: 'appearance', title: t('settings.appearance') },
         { name: 'security', title: t('security.title') },
+        { name: 'lock-delay', title: t('lockDelay.title') },
         { name: 'about', title: t('about.title') },
         { name: 'diagnostics', title: t('diagnostics.title') },
         { name: 'ui-kit', title: t('uiKit.title') },

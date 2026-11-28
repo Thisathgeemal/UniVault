@@ -10,6 +10,7 @@ import {
   loadOnboardingProgress,
   saveOnboardingCompleted,
 } from '../lib/preferences';
+import { disableBiometricUnlock } from '../security/biometrics';
 import { deletePinData } from '../security/pin';
 import {
   gateRedirect,
@@ -31,7 +32,7 @@ export interface SetupApi {
   completeSecuritySetup: () => Promise<boolean>;
   /**
    * Diagnostics (development builds only): back to the first onboarding screen; removes the
-   * onboarding flags, the PIN verifier and the attempt record.
+   * onboarding flags, the PIN verifier, the attempt record and the biometric unlock secret.
    */
   resetOnboarding: () => Promise<boolean>;
 }
@@ -63,7 +64,11 @@ export function SetupProvider({ initial, children }: { initial: SetupState; chil
   }, []);
 
   const resetOnboarding = useCallback(async () => {
-    const [cleared, pinDeleted] = await Promise.all([clearSetupProgress(), deletePinData()]);
+    const [cleared, pinDeleted] = await Promise.all([
+      clearSetupProgress(),
+      deletePinData(),
+      disableBiometricUnlock(), // the unlock secret belonged to the old setup
+    ]);
     if (cleared && pinDeleted) {
       setState(INITIAL_SETUP_STATE);
     }

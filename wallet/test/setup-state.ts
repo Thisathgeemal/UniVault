@@ -22,7 +22,24 @@ export const COMPLETED_SETUP: SetupState = {
 };
 
 /** The in-memory secure store of the expo-secure-store mock (test/setup.ts). */
-export const secureStore = (SecureStore as unknown as { mockStore: Map<string, string> }).mockStore;
+const mock = SecureStore as unknown as {
+  mockStore: Map<string, string>;
+  mockAuth: { outcome: string; prompts: string[] };
+  mockReset: () => void;
+};
+export const secureStore = mock.mockStore;
+
+/** The mocked OS biometric prompt: what the next one does, and every prompt shown. */
+export type PromptOutcome =
+  'success' | 'cancel' | 'lockout' | 'error' | 'invalidated' | 'unsupported';
+export const osPrompt = {
+  set: (outcome: PromptOutcome) => {
+    mock.mockAuth.outcome = outcome;
+  },
+  get shown(): readonly string[] {
+    return mock.mockAuth.prompts;
+  },
+};
 
 /** One real verifier for TEST_PIN per test file (scrypt with the default parameters, once). */
 let seededVerifier: Promise<string> | null = null;
@@ -50,7 +67,7 @@ function forgetSeedCalls() {
 
 /** Onboarding done and a PIN set: the gate opens the tabs. */
 export async function seedCompletedSetup() {
-  secureStore.clear();
+  mock.mockReset();
   await AsyncStorage.multiSet(onboardedEntries());
   secureStore.set(PIN_VERIFIER_KEY, await verifierJson());
   forgetSeedCalls();
@@ -59,7 +76,7 @@ export async function seedCompletedSetup() {
 /** Onboarding done, no PIN: the gate opens /setup/security. */
 export async function seedOnboardedWithoutSecurity() {
   await AsyncStorage.clear();
-  secureStore.clear();
+  mock.mockReset();
   await AsyncStorage.multiSet(onboardedEntries());
   forgetSeedCalls();
 }
@@ -67,6 +84,6 @@ export async function seedOnboardedWithoutSecurity() {
 /** Nothing saved (first start): the gate opens onboarding. */
 export async function freshInstall() {
   await AsyncStorage.clear();
-  secureStore.clear();
+  mock.mockReset();
   forgetSeedCalls();
 }

@@ -116,7 +116,20 @@ export function PinPad({
         {ROWS.map((row, r) => (
           <View key={r} style={[styles.row, { gap: theme.space(3) }]}>
             {row.map((key, k) => {
-              if (key === null) return <View key={k} style={styles.key} />;
+              if (key === null) {
+                // keeps the 0 under the 8: no border, no fill, not focusable, not announced
+                return (
+                  <View
+                    key={k}
+                    testID={`${testID}-spacer`}
+                    accessible={false}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                    pointerEvents="none"
+                    style={styles.spacer}
+                  />
+                );
+              }
               const isDelete = key === 'delete';
               const inactive = disabled || (isDelete && value.length === 0);
               return (
@@ -159,6 +172,7 @@ const styles = StyleSheet.create({
   dot: { width: DOT_SIZE, minHeight: DOT_SIZE, borderWidth: 2 },
   keys: { width: '100%' },
   row: { flexDirection: 'row' },
+  spacer: { flex: 1, minWidth: PIN_KEY_MIN_SIZE, minHeight: PIN_KEY_MIN_SIZE },
   key: {
     flex: 1,
     minWidth: PIN_KEY_MIN_SIZE,

@@ -147,7 +147,8 @@ derivation with the default parameters on random data (never a PIN) and shows th
   messages: `PinStoreError` has fixed messages per code (`PIN_REJECTED`, `STORE_FAILED`) and no
   cause; `verifyPin` returns `false` instead of throwing. `test/pin-flow.test.tsx` runs the whole
   flow with a known PIN and searches all of these for it.
-- **Failed attempts (prepared for the app-lock task, no UI yet):** a separate secure-store record
+- **Failed attempts (used since 28 Nov by `authenticate()`'s PIN prompt; schedule in
+  [wallet-authentication.md](wallet-authentication.md) §5):** a separate secure-store record
   `univault.pinAttempts` = `{ "failedAttempts": n, "lockedUntil": ISO instant | null }` with
   `readPinAttempts`, `writePinAttempts`, `clearPinAttempts` (same options; malformed = no
   attempts; a new PIN clears it). The app-lock task decides the policy (for example lock-outs that
@@ -163,11 +164,13 @@ iOS version (at least a blank screen in recordings); check it on a device.
 
 **Release builds only** (`screenCaptureBlockingEnabled()` = `!__DEV__`), so the evidence
 screenshots can be taken in development builds. A test checks it is not called in development
-and is called (and released) when the gate says release.
+and is called (and released) when the gate says release. Since 28 Nov, release builds also block
+capture for the WHOLE wallet (`useAppScreenCaptureBlock()`, key `univault-app`, in the
+`LockProvider`): wallet-authentication.md §9.
 
 ## 8. Not yet
 
-- Biometric unlock (next task: inserted after "PIN set", `stepAfterPinCreated()` in
-  `src/security/setup-flow.ts`).
-- App lock and the attempt policy (the record exists).
+- ~~Biometric unlock~~ and ~~the attempt policy~~: done on 28 Nov (Decision 026,
+  [wallet-authentication.md](wallet-authentication.md)).
+- App lock (it will call `authenticate()`).
 - "Change PIN" in Settings → Security (needs the current PIN; backlog).

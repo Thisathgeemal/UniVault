@@ -15,7 +15,7 @@ language preference, About, and the dev-only Diagnostics and UI kit.
 disclosure, security, privacy with "I understand"), then **PIN setup** (create and confirm a
 6-digit PIN; a salted scrypt verifier in the secure store, this device only:
 [docs/security/wallet-pin.md](../docs/security/wallet-pin.md)); a **gate** opens the tabs only
-when onboarding is done AND a PIN exists; **Settings → Appearance** (Use device setting / Light /
+when onboarding is done AND a PIN exists; **Settings → Appearance** (Automatic / Light /
 Dark); a typography and layout pass over every screen.
 Credentials and History show **synthetic sample data in development builds only**; credential
 redemption, the vault, the camera and presentation follow in the next Sprint 2 tasks. Design
@@ -177,6 +177,25 @@ screenshots work. To see onboarding again: **Settings → Diagnostics → Reset 
 (development builds only; deletes the PIN, keeps the language and appearance). **Settings →
 Diagnostics → PIN hashing time** shows how long one PIN derivation takes on your phone (target
 250–500 ms).
+
+## Testing fingerprint and face unlock on a phone
+
+Biometric unlock stores a secret the phone releases only after its own fingerprint / face check
+([docs/security/wallet-authentication.md](../docs/security/wallet-authentication.md)).
+
+- **Android (Expo Go works):** enrol a fingerprint in the phone's settings first. After "PIN set"
+  choose **Turn on**, or later **Settings → Security → Unlock with fingerprint**. **Test unlock**
+  shows the fingerprint prompt; Cancel it to see the PIN prompt. Adding a new fingerprint in the
+  phone's settings turns UniVault's fingerprint unlock off (you are asked for the PIN once).
+- **iOS: Face ID / Touch ID need a development build**, not Expo Go (Expo Go lacks UniVault's
+  Face ID permission text, so the secure store refuses). In Expo Go the wallet says so and uses
+  the PIN. A development build: `npx expo run:ios` (Xcode) or an EAS development build.
+- **App lock:** UniVault locks when it starts and when you leave it (home button, another app, the
+  screen turning off) for longer than Settings → Security → "Lock after leaving the app"
+  (Immediately by default). Pulling down the notification shade does not lock it. While it is
+  away, the app-switcher preview shows only the navy UniVault cover. "Lock now" locks at once.
+- **Lockout:** five wrong PINs lock PIN entry for 30 s (then 1 min, 5 min, 15 min, 1 h); closing
+  the app does not end the lock. Diagnostics → Reset onboarding clears it.
 
 ## Design system
 

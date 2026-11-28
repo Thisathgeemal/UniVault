@@ -1,4 +1,4 @@
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 
 /** Facts about this build and device for Settings and Diagnostics (no personal data). */
@@ -43,3 +43,18 @@ export const screenCaptureBlockingEnabled = (): boolean => !__DEV__;
 
 /** Diagnostics → "Reset onboarding" (development builds only). */
 export const onboardingResetEnabled = (): boolean => __DEV__;
+
+/**
+ * True inside Expo Go (the store client). iOS Expo Go cannot use secure-store items that need
+ * biometric authentication (its Info.plist has no NSFaceIDUsageDescription), so biometric unlock
+ * is reported unsupported there (src/security/biometrics.ts).
+ */
+export const isExpoGo = (): boolean =>
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+/**
+ * The app lock starts locked on every app start once setup is complete (src/security/app-lock.tsx).
+ * Always true in the app; test/setup.ts turns it off for the tests of other features (the app
+ * lock tests turn it back on).
+ */
+export const lockOnAppStart = (): boolean => true;

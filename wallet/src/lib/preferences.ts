@@ -4,7 +4,8 @@
  * STORAGE RULE: AsyncStorage is unencrypted, readable by anyone with a device backup or a
  * rooted phone. It holds NON-SECRET preferences only: the language, the appearance (theme) and
  * the onboarding progress flags. Never a key, credential, SD-JWT, claim, token, PIN or anything
- * personal: those go in secure storage (expo-secure-store: Keychain / Android Keystore): the PIN
+ * personal: those go in secure storage. The lock DELAY is a preference; the locked / unlocked state
+ * itself is never stored anywhere (src/security/app-lock.tsx). Those go in secure storage (expo-secure-store: Keychain / Android Keystore): the PIN
  * verifier already does (src/security/pin.ts). Every key is listed in PREFERENCE_KEYS; test/preferences.test.tsx
  * checks nothing else is ever written, and that each key only ever gets its allowed values.
  *
@@ -21,6 +22,8 @@ export const PREFERENCE_KEYS = {
   appearance: 'univault.appearance',
   onboardingCompleted: 'univault.onboardingCompleted',
   privacyAcknowledgedAt: 'univault.privacyAcknowledgedAt',
+  /** "Lock after leaving the app" (src/security/app-lock.tsx). */
+  lockDelay: 'univault.lockDelay',
 } as const;
 
 /**
@@ -83,6 +86,43 @@ export async function loadAppearancePreference(): Promise<AppearancePreference> 
 export async function saveAppearancePreference(value: AppearancePreference): Promise<boolean> {
   try {
     await AsyncStorage.setItem(PREFERENCE_KEYS.appearance, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Lock delay
+
+/** Settings → Security → "Lock after leaving the app": Immediately (default) … 5 minutes. */
+export const LOCK_DELAYS = ['immediately', '30s', '1m', '5m'] as const;
+export type LockDelay = (typeof LOCK_DELAYS)[number];
+export const DEFAULT_LOCK_DELAY: LockDelay = 'immediately';
+export const LOCK_DELAY_MS: Record<LockDelay, number> = {
+  immediately: 0,
+  '30s': 30_000,
+  '1m': 60_000,
+  '5m': 300_000,
+};
+
+export const isLockDelay = (value: unknown): value is LockDelay =>
+  typeof value === 'string' && (LOCK_DELAYS as readonly string[]).includes(value);
+
+/** The saved delay; "immediately" when none is saved, the value is unknown or storage fails. */
+export async function loadLockDelayPreference(): Promise<LockDelay> {
+  try {
+    const value = await AsyncStorage.getItem(PREFERENCE_KEYS.lockDelay);
+    return isLockDelay(value) ? value : DEFAULT_LOCK_DELAY;
+  } catch {
+    return DEFAULT_LOCK_DELAY;
+  }
+}
+
+/** Saves the delay; false if storage failed (the choice still applies this session). */
+export async function saveLockDelayPreference(value: LockDelay): Promise<boolean> {
+  try {
+    await AsyncStorage.setItem(PREFERENCE_KEYS.lockDelay, value);
     return true;
   } catch {
     return false;

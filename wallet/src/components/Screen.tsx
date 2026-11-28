@@ -15,7 +15,7 @@ export interface ScreenProps {
 }
 
 /**
- * A themed, safe-area-aware page with an optional heading (h1, left-aligned). Wallet layout:
+ * A themed, safe-area-aware page with an optional heading (h2, left-aligned). Wallet layout:
  * space-4 at the sides and top, space-6 between sections and at the bottom, content at most
  * 560 pt wide (centred on tablets).
  */
@@ -35,7 +35,7 @@ export function Screen({ title, children, scroll = true, testID }: ScreenProps) 
       ]}
     >
       {title ? (
-        <AppText variant="h1" accessibilityRole="header">
+        <AppText variant="h2" accessibilityRole="header">
           {title}
         </AppText>
       ) : null}

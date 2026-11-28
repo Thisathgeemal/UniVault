@@ -9,6 +9,7 @@ export default function OnboardingSecurityScreen() {
     <OnboardingStep
       step="security"
       title={t('onboarding.security.title')}
+      lead={t('onboarding.security.lead')}
       illustration={<SecurityIllustration />}
     >
       <OnboardingPoint icon="finger-print-outline">{t('onboarding.security.pin')}</OnboardingPoint>
