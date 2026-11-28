@@ -30,7 +30,7 @@ import { uiKitEnabled } from '../../../src/config/app-info';
 import { WALLET_STATUSES } from '../../../src/credentials/status';
 import { SAMPLE_CREDENTIALS, sampleStatus } from '../../../src/fixtures/sample-data';
 import { componentTokens } from '@univault/portal-ui/tokens';
-import { BUTTON_VARIANTS, TONES } from '../../../src/theme';
+import { BUTTON_VARIANTS, isNavyVariant, TONES } from '../../../src/theme';
 import { useTheme } from '../../../src/theme/use-theme';
 
 type DialogKind = 'confirm' | 'destructive' | null;
@@ -80,12 +80,13 @@ export default function UiKitScreen() {
         <Card testID="kit-buttons">
           {BUTTON_VARIANTS.map((variant) => {
             const name = t(`uiKit.variants.${variant}`);
-            // on-brand buttons only ever sit on navy (a header or a credential card)
-            const onNavy = variant === 'onBrand';
+            // the navy kinds only ever sit on navy (a header, a credential card, the lock screen)
+            const onNavy = isNavyVariant(variant);
+            const panelID = variant === 'onBrand' ? 'kit-on-brand-panel' : `kit-${variant}-panel`;
             return (
               <View
                 key={variant}
-                testID={onNavy ? 'kit-on-brand-panel' : undefined}
+                testID={onNavy ? panelID : undefined}
                 style={[
                   { gap: theme.space(2) },
                   onNavy
@@ -99,7 +100,7 @@ export default function UiKitScreen() {
               >
                 {onNavy ? (
                   <AppText variant="bodySm" tone="onBrandMuted">
-                    {t('uiKit.onBrandSample')}
+                    {t(variant === 'inverse' ? 'uiKit.inverseSample' : 'uiKit.onBrandSample')}
                   </AppText>
                 ) : null}
                 <Button
@@ -185,16 +186,23 @@ export default function UiKitScreen() {
       </Section>
 
       <Section title={t('uiKit.sections.header')}>
-        <View testID="kit-header">
-          <Header title={t('uiKit.headerTitle')} />
+        <View testID="kit-header" style={{ gap: theme.space(2) }}>
+          {/* every tab screen and every screen inside a tab: the navy header */}
+          <AppText tone="muted">{t('uiKit.headerInTabs')}</AppText>
+          <Header title={t('uiKit.headerTitle')} tone="brand" testID="kit-header-root" />
           <Header
             title={t('uiKit.headerTitle')}
+            tone="brand"
             onBack={pressed}
             actions={[
               { icon: 'share-outline', label: t('uiKit.headerAction'), onPress: pressed },
               { icon: 'ellipsis-horizontal', label: t('uiKit.headerAction2'), onPress: pressed },
             ]}
+            testID="kit-header-detail"
           />
+          {/* outside the tabs (not found, onboarding's Privacy details): the surface header */}
+          <AppText tone="muted">{t('uiKit.headerOutside')}</AppText>
+          <Header title={t('uiKit.headerTitle')} onBack={pressed} testID="kit-header-surface" />
         </View>
       </Section>
 
@@ -243,6 +251,7 @@ export default function UiKitScreen() {
 
       <Section title={t('uiKit.sections.feedback')}>
         <Card testID="kit-feedback">
+          <AppText tone="muted">{t('uiKit.swipeHint')}</AppText>
           <Button
             label={t('uiKit.showToast')}
             variant="secondary"

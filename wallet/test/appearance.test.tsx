@@ -22,6 +22,7 @@ import { ROUTES } from '../src/navigation/routes';
 import { statusBarStyleFor } from '../src/navigation/status-bar';
 import { applyNativeColorScheme, effectiveScheme, useAppearance } from '../src/theme/appearance';
 import { darkColors, lightColors } from '../src/theme';
+import * as appInfo from '../src/config/app-info';
 
 /**
  * A phone whose system colour scheme the test can change while the app runs: a tiny external
@@ -231,8 +232,9 @@ describe('Settings → Appearance', () => {
     await user.press(screen.getByTestId('appearance-dark'));
     await screen.findByText(en.settings.appearanceSaved);
 
+    // the navy header (dark brand) on every screen inside a tab
     expect(screen.getAllByTestId('stack-header').at(-1)).toHaveStyle({
-      backgroundColor: darkColors.surface,
+      backgroundColor: darkColors.brand,
     });
     const inactiveTab = screen
       .getAllByText(en.tabs.history)
@@ -312,7 +314,7 @@ describe('live system changes', () => {
     expect(statusBar()).toBe('light');
     await setSystem('light');
     expect(bgOf('settings-screen')).toBe(lightColors.bg);
-    expect(statusBar()).toBe('dark');
+    expect(statusBar()).toBe('light'); // the navy header: light icons in both themes
   });
 
   it.each([
@@ -341,29 +343,96 @@ describe('status bar', () => {
   it.each([
     ['light', 'dark'],
     ['dark', 'light'],
-  ] as const)('a %s-theme surface screen has %s content', async (choice, expected) => {
-    await saveAppearancePreference(choice);
-    await renderRouter(APP_DIR, { initialUrl: ROUTES.settings });
-    await screen.findByTestId('settings-screen');
-    expect(statusBar()).toBe(expected);
-  });
+  ] as const)(
+    'a %s-theme screen outside the tabs (surface header) has %s content',
+    async (choice, expected) => {
+      await saveAppearancePreference(choice);
+      await renderRouter(APP_DIR, { initialUrl: '/no-such-screen' });
+      await screen.findByTestId('not-found-screen');
+      expect(statusBar()).toBe(expected);
+    },
+  );
 
-  it('white icons on the navy home header in both themes, back to the theme elsewhere', async () => {
-    const user = userEvent.setup();
-    await renderRouter(APP_DIR, { initialUrl: ROUTES.credentials });
-    await screen.findByTestId('credentials-screen');
-    await waitFor(() => expect(statusBar()).toBe('light'));
+  it.each(['light', 'dark'] as const)(
+    '%s theme: white icons on every tab screen and every screen inside a tab',
+    async (choice) => {
+      await saveAppearancePreference(choice);
+      const user = userEvent.setup();
+      await renderRouter(APP_DIR, { initialUrl: ROUTES.credentials });
+      await screen.findByTestId('credentials-screen');
+      await waitFor(() => expect(statusBar()).toBe('light'));
+      for (const tab of ['tab-scan', 'tab-history', 'tab-settings'] as const) {
+        await user.press(screen.getByTestId(tab));
+        await waitFor(() => expect(statusBar()).toBe('light'));
+      }
+      // a screen inside the Settings tab (compact navy header), then back
+      await user.press(screen.getByTestId('settings-language'));
+      await screen.findByTestId('language-screen');
+      expect(statusBar()).toBe('light');
+      await user.press(screen.getByTestId('stack-header-back'));
+      await screen.findByTestId('settings-screen');
+      // never a flash of dark icons once a screen shows (the very first render, before any screen
+      // is mounted, happens under the splash screen)
+      const shown = mockStatusBarStyles.slice(mockStatusBarStyles.indexOf('light'));
+      expect(shown).not.toContain('dark');
+    },
+  );
 
-    await setSystem('dark'); // a live change while the navy header is showing: still light
+  it('a live theme change while a navy header shows keeps the icons light', async () => {
+    await renderRouter(APP_DIR, { initialUrl: ROUTES.history });
+    await screen.findByTestId('history-screen');
+    await setSystem('dark');
     expect(statusBar()).toBe('light');
     await setSystem('light');
     expect(statusBar()).toBe('light');
+  });
+});
 
-    await user.press(screen.getByTestId('tab-settings'));
-    await screen.findByTestId('settings-screen');
-    await waitFor(() => expect(statusBar()).toBe('dark'));
+describe('the lock screen: one navy surface in both themes', () => {
+  /** Every host element inside `root` that paints a background. */
+  const backgrounds = (rootID: string): Set<unknown> => {
+    const found = new Set<unknown>();
+    const walk = (node: ReturnType<typeof screen.getByTestId>) => {
+      const bg = flat(node.props.style).backgroundColor;
+      if (bg !== undefined) found.add(bg);
+      for (const child of node.children) if (typeof child !== 'string') walk(child);
+    };
+    walk(screen.getByTestId(rootID));
+    return found;
+  };
 
-    await user.press(screen.getByTestId('tab-credentials'));
+  it.each([
+    ['light', lightColors],
+    ['dark', darkColors],
+  ] as const)('%s: brand everywhere, inverse Unlock, light status-bar icons', async (choice, c) => {
+    jest.spyOn(appInfo, 'lockOnAppStart').mockReturnValue(true);
+    await saveAppearancePreference(choice);
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    // a surface screen behind it (dark icons in light mode): the light icons come from the lock
+    await renderRouter(APP_DIR, { initialUrl: ROUTES.settings });
+    await user.press(await screen.findByTestId('pin-prompt-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('pin-prompt')).toBeNull());
+    expect(bgOf('lock-screen')).toBe(c.brand);
+    // no split container: nothing inside paints anything but brand, except the inverse button
+    expect([...backgrounds('lock-screen')].sort()).toEqual([c.brand, c.onBrand].sort());
+    const actions = screen.getByTestId('lock-screen-actions');
+    expect(flat(actions.props.style)).toMatchObject({ backgroundColor: c.brand });
+    expect(flat(actions.props.style).borderTopWidth).toBeUndefined(); // no footer edge
+    expect(flat(actions.props.style).paddingBottom).toBeGreaterThan(0); // the bottom inset
+    // the mark and the text are one centred group
+    expect(flat(screen.getByTestId('lock-screen-group').props.style)).toMatchObject({
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    });
+    const title = screen.getByRole('header', { name: en.lock.title });
+    expect(flat(title.props.style).color).toBe(c.onBrand);
+    expect(flat(screen.getByText(en.lock.subtitle).props.style).color).toBe(c.onBrandMuted);
+    // Unlock: inverse (on-brand fill, brand label)
+    const unlock = screen.getByTestId('lock-unlock');
+    expect(flat(unlock.props.style).backgroundColor).toBe(c.onBrand);
+    expect(flat(within(unlock).getByText(en.lock.unlock).props.style).color).toBe(c.brand);
+    // white status-bar icons while it shows, whatever the theme
     await waitFor(() => expect(statusBar()).toBe('light'));
   });
 });

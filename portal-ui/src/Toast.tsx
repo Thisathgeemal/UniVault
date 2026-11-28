@@ -35,7 +35,8 @@ export interface ToastProviderProps {
 }
 
 const TONES: Record<ToastTone, string> = {
-  success: 'border-status-valid bg-status-valid-bg text-status-valid-text',
+  // a confirmation is not a credential status: accent edge on brand-soft (never status green)
+  success: 'border-accent bg-brand-soft text-text',
   info: 'border-border bg-brand-soft text-text',
   error: 'border-status-revoked bg-status-revoked-bg text-status-revoked-text',
 };

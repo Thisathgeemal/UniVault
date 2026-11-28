@@ -28,9 +28,11 @@ flowchart TD
   OS2 -- "not released" --> PIN
   PIN --> L{"locked?<br/>(secure-store record)"}
   L -- yes --> CD["'Too many attempts. Try again in 30 seconds.'<br/>live countdown, keypad hidden"] --> L
-  L -- no --> V["verifyPin (scrypt, 'Checking your PIN…')"]
-  V -- correct --> OKP["reset the counter<br/>{ ok: true, method: 'pin' }"]
-  V -- wrong --> W["count it; lock per the schedule (§5)"] --> L
+  L -- no --> K["keypad (PinCheck)"]
+  K -- "6th digit" --> V["full screen 'Checking your PIN…' (≥ 400 ms;<br/>no Cancel, Back ignored): checkPinWithLimits"]
+  V -- correct --> OKP["reset the counter<br/>{ ok: true, method: 'pin' } at once"]
+  V -- "wrong, not yet the limit" --> W["back to the keypad: digits cleared, shake,<br/>'That PIN isn't right. Try again.' (+ attempts left)"] --> K
+  V -- "wrong: the limit" --> CD
   PIN -- "Cancel / Android back" --> C["{ ok: false, 'cancelled' }<br/>('locked-out' while locked)"]
 ```
 
@@ -123,6 +125,17 @@ in `src/security/pin-attempts.ts`:
 - The prompt shows "Too many attempts. Try again in 30 seconds." with a live countdown (seconds
   under a minute, then minutes). Screen readers hear it when the lock starts and then at most
   every 10 s.
+- **The PIN check flow** (`src/security/PinCheck.tsx`, the ONE place a PIN is verified; every
+  entry point — the lock screen's PIN path, `authenticate()`'s PIN prompt for Test unlock,
+  turning biometric unlock off and later approvals — uses it; `test/pin-check.test.tsx` checks
+  that no other code calls `verifyPin()` / `checkPinWithLimits()` or draws a keypad, except PIN
+  creation): the 6th digit replaces the keypad with the full-screen "Checking your PIN…" for at
+  least 400 ms (no Cancel, Android back ignored, announced). Correct → the caller continues at
+  once ("PIN correct" announced; no success screen). Wrong → the keypad again, digits cleared, a
+  shake (none with reduce motion) and "That PIN isn't right. Try again." above it, with "2 attempts
+  left before a short wait." / "1 attempt left before a short wait." when 2 or 1 wrong PINs remain
+  before the next lock (announced). The limit reached → straight to the countdown. A check that
+  throws counts as wrong, never as correct.
 - In the long run that is about one guess per hour: the 1,000,000 PINs would take over 100 years.
 - **Future work:** a wipe after N failures (credentials deleted, issuer re-issues) is not
   implemented; it needs a recovery story first.

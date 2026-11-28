@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react-native';
 import type { ReactElement, ReactNode } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '../src/components';
 import type { AppearancePreference } from '../src/lib/preferences';
@@ -31,17 +32,19 @@ export function Providers({
   setup = COMPLETED_SETUP,
 }: ProviderOptions & { children: ReactNode }) {
   return (
-    <SafeAreaProvider initialMetrics={TEST_SAFE_AREA}>
-      <AppearanceProvider initial={appearance}>
-        <SetupProvider initial={setup}>
-          <ToastProvider>
-            <AuthenticationProvider>
-              <LockProvider>{children}</LockProvider>
-            </AuthenticationProvider>
-          </ToastProvider>
-        </SetupProvider>
-      </AppearanceProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView>
+      <SafeAreaProvider initialMetrics={TEST_SAFE_AREA}>
+        <AppearanceProvider initial={appearance}>
+          <SetupProvider initial={setup}>
+            <ToastProvider>
+              <AuthenticationProvider>
+                <LockProvider>{children}</LockProvider>
+              </AuthenticationProvider>
+            </ToastProvider>
+          </SetupProvider>
+        </AppearanceProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

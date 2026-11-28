@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { buttonColors, MIN_TOUCH_TARGET, type ButtonVariant } from '../theme';
 import { useTheme } from '../theme/use-theme';
@@ -12,7 +13,8 @@ export interface ButtonProps {
   /**
    * primary (azure: the ONE main action on a screen), secondary (every other action), text
    * (low weight, e.g. "View details"), destructive (revoke, delete), onBrand (on a navy header or
-   * credential card).
+   * credential card), inverse (the primary action on a full-navy screen such as the lock screen:
+   * on-brand fill, brand label), textOnBrand (a text button in on-brand on such a screen).
    */
   variant?: ButtonVariant;
   disabled?: boolean;
@@ -29,7 +31,8 @@ export interface ButtonProps {
 /**
  * Accessible button in the design system's kinds: role "button", disabled/busy state announced,
  * at least 44 × 44 pt, radius-md, label 16 / weight 600. On onboarding and setup screens buttons
- * sit full width in BottomActions.
+ * sit full width in BottomActions. With keyboard or switch-access focus it draws a 2 pt focus ring
+ * 2 pt outside its edge: focus-ring, or focus-ring-on-brand for the navy kinds.
  */
 export function Button({
   label,
@@ -45,8 +48,11 @@ export function Button({
   const theme = useTheme();
   const inactive = disabled || loading;
   const colors = buttonColors(theme.colors, variant);
+  const [focused, setFocused] = useState(false);
   return (
     <Pressable
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       {...(accessibilityHint ? { accessibilityHint } : {})}
@@ -65,6 +71,7 @@ export function Button({
           // disabled controls are exempt from WCAG contrast; the state is also announced
           opacity: inactive ? 0.55 : pressed ? 0.8 : 1,
         },
+        focused ? { ...styles.focusRing, outlineColor: colors.focus } : null,
       ]}
     >
       <View style={[styles.row, { gap: theme.space(2) }]}>
@@ -91,5 +98,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   row: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  focusRing: { outlineWidth: 2, outlineOffset: 2, outlineStyle: 'solid' },
   label: { flexShrink: 1, textAlign: 'center' },
 });

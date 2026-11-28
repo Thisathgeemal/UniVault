@@ -30,6 +30,10 @@ module.exports = {
   // The design tokens are not an npm dependency (see metro.config.js): map them the same way.
   moduleNameMapper: {
     [String.raw`^@univault/portal-ui/tokens$`]: '<rootDir>/../portal-ui/src/tokens.ts',
+    // Reanimated 4.7's own mock loads the real module, which throws under jest-expo; expo-router's
+    // testing library (renderRouter) mocks reanimated with that file, so it is mapped to ours
+    // (test/mocks/reanimated.ts; test/setup.ts uses the same one)
+    [String.raw`^react-native-reanimated/mock$`]: '<rootDir>/test/mocks/reanimated.ts',
   },
   testMatch: ['<rootDir>/test/**/*.test.{ts,tsx}'],
   transform: { ...expoPreset.transform, [String.raw`\.mjs$`]: jsTransform },

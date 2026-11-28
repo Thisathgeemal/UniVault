@@ -3,7 +3,7 @@
  * - i18n: initialised synchronously at import (device language), then the SAVED state is
  *   applied before anything renders (restoreAppState: language, appearance, setup state), so
  *   there is no flash of the wrong language, the wrong theme or the wrong first screen
- * - safe areas, the appearance (theme: Settings → Appearance or the phone), the setup state for
+ * - the gesture root (react-native-gesture-handler: swipe-to-dismiss toasts), safe areas, the appearance (theme: Settings → Appearance or the phone), the setup state for
  *   the gate (src/onboarding/gate.ts), the status bar (follows the theme and the navy header),
  *   Noto Sans and Noto Sans Sinhala (bundled, expo-font), the navigation theme
  * - toasts (ToastProvider), authenticate() with its PIN prompt (AuthenticationProvider), the app
@@ -29,6 +29,8 @@ import { Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary, ToastProvider } from '../src/components';
 import { setupI18n } from '../src/i18n';
@@ -94,22 +96,26 @@ export default function RootLayout() {
 
   if (!ready) return null;
   return (
-    <SafeAreaProvider>
-      <AppearanceProvider initial={restored.appearance}>
-        <SetupProvider initial={restored.setup}>
-          <StatusBarProvider>
-            <ToastProvider>
-              <AuthenticationProvider>
-                <LockProvider initialDelay={restored.lockDelay}>
-                  <ErrorBoundary>
-                    <RootNavigator />
-                  </ErrorBoundary>
-                </LockProvider>
-              </AuthenticationProvider>
-            </ToastProvider>
-          </StatusBarProvider>
-        </SetupProvider>
-      </AppearanceProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <AppearanceProvider initial={restored.appearance}>
+          <SetupProvider initial={restored.setup}>
+            <StatusBarProvider>
+              <ToastProvider>
+                <AuthenticationProvider>
+                  <LockProvider initialDelay={restored.lockDelay}>
+                    <ErrorBoundary>
+                      <RootNavigator />
+                    </ErrorBoundary>
+                  </LockProvider>
+                </AuthenticationProvider>
+              </ToastProvider>
+            </StatusBarProvider>
+          </SetupProvider>
+        </AppearanceProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({ root: { flex: 1 } });

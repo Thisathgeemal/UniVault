@@ -414,6 +414,73 @@ lockedUntil }` record with helpers for app lock. The PIN is cleared from state a
 - **Blockers:** None.
 - **Evidence:** `wallet/test/app-lock.test.tsx` (33).
 
+### Sat 28 Nov (wallet UI: one-navy lock screen, PIN success, swipe-to-dismiss toasts)
+
+- **Done:** **Lock screen** is one `brand` surface like the privacy cover: mark, "UniVault is
+  locked" / "Unlock to continue" and the lockout countdown centred as one group in on-brand /
+  on-brand-muted, the buttons at the bottom on the navy (`BottomActions tone="brand"`, bottom
+  inset). New Button kinds **`inverse`** (on-brand fill, brand label: primary on navy, full-navy
+  screens only) and **`textOnBrand`** (Use PIN); every Button draws a 2 pt focus ring 2 pt outside
+  its edge, `focus-ring-on-brand` for the navy kinds. Contrast (both themes, in the test): inverse
+  label 15.39:1 light / 10.83:1 dark, fill edge on navy the same, text on brand 15.39 / 10.83; all
+  pass. Light status-bar icons on the lock screen in both themes. **PIN setup:** the keypad goes
+  on a match and a full-screen "Securing your PIN…" (≥ 600 ms) replaces the inline "Saving your
+  PIN…"; then `SuccessState` (circle-check in status-valid on a status-valid-bg circle, "PIN set"
+  announced, "You'll use this PIN to open UniVault and approve every share.", Continue; scale-in
+  unless reduce motion); a failed save goes back to Create PIN with "Something went wrong. Please
+  create your PIN again." (Try again removed). **Fingerprint setup:** same pattern ("Turning on
+  unlock with fingerprint…" → "Unlock with fingerprint is on" → Continue; the toast there
+  removed). **Toasts:** swipe left / right to dismiss (follows the finger; past 35 % of the width
+  or a flick ≥ 800 pt/s, else springs back), timer paused while touched, close button kept, a
+  screen-reader "dismiss" action, reduce motion without slide or spring, every dismissal path
+  once only. `react-native-gesture-handler` 3.3.0, `react-native-reanimated` 4.7.1,
+  `react-native-worklets` 0.13.0 via `npx expo install` (the SDK 58 / Expo Go versions; pinned;
+  the worklets Babel plugin comes from babel-preset-expo; `GestureHandlerRootView` in the root
+  layout); a small reanimated Jest mock (`test/mocks/reanimated.ts`, Issue 16). UI kit: the two
+  navy kinds on navy panels and a swipe hint by "Show a toast". Wallet tests 730 → **765** (23
+  files); coverage 99.34 / 96.47 / 99.25 / 99.87.
+- **Next:** Try the swipe and the lock screen in Expo Go on Android and iOS (gesture feel, the
+  flick speed); native-speaker review of the new Sinhala strings (setup progress / success, UI kit
+  labels, the swipe hint).
+- **Blockers:** None.
+- **Evidence:** `wallet/test/toast.test.tsx` (13), `appearance.test.tsx` (lock screen in both
+  themes), `pin-flow.test.tsx`, `biometrics.test.tsx`, `contrast.test.ts`.
+
+### Sat 28 Nov (consistency: navy headers, status colours only for status, PIN checking)
+
+- **Done:** **Navy header on every tab:** the four tab roots and every screen inside a tab
+  (credential and history detail, every Settings screen, Diagnostics, UI kit) use the `brand`
+  header, set once in the tab stacks' shared options (`useStackScreenOptions('brand')` in
+  `TabStack`; the per-screen `brandHeader` flag is gone); compact with an on-brand back arrow
+  inside a tab, on-brand actions, focus ring `focus-ring-on-brand` on the header buttons. The
+  header itself gives light status-bar icons while its screen is focused
+  (`useBrandStatusBarWhileFocused`, replacing the Credentials home's own `useBrandStatusBar()`);
+  onboarding, setup, the lock screen and "not found" unchanged. UI kit: navy root / compact and
+  the surface header (outside the tabs). **Status colours only for status:** the success state
+  ("PIN set", fingerprint on) now has an accent circle-check in a brand-soft circle; audit of the
+  wallet, portal-ui and issuer portal: replaced the portal-ui success toast (status-valid edge /
+  fill / text → accent edge, brand-soft, text), the issuer portal's "Accepted by the holder's
+  wallet" check (status-valid → accent in a brand-soft circle) and the reissue table's changed-row
+  highlight (status-expired-bg / -text → brand-soft / text); kept: status badges, the dashboard
+  bar, the offer countdown's last minute and the expired offer (expired colours for an offer's
+  status), "expiring soon" in the credentials table, errors, invalid fields and destructive
+  actions (revoked), the offline notice, Diagnostics pass / fail. New allow-list tests
+  (`wallet/test/status-colours.test.ts`, `portal-ui/test/tokens.test.ts`). **PIN checking:**
+  `PinCheck` is now the whole shared flow (title, reason, keypad, full-screen "Checking your
+  PIN…" ≥ 400 ms with no Cancel and Back ignored, correct → straight on, wrong → digits cleared +
+  shake + "That PIN isn't right. Try again." + "2 / 1 attempts left before a short wait.", the
+  limit → straight to the countdown, announcements); `PinPrompt` is a modal around it, used by
+  the lock screen, Test unlock and turning biometric unlock off. Wallet tests 765 → **810** (25
+  files); coverage 99.36 / 96.18 / 99.26 / 99.88. portal-ui 97 → **101**; issuer portal 424
+  (two tests extended).
+- **Next:** Check the navy headers and light icons on both phones (Android Expo Go, iOS dev
+  build); native-speaker review of the new Sinhala strings (wrong PIN, attempts left, PIN
+  correct, the UI kit header captions).
+- **Blockers:** None.
+- **Evidence:** `wallet/test/design-system.test.tsx` (header on every tab route),
+  `appearance.test.tsx` (status bar), `pin-check.test.tsx` (16), `status-colours.test.ts` (11),
+  `portal-ui/test/tokens.test.ts`.
+
 ## Backlog
 
 - **Sample data in the release bundle:** `src/fixtures/sample-data.ts` (synthetic, never shown
@@ -454,9 +521,12 @@ Record the tests that show the sprint goal is met, with links to output in `evid
 
 | Test / check                         | Type (unit / integration / manual)           | Result         | Evidence                                                                          |
 | ------------------------------------ | -------------------------------------------- | -------------- | --------------------------------------------------------------------------------- |
-| Wallet unit and component tests      | unit / component (Jest + RNTL)               | 730 passed     |
+| Wallet unit and component tests      | unit / component (Jest + RNTL)               | 810 passed     |
+| Shared PIN check flow                | component (all PIN entry points)             | 16 passed      | `wallet/test/pin-check.test.tsx`                                                  |
+| Status colours only for status       | unit (source scan, wallet and portals)       | passed         | `wallet/test/status-colours.test.ts`, `portal-ui/test/tokens.test.ts`             |
 | App lock and re-authentication       | component (mocked AppState, fake clock)      | 33 passed      | `wallet/test/app-lock.test.tsx`                                                   |
-| Biometric unlock and PIN fallback    | unit / component (mocked OS prompt)          | 58 passed      | `wallet/test/biometrics.test.tsx`                                                 |
+| Swipe-to-dismiss toasts              | component (gesture-handler test utilities)   | 13 passed      | `wallet/test/toast.test.tsx`                                                      |
+| Biometric unlock and PIN fallback    | unit / component (mocked OS prompt)          | 59 passed      | `wallet/test/biometrics.test.tsx`                                                 |
 | Biometrics on real phones            | manual (Android Expo Go; iOS dev build)      | to be recorded | [s2-wallet-biometrics-guide.md](evidence/s2-wallet-biometrics-guide.md)           | `wallet/test/` |
 | Onboarding gate and flows            | component (real `app/` tree)                 | 83 passed      | `wallet/test/onboarding.test.tsx`                                                 |
 | Appearance setting and status bar    | component (simulated system changes)         | 23 passed      | `wallet/test/appearance.test.tsx`                                                 |
@@ -712,3 +782,23 @@ jest.advanceTimersByTime(PROCESSING_MIN_MS + 100); })`; otherwise wait with `fin
   `waitFor`. Noted for future tests.
 - **Lesson:** In router tests, never wait on a real timer; advance the fake clock or use
   `waitFor`.
+
+### Issue 16: Reanimated's Jest mock crashed every test that showed a toast (28 Nov 2026)
+
+- **Task:** Swipe-to-dismiss toasts
+- **Symptom:** After adding `react-native-reanimated` 4.7.1, every test that rendered a toast
+  failed with `useSharedValue is not a function`, and a direct require of
+  `react-native-reanimated/mock` threw "`setCSSEventHandler` is not available in JSReanimated".
+- **Cause:** Reanimated's own `mock.js` imports the real module, whose native initialiser throws
+  under jest-expo. expo-router's testing library (`renderRouter`) mocks reanimated with that file
+  and falls back to an empty object when it throws, so gesture-handler and the Toast got nothing.
+- **Resolution:** A small mock of what the wallet uses, `wallet/test/mocks/reanimated.ts`
+  (animations finish at once and are recorded; `useAnimatedStyle` runs on render; the hooks
+  gesture-handler looks for), installed in `test/setup.ts` and mapped over
+  `react-native-reanimated/mock` in `jest.config.js` so `renderRouter` loads it too.
+  `react-native-worklets` is made unavailable in Jest, so gesture-handler takes its JS path;
+  gestures are driven with `react-native-gesture-handler/jest-utils` (`fireGestureHandler`, and
+  `createGestureController` to keep a finger down). The Toast writes the shared value with
+  `get()` / `set()`, as the React Compiler lint requires.
+- **Lesson:** Check a native library's Jest story before building on it; when the official mock
+  does not load, mock only the surface the app uses and map every path to it.

@@ -1,16 +1,30 @@
 /**
  * Setup, after "PIN set", only when the phone has strong biometrics (stepAfterPinCreated):
- * "Use fingerprint to unlock?". Turn on → the OS biometric prompt stores the unlock secret
- * (enableBiometricUnlock); success → setup completes and the gate opens the tabs; failure or
- * cancel → it stays off with a short message (try again, or Not now). Not now → setup completes
- * with the PIN only. Biometric unlock can be changed later in Settings → Security. Above the
- * buttons: anyone whose fingerprint / face is saved on the phone could unlock (the platform
- * cannot tell which enrolled biometric matched); Turn on and Not now are both full width.
+ * "Use fingerprint to unlock?".
+ *
+ *   ask → Turn on → enabling (full-screen progress, the OS prompt on top) → success → Continue
+ *
+ * Turn on → the OS biometric prompt stores the unlock secret (enableBiometricUnlock) behind the
+ * full-screen progress state ("Turning on unlock with fingerprint…", at least 600 ms); success →
+ * the success state (check mark, "Unlock with fingerprint is on" announced) and Continue, which
+ * completes setup (the gate opens the tabs); failure or cancel → back to the question with a short
+ * message (try again, or Not now). Not now → setup completes with the PIN only. Biometric unlock
+ * can be changed later in Settings → Security. Above the buttons: anyone whose fingerprint / face
+ * is saved on the phone could unlock (the platform cannot tell which enrolled biometric matched);
+ * Turn on and Not now are both full width.
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { AppText, BottomActions, Button, ProcessingState, useToast } from '../../src/components';
+import {
+  AppText,
+  BottomActions,
+  Button,
+  ProcessingState,
+  SuccessState,
+  useToast,
+} from '../../src/components';
+import { withMinimumDuration, yieldToUi } from '../../src/lib/timing';
 import { SharedBiometricNotice } from '../../src/security/SharedBiometricNotice';
 import { SecurityIllustration } from '../../src/onboarding/illustrations';
 import { useSetup } from '../../src/onboarding/SetupProvider';
@@ -23,6 +37,8 @@ import { useBlockScreenCapture } from '../../src/security/screen-capture';
 import { MAX_READABLE_WIDTH } from '../../src/theme';
 import { useTheme } from '../../src/theme/use-theme';
 
+type Phase = 'ask' | 'enabling' | 'success';
+
 export default function SetupBiometricsScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -30,7 +46,7 @@ export default function SetupBiometricsScreen() {
   const { completeSecuritySetup } = useSetup();
   useBlockScreenCapture();
   const [biometric, setBiometric] = useState<BiometricKind>('fingerprint');
-  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<Phase>('ask');
   const [failed, setFailed] = useState(false);
   const kind = t(`biometrics.kind.${biometric}`);
 
@@ -51,23 +67,55 @@ export default function SetupBiometricsScreen() {
   };
 
   const turnOn = async () => {
-    setBusy(true);
+    setPhase('enabling');
     setFailed(false);
-    const result = await enableBiometricUnlock(t('biometrics.enablePrompt', { kind }));
-    setBusy(false);
+    await yieldToUi();
+    const result = await withMinimumDuration(() =>
+      enableBiometricUnlock(t('biometrics.enablePrompt', { kind })),
+    );
     if (result.ok) {
-      toast.show({ message: t('biometrics.turnedOn', { kind }), tone: 'success' });
-      await complete();
+      setPhase('success');
     } else {
       setFailed(true);
+      setPhase('ask');
     }
   };
 
+  const root = [styles.root, { backgroundColor: theme.colors.bg }];
+
+  if (phase === 'enabling') {
+    return (
+      <View testID="setup-biometrics-screen" style={root}>
+        <ProcessingState
+          fullScreen
+          message={t('setupBiometrics.enabling', { kind })}
+          testID="setup-biometrics-busy"
+        />
+      </View>
+    );
+  }
+
+  if (phase === 'success') {
+    return (
+      <View testID="setup-biometrics-screen" style={root}>
+        <SuccessState
+          title={t('setupBiometrics.success.title', { kind })}
+          body={t('setupBiometrics.success.body', { kind })}
+          testID="setup-biometrics-success"
+        />
+        <BottomActions testID="setup-biometrics-actions">
+          <Button
+            label={t('setupBiometrics.success.cta')}
+            onPress={() => void complete()}
+            testID="setup-biometrics-continue"
+          />
+        </BottomActions>
+      </View>
+    );
+  }
+
   return (
-    <View
-      testID="setup-biometrics-screen"
-      style={[styles.root, { backgroundColor: theme.colors.bg }]}
-    >
+    <View testID="setup-biometrics-screen" style={root}>
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -90,9 +138,6 @@ export default function SetupBiometricsScreen() {
           <AppText>{t(`setupBiometrics.body.${biometric}`)}</AppText>
           <AppText tone="muted">{t('setupBiometrics.pinStill')}</AppText>
         </View>
-        {busy ? (
-          <ProcessingState message={t('setupBiometrics.waiting')} testID="setup-biometrics-busy" />
-        ) : null}
         {failed ? (
           <AppText tone="error" accessibilityRole="alert" testID="setup-biometrics-failed">
             {t('setupBiometrics.failed', { kind })}
@@ -106,14 +151,12 @@ export default function SetupBiometricsScreen() {
         <Button
           label={t('setupBiometrics.turnOn')}
           onPress={() => void turnOn()}
-          loading={busy}
           testID="setup-biometrics-on"
         />
         <Button
           variant="secondary"
           label={t('setupBiometrics.notNow')}
           onPress={() => void complete()}
-          disabled={busy}
           testID="setup-biometrics-not-now"
         />
       </BottomActions>

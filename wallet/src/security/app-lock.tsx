@@ -345,23 +345,26 @@ function LockScreen({ autoPrompt }: { autoPrompt: boolean }) {
   }, [pinLockedUntil]);
   const lockMessage = useLockMessage(pinLockedUntil, now);
 
+  // ONE navy surface, like the privacy cover (leaving and returning look the same): the mark and
+  // the text centred as one group, the buttons at the bottom with the bottom inset
   return (
     <View
       testID="lock-screen"
-      style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.bg }]}
+      style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.brand }]}
     >
       <View
+        testID="lock-screen-group"
         style={[
-          styles.brand,
+          styles.group,
           {
-            backgroundColor: theme.colors.brand,
             paddingTop: insets.top + theme.space(6),
+            paddingHorizontal: theme.space(4),
             gap: theme.space(4),
           },
         ]}
       >
         <UniVaultMark />
-        <View style={[styles.centre, { gap: theme.space(1), paddingHorizontal: theme.space(4) }]}>
+        <View style={[styles.centre, { gap: theme.space(1) }]}>
           <AppText variant="h2" tone="onBrand" accessibilityRole="header" style={styles.text}>
             {t('lock.title')}
           </AppText>
@@ -369,16 +372,20 @@ function LockScreen({ autoPrompt }: { autoPrompt: boolean }) {
             {t('lock.subtitle')}
           </AppText>
         </View>
-      </View>
-      <View style={[styles.fill, { padding: theme.space(4) }]}>
         {lockMessage ? (
-          <AppText tone="error" testID="lock-screen-countdown" accessibilityLiveRegion="polite">
+          <AppText
+            tone="onBrand"
+            testID="lock-screen-countdown"
+            accessibilityLiveRegion="polite"
+            style={styles.text}
+          >
             {lockMessage}
           </AppText>
         ) : null}
       </View>
-      <BottomActions testID="lock-screen-actions">
+      <BottomActions testID="lock-screen-actions" tone="brand">
         <Button
+          variant="inverse"
           label={t('lock.unlock')}
           onPress={() => void attempt(false)}
           loading={busy}
@@ -386,7 +393,7 @@ function LockScreen({ autoPrompt }: { autoPrompt: boolean }) {
         />
         {biometricOn ? (
           <Button
-            variant="secondary"
+            variant="textOnBrand"
             label={t('lock.usePin')}
             onPress={() => void attempt(true)}
             disabled={busy}
@@ -402,6 +409,6 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   centre: { alignItems: 'center', justifyContent: 'center' },
   mark: { alignItems: 'center' },
-  brand: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  group: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   text: { textAlign: 'center' },
 });

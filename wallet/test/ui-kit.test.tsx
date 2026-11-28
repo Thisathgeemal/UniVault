@@ -50,8 +50,9 @@ describe('UI kit (development build)', () => {
     for (const tone of TONES) expect(screen.getByText(en.uiKit.tones[tone])).toBeOnTheScreen();
     expect(within(screen.getByTestId('kit-list')).getAllByText(en.uiKit.listTitle)).toHaveLength(4);
     const header = within(screen.getByTestId('kit-header'));
-    expect(header.getAllByRole('header', { name: en.uiKit.headerTitle })).toHaveLength(2);
-    expect(header.getByRole('button', { name: en.common.back })).toBeOnTheScreen();
+    // navy root, navy compact (with Back and actions), surface (outside the tabs, with Back)
+    expect(header.getAllByRole('header', { name: en.uiKit.headerTitle })).toHaveLength(3);
+    expect(header.getAllByRole('button', { name: en.common.back })).toHaveLength(2);
     expect(header.getByRole('button', { name: en.uiKit.headerAction2 })).toBeOnTheScreen();
     const states = within(screen.getByTestId('kit-states'));
     expect(states.getByRole('progressbar', { name: en.uiKit.loadingMessage })).toBeOnTheScreen();
@@ -64,6 +65,24 @@ describe('UI kit (development build)', () => {
     expect(screen.getByTestId('kit-on-brand-panel')).toHaveStyle({
       backgroundColor: lightColors.brand,
     });
+    // the navy kinds: inverse (primary on navy) and text on brand, each on its own navy panel
+    for (const panel of ['kit-inverse-panel', 'kit-textOnBrand-panel']) {
+      expect(screen.getByTestId(panel)).toHaveStyle({ backgroundColor: lightColors.brand });
+    }
+    expect(screen.getByText(en.uiKit.inverseSample)).toBeOnTheScreen();
+    expect(screen.getByTestId('kit-inverse')).toHaveStyle({ backgroundColor: lightColors.onBrand });
+    expect(screen.getByText(en.uiKit.swipeHint)).toBeOnTheScreen();
+    // headers: navy as in the tabs (root and compact with Back), surface as outside them
+    expect(screen.getByTestId('kit-header-root')).toHaveStyle({
+      backgroundColor: lightColors.brand,
+    });
+    expect(screen.getByTestId('kit-header-detail')).toHaveStyle({
+      backgroundColor: lightColors.brand,
+    });
+    expect(screen.getByTestId('kit-header-surface')).toHaveStyle({
+      backgroundColor: lightColors.surface,
+    });
+    expect(screen.getByText(en.uiKit.headerInTabs)).toBeOnTheScreen();
     expect(screen.getByTestId('kit-offline')).toHaveStyle({
       backgroundColor: lightColors.statusExpiredBg,
     });

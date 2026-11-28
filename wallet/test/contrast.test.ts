@@ -88,6 +88,24 @@ describe.each([
     expect(pairs.length).toBeGreaterThanOrEqual(DESIGN_PAIRS.length + 10);
   });
 
+  it('the navy button kinds are checked: inverse label + fill edge, text on brand, focus rings', () => {
+    const uses = pairs.map((p) => p.use);
+    for (const use of [
+      'brand on on-brand (inverse button label)',
+      'on-brand fill (inverse button) on brand',
+      'inverse button',
+      'inverse button fill on brand',
+      'inverse button focus ring on brand',
+      'textOnBrand button on brand',
+      'textOnBrand button focus ring on brand',
+    ]) {
+      expect(uses).toContain(use);
+    }
+    // recorded 28 Nov 2026 (docs/design/design-system.md, Buttons)
+    const inverse = contrastRatio(colors.brand, colors.onBrand);
+    expect(Number(inverse.toFixed(2))).toBe(mode === 'light' ? 15.39 : 10.83);
+  });
+
   it.each(pairs.map((p) => [p.use, p] as const))('%s meets AA', (_use, pair) => {
     const ratio = contrastRatio(pair.fg, pair.bg, pair.under);
     expect({

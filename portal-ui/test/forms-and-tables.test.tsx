@@ -343,6 +343,13 @@ describe('Toast', () => {
     fireEvent.click(plain!);
     fireEvent.click(error!);
     expect(within(region).getByText('Saved').parentElement).toHaveAttribute('data-tone', 'success');
+    // a confirmation is not a status: accent edge on brand-soft, never status green
+    expect(within(region).getByText('Saved').parentElement).toHaveClass(
+      'border-accent',
+      'bg-brand-soft',
+      'text-text',
+    );
+    expect(within(region).getByText('Saved').parentElement!.className).not.toMatch(/status-/);
     expect(within(region).getByText('Saved error').parentElement).toHaveAttribute(
       'data-tone',
       'error',

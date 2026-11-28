@@ -61,21 +61,40 @@ export function toneColors(colors: ThemeColors, tone: Tone): { fg: string; bg: s
   return { fg: colors[names.text], bg: colors[names.bg] };
 }
 
-export type ButtonVariant = 'primary' | 'secondary' | 'text' | 'destructive' | 'onBrand';
+export type ButtonVariant =
+  'primary' | 'secondary' | 'text' | 'destructive' | 'onBrand' | 'inverse' | 'textOnBrand';
 export const BUTTON_VARIANTS: readonly ButtonVariant[] = [
   'primary',
   'secondary',
   'text',
   'destructive',
   'onBrand',
+  'inverse',
+  'textOnBrand',
 ];
+
+/** Kinds that only ever sit on navy (a header, a credential card, the full-navy lock screen). */
+export const NAVY_BUTTON_VARIANTS: readonly ButtonVariant[] = ['onBrand', 'inverse', 'textOnBrand'];
+export const isNavyVariant = (variant: ButtonVariant): boolean =>
+  NAVY_BUTTON_VARIANTS.includes(variant);
 
 /**
  * Button colours per kind (design system, Buttons). `bg` is what the label sits on: a text
- * button is transparent on bg or surface (`on: 'screen'`); an on-brand button is the
- * translucent role-tag-bg on brand (`on: 'brand'`, composited for the contrast test).
+ * button is transparent on bg or surface (`on: 'screen'`); the navy kinds sit on brand
+ * (`on: 'brand'`): on-brand is the translucent role-tag-bg (composited for the contrast test),
+ * inverse is an on-brand fill with a brand label (the primary action on a full-navy screen),
+ * text-on-brand is a transparent text button in on-brand. `focus` is the keyboard focus ring:
+ * focus-ring, or focus-ring-on-brand for the navy kinds.
  */
 export function buttonColors(
+  colors: ThemeColors,
+  variant: ButtonVariant,
+): { fg: string; bg: string; border: string; focus: string; on?: 'screen' | 'brand' } {
+  const focus = isNavyVariant(variant) ? colors.focusRingOnBrand : colors.focusRing;
+  return { ...kindColors(colors, variant), focus };
+}
+
+function kindColors(
   colors: ThemeColors,
   variant: ButtonVariant,
 ): { fg: string; bg: string; border: string; on?: 'screen' | 'brand' } {
@@ -90,6 +109,10 @@ export function buttonColors(
       return { fg: colors.onStatusRevoked, bg: colors.statusRevoked, border: colors.statusRevoked };
     case 'onBrand':
       return { fg: colors.onBrand, bg: colors.roleTagBg, border: 'transparent', on: 'brand' };
+    case 'inverse':
+      return { fg: colors.brand, bg: colors.onBrand, border: colors.onBrand, on: 'brand' };
+    case 'textOnBrand':
+      return { fg: colors.onBrand, bg: 'transparent', border: 'transparent', on: 'brand' };
   }
 }
 

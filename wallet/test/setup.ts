@@ -29,6 +29,16 @@ jest.mock('expo-screen-capture', () => ({
   allowScreenCaptureAsync: jest.fn(async () => undefined),
 }));
 
+// Gestures and animations (swipe-to-dismiss toasts): gesture-handler's own Jest setup and a
+// small reanimated mock (test/mocks/reanimated.ts: animations finish at once);
+// gestures are driven with gesture-handler's fireGestureHandler (test/toast.test.tsx).
+jest.mock('react-native-reanimated', () => require('./mocks/reanimated'));
+// no worklets runtime in Jest: gesture-handler requires it in a try/catch and carries on without
+jest.mock('react-native-worklets', () => {
+  throw new Error('react-native-worklets is not available in Jest');
+});
+require('react-native-gesture-handler/jestSetup');
+
 // AsyncStorage's official in-memory Jest mock; emptied before every test (no state leaks)
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),

@@ -17,11 +17,21 @@ export { LoadingState, type LoadingStateProps } from './LoadingState';
 export { OfflineNotice, type OfflineNoticeProps } from './OfflineNotice';
 export { PIN_KEY_MIN_SIZE, PinPad, type PinPadProps } from './PinPad';
 export { ProcessingState, type ProcessingStateProps } from './ProcessingState';
+export {
+  SUCCESS_ANIMATION_MS,
+  SUCCESS_START_SCALE,
+  SuccessState,
+  type SuccessStateProps,
+} from './SuccessState';
 export { Toggle, type ToggleProps } from './Toggle';
 export { Screen, type ScreenProps } from './Screen';
 export { Section, SectionHeader, type SectionHeaderProps } from './SectionHeader';
 export { StatusBadge, type StatusBadgeProps } from './StatusBadge';
 export {
+  shouldDismissSwipe,
+  SWIPE_DISMISS_FRACTION,
+  SWIPE_FLICK_VELOCITY,
+  SWIPE_OUT_MS,
   TOAST_DURATION_MS,
   TOAST_QUEUE_LIMIT,
   ToastProvider,

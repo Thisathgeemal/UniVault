@@ -222,6 +222,11 @@ describe('status polling', () => {
     mockRedeemOffer(offer.offerId);
     await advance(5_000);
     expect(await screen.findByText("Accepted by the holder's wallet")).toBeInTheDocument();
+    // a confirmation, not a status: the accent check in a brand-soft circle (no status green)
+    const check = screen.getByTestId('offer-success-check');
+    expect(check).toHaveClass('bg-brand-soft');
+    expect(check.querySelector('svg')).toHaveClass('text-accent');
+    expect(check.parentElement!.innerHTML).not.toMatch(/status-valid/);
     expect(qr()).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View credential' })).toHaveAttribute(
       'href',

@@ -349,7 +349,8 @@ export function ReissueCredentialPage() {
                           data-changed={changed ? 'true' : undefined}
                           className={
                             changed
-                              ? 'bg-status-expired-bg text-status-expired-text'
+                              ? // a highlight, not a status: brand-soft (like a selected row)
+                                'border-t border-border bg-brand-soft text-text'
                               : 'border-t border-border'
                           }
                         >

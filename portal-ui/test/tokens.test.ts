@@ -159,4 +159,78 @@ describe('no hex colour outside tokens.ts and the generated theme.css', () => {
       .filter((file) => HEX.test(readFileSync(join(REPO, file), 'utf8')));
     expect(offenders).toEqual([]);
   });
+
+  /**
+   * Status colours mean ONLY a credential's or a verification's status (design-system.md, Do /
+   * Don't "Success confirmations"): a confirmation that an action worked uses accent / brand-soft.
+   * Each portal file may use only the status sets listed here (the wallet has its own test,
+   * wallet/test/status-colours.test.ts); comments are ignored.
+   */
+  const STATUS_ALLOWED: Record<string, readonly string[]> = {
+    // definitions
+    'portal-ui/src/tokens.ts': ['valid', 'expired', 'revoked', 'pending'],
+    'portal-ui/src/theme-css.ts': ['valid', 'expired', 'revoked', 'pending'],
+    // statuses: the badge, the dashboard breakdown, an offer running out / expired
+    'portal-ui/src/StatusBadge.tsx': ['valid', 'expired', 'revoked', 'pending'],
+    'portal-ui/src/StackedBar.tsx': ['valid', 'expired', 'revoked', 'pending'],
+    'portal-ui/src/Countdown.tsx': ['expired'],
+    'issuer-portal/src/pages/credentials/CredentialOfferPage.tsx': ['expired'],
+    'issuer-portal/src/pages/credentials/CredentialsPage.tsx': ['expired'],
+    // errors, invalid fields and destructive actions (the revoked colours)
+    'portal-ui/src/Toast.tsx': ['revoked'],
+    'portal-ui/src/ErrorSummary.tsx': ['revoked'],
+    'portal-ui/src/FormField.tsx': ['revoked'],
+    'portal-ui/src/ActionMenu.tsx': ['revoked'],
+    'portal-ui/src/ui/alert.tsx': ['revoked'],
+    'portal-ui/src/ui/button.tsx': ['revoked'],
+    'portal-ui/src/ui/input.tsx': ['revoked'],
+    'portal-ui/src/ui/select.tsx': ['revoked'],
+    'issuer-portal/src/credentials/RevokeDialog.tsx': ['revoked'],
+    'issuer-portal/src/pages/LoginPage.tsx': ['revoked'],
+    'issuer-portal/src/pages/credentials/IssueCredentialPage.tsx': ['revoked'],
+    'issuer-portal/src/pages/credentials/ReissueCredentialPage.tsx': ['revoked'],
+  };
+  const PORTAL_ROOTS = ['portal-ui/src', 'issuer-portal/src', 'verifier-portal/src'];
+  const statusSets = (code: string): string[] => {
+    const src = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+    const found = new Set<string>();
+    for (const m of src.matchAll(/status-(valid|expired|revoked|pending)/g)) found.add(m[1]!);
+    for (const m of src.matchAll(/\bstatus(Valid|Expired|Revoked|Pending)/g)) {
+      found.add(m[1]!.toLowerCase());
+    }
+    return [...found].sort();
+  };
+
+  it('recognises status colour utilities and tokens, not comments', () => {
+    expect(statusSets('className="bg-status-valid-bg text-on-status-revoked"')).toEqual([
+      'revoked',
+      'valid',
+    ]);
+    expect(statusSets('// bg-status-pending\nconst ok = "text-accent";')).toEqual([]);
+  });
+
+  it('every allow-listed file exists', () => {
+    const all = PORTAL_ROOTS.flatMap(files);
+    for (const file of Object.keys(STATUS_ALLOWED)) expect(all).toContain(file);
+  });
+
+  it('no portal component uses a status colour outside the allow-list', () => {
+    const offenders = PORTAL_ROOTS.flatMap(files).flatMap((file) => {
+      const used = statusSets(readFileSync(join(REPO, file), 'utf8'));
+      const allowed = STATUS_ALLOWED[file] ?? [];
+      const extra = used.filter((set) => !allowed.includes(set));
+      return extra.length ? [`${file}: ${extra.join(', ')}`] : [];
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('success confirmations use the accent: the portal toast, the offer "added" check', () => {
+    const toast = readFileSync(join(REPO, 'portal-ui/src/Toast.tsx'), 'utf8');
+    expect(toast).toMatch(/success: 'border-accent bg-brand-soft text-text'/);
+    const offer = readFileSync(
+      join(REPO, 'issuer-portal/src/pages/credentials/CredentialOfferPage.tsx'),
+      'utf8',
+    );
+    expect(offer).toMatch(/bg-brand-soft[\s\S]{0,200}CircleCheck[^>]*text-accent/);
+  });
 });

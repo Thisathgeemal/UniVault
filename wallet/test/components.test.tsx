@@ -2,10 +2,10 @@
  * Shared components: variants, states and accessibility props (roles, labels, states, 44 pt
  * targets, decorative icons hidden, text that wraps). ErrorBoundary fallback and retry.
  */
-import { fireEvent, render, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import Constants from 'expo-constants';
 import { useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Text } from 'react-native';
+import { AccessibilityInfo, StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   AppText,
@@ -177,13 +177,40 @@ describe('Badge', () => {
 });
 
 describe('Header tones and OfflineNotice', () => {
-  it('brand tone: navy header with an on-brand title and icons (Credentials home)', async () => {
+  it('brand tone: navy header with an on-brand title and icons (every screen in a tab)', async () => {
     await renderWithProviders(<Header testID="h" title="Home" tone="brand" onBack={jest.fn()} />);
     expect(screen.getByTestId('h')).toHaveStyle({ backgroundColor: lightColors.brand });
     expect(screen.getByRole('header', { name: 'Home' })).toHaveStyle({
       color: lightColors.onBrand,
     });
   });
+
+  it.each([
+    ['brand', lightColors.focusRingOnBrand],
+    ['surface', lightColors.focusRing],
+  ] as const)(
+    '%s header: keyboard focus draws the ring in its focus colour',
+    async (tone, ring) => {
+      await renderWithProviders(
+        <Header
+          testID="h"
+          title="Details"
+          tone={tone}
+          onBack={jest.fn()}
+          actions={[{ icon: 'share-outline', label: 'Share', onPress: jest.fn(), testID: 'share' }]}
+        />,
+      );
+      for (const id of ['h-back', 'share']) {
+        await act(async () => screen.getByTestId(id).props.onFocus?.());
+        expect(StyleSheet.flatten(screen.getByTestId(id).props.style)).toMatchObject({
+          outlineColor: ring,
+          outlineWidth: 2,
+        });
+        await act(async () => screen.getByTestId(id).props.onBlur?.());
+        expect(StyleSheet.flatten(screen.getByTestId(id).props.style).outlineColor).toBeUndefined();
+      }
+    },
+  );
 
   it('surface tone by default', async () => {
     await renderWithProviders(<Header testID="h" title="Settings" />);

@@ -1,14 +1,15 @@
 /**
  * The "Navy and azure" design system in the wallet (docs/design/design-system.md): at most one
  * primary (azure) action per screen, the surface tab bar with a border top edge and the active
- * tab in accent, and the brand header on the Credentials home screen only.
+ * tab in accent, and the navy header on EVERY tab screen and every screen inside a tab (tall on
+ * a tab root, compact with an on-brand back arrow inside; surface only outside the tabs).
  */
 import { screen, userEvent, within } from '@testing-library/react-native';
 import { fontFamily } from '@univault/portal-ui/tokens';
 import { renderRouter } from 'expo-router/testing-library';
 import { join } from 'node:path';
 import { StyleSheet } from 'react-native';
-import { ROUTES } from '../src/navigation/routes';
+import { ROUTE_FILES, ROUTES } from '../src/navigation/routes';
 import { ONBOARDING_STEPS } from '../src/onboarding/steps';
 import { lightColors } from '../src/theme';
 import { freshInstall, seedOnboardedWithoutSecurity } from './setup-state';
@@ -47,16 +48,62 @@ describe('one primary action per screen', () => {
   });
 });
 
+/** Every route inside the tabs: the four tab roots and every screen in their stacks. */
+const TAB_ROUTES: readonly (readonly [string, string, 'root' | 'detail'])[] = [
+  [ROUTES.credentials, 'credentials-screen', 'root'],
+  [ROUTES.scan, 'scan-screen', 'root'],
+  [ROUTES.history, 'history-screen', 'root'],
+  [ROUTES.settings, 'settings-screen', 'root'],
+  [ROUTES.credential('sample-employment-active'), 'credential-detail-screen', 'detail'],
+  [ROUTES.historyEntry('sample-history-1'), 'history-detail-screen', 'detail'],
+  [ROUTES.language, 'language-screen', 'detail'],
+  [ROUTES.appearance, 'appearance-screen', 'detail'],
+  [ROUTES.security, 'security-screen', 'detail'],
+  [ROUTES.lockDelay, 'lock-delay-screen', 'detail'],
+  [ROUTES.about, 'about-screen', 'detail'],
+  [ROUTES.diagnostics, 'diagnostics-screen', 'detail'],
+  [ROUTES.uiKit, 'ui-kit-screen', 'detail'],
+];
+
 describe('frame', () => {
-  it('the Credentials home screen has the brand header; other screens a surface one', async () => {
-    const user = userEvent.setup();
-    await renderRouter(APP_DIR, { initialUrl: ROUTES.credentials });
-    await screen.findByTestId('credentials-screen');
-    expect(screen.getByTestId('stack-header')).toHaveStyle({ backgroundColor: lightColors.brand });
-    await user.press(screen.getByTestId('tab-settings'));
-    await screen.findByTestId('settings-screen');
-    const headers = screen.getAllByTestId('stack-header');
-    expect(headers.at(-1)).toHaveStyle({ backgroundColor: lightColors.surface });
+  it('the route list covers every tab route file', () => {
+    const tabFiles = ROUTE_FILES.filter((r) => r.file.startsWith('(tabs)/') && r.pattern);
+    expect(TAB_ROUTES).toHaveLength(tabFiles.length);
+  });
+
+  it.each(TAB_ROUTES)(
+    '%s: the navy header (on-brand title and back)',
+    async (path, testID, size) => {
+      await renderRouter(APP_DIR, { initialUrl: path });
+      await screen.findByTestId(testID);
+      const header = screen.getAllByTestId('stack-header').at(-1)!;
+      expect(flat(header.props.style).backgroundColor).toBe(lightColors.brand);
+      const title = within(header).getByRole('header');
+      expect(flat(title.props.style).color).toBe(lightColors.onBrand);
+      // tab roots: tall h2 title, no Back; screens inside a tab: compact h3 with an on-brand Back
+      expect(flat(title.props.style).fontSize).toBe(size === 'root' ? 20 : 16);
+      const back = within(header).queryByTestId('stack-header-back');
+      if (size === 'root') {
+        expect(back).toBeNull();
+      } else {
+        const icon = within(back!).getByText(/./, { includeHiddenElements: true });
+        expect(flat(icon.props.style).color).toBe(lightColors.onBrand);
+      }
+      // never azure on navy: nothing in the header is drawn in accent / accent-text
+      const colours = within(header)
+        .queryAllByText(/./, { includeHiddenElements: true })
+        .map((n) => flat(n.props.style).color);
+      expect(colours).not.toContain(lightColors.accent);
+      expect(colours).not.toContain(lightColors.accentText);
+    },
+  );
+
+  it('outside the tabs (not found) the header stays surface', async () => {
+    await renderRouter(APP_DIR, { initialUrl: '/no-such-screen' });
+    await screen.findByTestId('not-found-screen');
+    expect(screen.getAllByTestId('stack-header').at(-1)).toHaveStyle({
+      backgroundColor: lightColors.surface,
+    });
   });
 
   it('screens on bg; tab bar on surface with a border top edge; active tab in accent', async () => {

@@ -72,6 +72,7 @@ describe('theme from @univault/portal-ui/tokens', () => {
       fg: lightColors.onAccent,
       bg: lightColors.accent,
       border: lightColors.accent,
+      focus: lightColors.focusRing,
     });
     expect(buttonColors(lightColors, 'secondary').border).toBe(lightColors.borderStrong);
     expect(buttonColors(lightColors, 'destructive').bg).toBe(lightColors.statusRevoked);
@@ -79,7 +80,25 @@ describe('theme from @univault/portal-ui/tokens', () => {
       fg: lightColors.onBrand,
       bg: lightColors.roleTagBg,
       on: 'brand',
+      focus: lightColors.focusRingOnBrand,
     });
+    // primary on navy (full-navy screens only): on-brand fill, brand label, on-brand focus ring
+    for (const colors of [lightColors, darkColors]) {
+      expect(buttonColors(colors, 'inverse')).toEqual({
+        fg: colors.brand,
+        bg: colors.onBrand,
+        border: colors.onBrand,
+        focus: colors.focusRingOnBrand,
+        on: 'brand',
+      });
+      expect(buttonColors(colors, 'textOnBrand')).toEqual({
+        fg: colors.onBrand,
+        bg: 'transparent',
+        border: 'transparent',
+        focus: colors.focusRingOnBrand,
+        on: 'brand',
+      });
+    }
   });
 
   it('no hex colour is written anywhere in the wallet source (tokens only)', () => {

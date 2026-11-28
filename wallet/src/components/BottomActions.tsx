@@ -10,6 +10,11 @@ export interface BottomActionsProps {
   /** Shown above the buttons (e.g. the onboarding progress). */
   above?: ReactNode;
   testID: string;
+  /**
+   * `surface` (default): the surface footer with a border top. `brand`: on a full-navy screen
+   * (the lock screen): no footer of its own, the buttons sit on the screen's brand.
+   */
+  tone?: 'surface' | 'brand';
 }
 
 /**
@@ -18,16 +23,16 @@ export interface BottomActionsProps {
  * with space-2 (primary first), space-4 padding plus the bottom safe-area inset on every screen,
  * centred at most MAX_READABLE_WIDTH wide on tablets.
  */
-export function BottomActions({ children, above, testID }: BottomActionsProps) {
+export function BottomActions({ children, above, testID, tone = 'surface' }: BottomActionsProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   return (
     <View
       testID={testID}
       style={[
-        styles.footer,
+        tone === 'surface' ? styles.footer : null,
         {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: tone === 'surface' ? theme.colors.surface : theme.colors.brand,
           borderTopColor: theme.colors.border,
           paddingTop: theme.space(4),
           paddingHorizontal: theme.space(4) + Math.max(insets.left, insets.right),

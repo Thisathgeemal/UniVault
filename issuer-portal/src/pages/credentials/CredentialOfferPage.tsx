@@ -483,7 +483,13 @@ function StatePanel({
       }
     >
       {tone === 'success' ? (
-        <CircleCheck aria-hidden="true" className="h-10 w-10 text-status-valid" />
+        // a confirmation, not a status: the accent check in a brand-soft circle
+        <span
+          data-testid="offer-success-check"
+          className="flex h-16 w-16 items-center justify-center rounded-pill bg-brand-soft"
+        >
+          <CircleCheck aria-hidden="true" className="h-10 w-10 text-accent" />
+        </span>
       ) : (
         <QrIcon aria-hidden="true" className="h-10 w-10 text-text-muted" />
       )}

@@ -2,8 +2,8 @@
  * The status bar: ONE `<StatusBar>` (expo-status-bar) whose style follows the effective theme
  * (src/theme/appearance.tsx) and the navy header.
  *
- *   - a screen with the navy header is focused (useBrandStatusBar): light content (white icons on
- *     navy, in both themes);
+ *   - a screen with the navy header is focused (every screen inside a tab: the brand stack header,
+ *     useBrandStatusBarWhileFocused): light content (white icons on navy, in both themes);
  *   - otherwise: dark content on the light theme, light content on the dark theme.
  *
  * The style is computed, never set imperatively, so a theme change (including a live system
@@ -11,7 +11,6 @@
  * phone's root view the theme's `bg` (expo-system-ui), so nothing light shows behind a dark app
  * during transitions.
  */
-import { useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import {
@@ -67,11 +66,34 @@ export function StatusBarProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Call in a screen with the navy header: light status-bar content while it is focused. */
-export function useBrandStatusBar(): void {
+/**
+ * The navy stack header (src/navigation/stack-options.tsx): light content while ITS screen is
+ * focused (a screen kept mounted under another one, or in another tab, does not count).
+ */
+export function useBrandStatusBarWhileFocused(
+  navigation: {
+    isFocused: () => boolean;
+    addListener: (event: 'focus' | 'blur', listener: () => void) => () => void;
+  },
+  active: boolean,
+): void {
   const api = useContext(BrandStatusBarContext);
-  // without a StatusBarProvider (a screen rendered on its own) there is no status bar to set
-  useFocusEffect(useCallback(() => api?.enter(), [api]));
+  useEffect(() => {
+    if (!active || !api) return undefined;
+    let leave: (() => void) | null = navigation.isFocused() ? api.enter() : null;
+    const offFocus = navigation.addListener('focus', () => {
+      leave ??= api.enter();
+    });
+    const offBlur = navigation.addListener('blur', () => {
+      leave?.();
+      leave = null;
+    });
+    return () => {
+      offFocus();
+      offBlur();
+      leave?.();
+    };
+  }, [active, api, navigation]);
 }
 
 /** Outside the navigator (the lock screen, the privacy cover): light content while `active`. */

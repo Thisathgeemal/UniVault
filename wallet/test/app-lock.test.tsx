@@ -8,12 +8,19 @@
  * renderRouter runs on Jest's fake timers: time moves with jest.setSystemTime / advanceTimersByTime.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, renderHook, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, renderHook, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { renderRouter } from 'expo-router/testing-library';
 import { join } from 'node:path';
 import { useEffect, useState } from 'react';
-import { AppState, BackHandler, Pressable, Text, type AppStateStatus } from 'react-native';
+import {
+  AppState,
+  BackHandler,
+  Pressable,
+  StyleSheet,
+  Text,
+  type AppStateStatus,
+} from 'react-native';
 import * as appInfo from '../src/config/app-info';
 import { en } from '../src/i18n/locales/en';
 import { restoreAppState } from '../src/lib/app-state';
@@ -32,6 +39,7 @@ import { beginAuthActivity, isAuthActive } from '../src/security/auth-activity';
 import { enableBiometricUnlock, UNLOCK_SECRET_KEY } from '../src/security/biometrics';
 import { APP_SCREEN_CAPTURE_KEY } from '../src/security/screen-capture';
 import { PIN_ATTEMPTS_KEY } from '../src/security/pin';
+import { lightColors } from '../src/theme';
 import { renderWithProviders } from './render';
 import {
   freshInstall,
@@ -42,6 +50,7 @@ import {
 } from './setup-state';
 
 const APP_DIR = join(__dirname, '..', 'app');
+const flat = (style: unknown) => StyleSheet.flatten(style as never) as Record<string, unknown>;
 const LA = LocalAuthentication as jest.Mocked<typeof LocalAuthentication>;
 
 const startLocked = () => jest.spyOn(appInfo, 'lockOnAppStart').mockReturnValue(true);
@@ -213,6 +222,9 @@ describe('app start', () => {
     expect(await screen.findByTestId('lock-screen-countdown')).toHaveTextContent(
       /^Too many attempts\. Try again in \d+ minutes\.$/,
     );
+    expect(flat(screen.getByTestId('lock-screen-countdown').props.style).color).toBe(
+      lightColors.onBrand,
+    );
   });
 });
 
@@ -301,6 +313,25 @@ describe('leaving the app', () => {
     // the fingerprint was cancelled → authenticate() shows the PIN prompt; cancel that too
     await u.press(await screen.findByTestId('pin-prompt-cancel'));
     await waitFor(() => expect(screen.queryByTestId('pin-prompt')).toBeNull());
+    // Use PIN: a text button in on-brand, straight on the navy screen
+    const usePin = screen.getByTestId('lock-use-pin');
+    expect(flat(usePin.props.style).backgroundColor).toBe('transparent');
+    expect(flat(within(usePin).getByText(en.lock.usePin).props.style).color).toBe(
+      lightColors.onBrand,
+    );
+    // keyboard / switch-access focus: the ring in focus-ring-on-brand, outside the edge
+    await act(async () => {
+      usePin.props.onFocus?.();
+    });
+    expect(flat(screen.getByTestId('lock-use-pin').props.style)).toMatchObject({
+      outlineColor: lightColors.focusRingOnBrand,
+      outlineWidth: 2,
+      outlineOffset: 2,
+    });
+    await act(async () => {
+      screen.getByTestId('lock-use-pin').props.onBlur?.();
+    });
+    expect(flat(screen.getByTestId('lock-use-pin').props.style).outlineColor).toBeUndefined();
     await u.press(screen.getByTestId('lock-use-pin'));
     await screen.findByTestId('pin-prompt');
     expect(screen.queryByTestId('pin-prompt-biometric')).toBeNull(); // PIN only

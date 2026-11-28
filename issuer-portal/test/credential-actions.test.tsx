@@ -393,6 +393,9 @@ describe('reissue page', () => {
     expect(screen.getByText('1 changed')).toBeInTheDocument();
     const changed = table.querySelectorAll('tr[data-changed="true"]');
     expect(changed).toHaveLength(1);
+    // a highlight, not a status: brand-soft (never the expired status colours)
+    expect(changed[0]).toHaveClass('bg-brand-soft', 'text-text');
+    expect(changed[0]!.className).not.toMatch(/status-/);
     expect(changed[0]).toHaveTextContent('Logistics Coordinator');
     expect(changed[0]).toHaveTextContent('Senior Coordinator');
     expect(changed[0]).toHaveTextContent('Changed');

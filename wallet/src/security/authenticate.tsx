@@ -11,29 +11,28 @@
  *    Cancel, failure, OS lockout or error → the PIN prompt (no automatic repeat; its
  *    "Use fingerprint" button retries once). Biometrics changed (the item invalidated, or no
  *    strong biometric enrolled any more) → biometric unlock is turned off and the PIN prompt says so.
- * 3. PIN prompt (PinPrompt below, a full-screen modal): PinPad + verifyPin under the attempt
- *    limits (src/security/pin-attempts.ts), "Checking your PIN…" while it runs, a live lockout
- *    countdown (announced at most every 10 s). Correct → { ok, 'pin' }; Cancel or Android back →
- *    { ok: false, 'cancelled' } (or 'locked-out' while locked).
+ * 3. PIN prompt (PinPrompt below, a full-screen modal around the shared PinCheck flow): the
+ *    keypad, then the full-screen "Checking your PIN…" (≥ 400 ms; no Cancel, Back ignored) under
+ *    the attempt limits (src/security/pin-attempts.ts); wrong → back to the keypad with the
+ *    message (and the attempts left); the lockout countdown (announced at most every 10 s).
+ *    Correct → { ok, 'pin' } straight away; Cancel or Android back → { ok: false, 'cancelled' }
+ *    (or 'locked-out' while locked).
  * Results never contain a secret; the PIN and the unlock secret are never logged.
  */
 import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AccessibilityInfo, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '../components/AppText';
-import { BottomActions } from '../components/BottomActions';
 import { Button } from '../components/Button';
-import { MAX_READABLE_WIDTH } from '../theme';
 import { useTheme } from '../theme/use-theme';
 import {
   detectBiometrics,
@@ -44,7 +43,6 @@ import {
 } from './biometrics';
 import { withAuthActivity } from './auth-activity';
 import { hasPinVerifier } from './pin';
-import { checkPinWithLimits, currentPinLock } from './pin-attempts';
 import { PinCheck } from './PinCheck';
 import { useBlockScreenCapture } from './screen-capture';
 
@@ -61,8 +59,8 @@ export interface AuthenticateOptions {
 
 export type Authenticate = (options: AuthenticateOptions) => Promise<AuthResult>;
 
-/** Screen readers hear the lockout countdown at most this often. */
-export const COUNTDOWN_ANNOUNCE_MS = 10_000;
+// the lock message and its announcement live with the shared PIN flow
+export { COUNTDOWN_ANNOUNCE_MS, useLockMessage } from './PinCheck';
 
 interface PinRequest {
   reason: string;
@@ -174,78 +172,18 @@ export function useAuthenticate(): Authenticate {
   return authenticate;
 }
 
-/** "30 seconds" / "5 minutes" / "1 hour" for the lock message (count picks the plural form). */
-export function useLockMessage(lockedUntil: number | null, now: number): string | null {
-  const { t } = useTranslation();
-  if (lockedUntil === null) return null;
-  const seconds = Math.max(1, Math.ceil((lockedUntil - now) / 1000));
-  if (seconds < 60) return t('auth.lockedSeconds', { count: seconds, seconds });
-  if (seconds < 3600) {
-    const minutes = Math.ceil(seconds / 60);
-    return t('auth.lockedMinutes', { count: minutes, minutes });
-  }
-  const hours = Math.ceil(seconds / 3600);
-  return t('auth.lockedHours', { count: hours, hours });
-}
-
+/** The PIN prompt: a full-screen modal around the shared PinCheck flow (src/security/PinCheck.tsx). */
 function PinPrompt({ request, onDone }: { request: PinRequest; onDone: (r: AuthResult) => void }) {
   const { t } = useTranslation();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   useBlockScreenCapture();
   const kind = t(`biometrics.kind.${request.biometric}`);
-  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-  const [wrong, setWrong] = useState(false);
   const [notice, setNotice] = useState(request.notice);
   const [canRetry, setCanRetry] = useState(request.biometricRetry);
-  const lastAnnounced = useRef(0);
-
-  // a lock from before (even before a restart) applies at once
-  useEffect(() => {
-    let active = true;
-    void currentPinLock().then((until) => {
-      if (active) setLockedUntil(until);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // live countdown: tick every second while locked; unlock when it runs out
-  useEffect(() => {
-    if (lockedUntil === null) return undefined;
-    const timer = setInterval(() => {
-      const current = Date.now();
-      setNow(current);
-      if (current >= lockedUntil) setLockedUntil(null);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [lockedUntil]);
-
-  const lockMessage = useLockMessage(lockedUntil, now);
-
-  // announce the lock, then at most every 10 s (the visible text updates every second)
-  useEffect(() => {
-    if (!lockMessage) {
-      lastAnnounced.current = 0;
-      return;
-    }
-    const current = Date.now();
-    if (current - lastAnnounced.current >= COUNTDOWN_ANNOUNCE_MS) {
-      lastAnnounced.current = current;
-      AccessibilityInfo.announceForAccessibility(lockMessage);
-    }
-  }, [lockMessage]);
-
-  const verify = async (pin: string) => {
-    const result = await checkPinWithLimits(pin);
-    if (!result.ok) {
-      setNow(Date.now());
-      setLockedUntil(result.lockedUntil);
-    }
-    return result.ok;
-  };
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  // while the PIN is checked there is no way out: no Cancel, and Android back is ignored
+  const busy = useRef(false);
 
   const retryBiometric = async () => {
     setCanRetry(false); // once
@@ -254,74 +192,49 @@ function PinPrompt({ request, onDone }: { request: PinRequest; onDone: (r: AuthR
     else if (result.reason === 'invalidated') setNotice('invalidated');
   };
 
-  const cancel = () =>
-    onDone({ ok: false, reason: lockedUntil !== null ? 'locked-out' : 'cancelled' });
+  const cancel = (lockedOut: boolean) =>
+    onDone({ ok: false, reason: lockedOut ? 'locked-out' : 'cancelled' });
+
+  const onBack = () => {
+    if (!busy.current) cancel(lockedUntil !== null);
+  };
 
   return (
-    <Modal visible animationType="none" onRequestClose={cancel} testID="pin-prompt-modal">
+    <Modal visible animationType="none" onRequestClose={onBack} testID="pin-prompt-modal">
       <View
         testID="pin-prompt"
         accessibilityViewIsModal
         style={[styles.root, { backgroundColor: theme.colors.bg, paddingTop: insets.top }]}
       >
-        <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { padding: theme.space(4), paddingBottom: theme.space(6), gap: theme.space(6) },
-          ]}
-        >
-          <View style={{ gap: theme.space(2) }}>
-            <AppText variant="h2" accessibilityRole="header" style={styles.centre}>
-              {t('auth.title')}
-            </AppText>
-            <AppText tone="muted" style={styles.centre} testID="pin-prompt-reason">
-              {request.reason}
-            </AppText>
-          </View>
-          {notice === 'invalidated' ? (
-            <AppText tone="error" accessibilityRole="alert" testID="pin-prompt-notice">
-              {t('auth.invalidated', { kind })}
-            </AppText>
-          ) : null}
-          {lockMessage ? (
-            <AppText tone="error" testID="pin-prompt-locked">
-              {lockMessage}
-            </AppText>
-          ) : (
-            <>
-              {wrong ? (
-                <AppText tone="error" accessibilityRole="alert" testID="pin-prompt-wrong">
-                  {t('auth.wrong')}
-                </AppText>
-              ) : null}
-              <PinCheck
-                verify={verify}
-                onResult={(correct) => {
-                  if (correct) onDone({ ok: true, method: 'pin' });
-                  else setWrong(true);
-                }}
-                testID="pin-prompt-check"
+        <PinCheck
+          title={t('auth.title')}
+          reason={request.reason}
+          notice={
+            notice === 'invalidated' ? (
+              <AppText tone="error" accessibilityRole="alert" testID="pin-prompt-notice">
+                {t('auth.invalidated', { kind })}
+              </AppText>
+            ) : null
+          }
+          onSuccess={() => onDone({ ok: true, method: 'pin' })}
+          onCancel={cancel}
+          onBusyChange={(next) => {
+            busy.current = next;
+          }}
+          onLockChange={setLockedUntil}
+          extraActions={
+            canRetry && lockedUntil === null ? (
+              <Button
+                variant="secondary"
+                icon="finger-print-outline"
+                label={t('auth.useBiometric', { kind })}
+                onPress={() => void retryBiometric()}
+                testID="pin-prompt-biometric"
               />
-            </>
-          )}
-        </ScrollView>
-        <BottomActions testID="pin-prompt-actions">
-          {canRetry && lockedUntil === null ? (
-            <Button
-              variant="secondary"
-              icon="finger-print-outline"
-              label={t('auth.useBiometric', { kind })}
-              onPress={() => void retryBiometric()}
-              testID="pin-prompt-biometric"
-            />
-          ) : null}
-          <Button
-            variant="text"
-            label={t('common.cancel')}
-            onPress={cancel}
-            testID="pin-prompt-cancel"
-          />
-        </BottomActions>
+            ) : null
+          }
+          testID="pin-prompt"
+        />
       </View>
     </Modal>
   );
@@ -329,6 +242,4 @@ function PinPrompt({ request, onDone }: { request: PinRequest; onDone: (r: AuthR
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { flexGrow: 1, width: '100%', maxWidth: MAX_READABLE_WIDTH, alignSelf: 'center' },
-  centre: { textAlign: 'center' },
 });

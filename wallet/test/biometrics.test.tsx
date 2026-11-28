@@ -13,6 +13,7 @@ import * as SecureStore from 'expo-secure-store';
 import { join } from 'node:path';
 import { useState } from 'react';
 import { AccessibilityInfo, Platform, Pressable, Text } from 'react-native';
+import { PROCESSING_MIN_MS } from '../src/lib/timing';
 import * as appInfo from '../src/config/app-info';
 import { en } from '../src/i18n/locales/en';
 import { ROUTES } from '../src/navigation/routes';
@@ -676,10 +677,48 @@ describe('setup: the biometric step after "PIN set"', () => {
         .map((b) => b.props.accessibilityLabel),
     ).toEqual(['Turn on', 'Not now']);
     await u.press(screen.getByRole('button', { name: 'Turn on' }));
+    // the full-screen progress state while the OS prompt is up (announced, no buttons)
+    const busy = await screen.findByTestId('setup-biometrics-busy');
+    expect(busy.props.accessibilityLabel).toBe('Turning on unlock with fingerprint…');
+    expect(busy.props.accessibilityRole).toBe('progressbar');
+    expect(screen.queryByTestId('setup-biometrics-on')).toBeNull();
+    // then the success state: check mark, the heading announced, one line, Continue
+    expect(
+      await screen.findByText('Unlock with fingerprint is on', {}, { timeout: 3000 }),
+    ).toBeOnTheScreen();
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
+      'Unlock with fingerprint is on',
+    );
+    expect(
+      screen.getByText(
+        'Next time, open UniVault with your fingerprint. You can always use your PIN instead.',
+      ),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByTestId('setup-biometrics-success-check', { includeHiddenElements: true }),
+    ).toBeTruthy();
+    expect(await isBiometricEnabled()).toBe(true);
+    expect(screen).toHavePathname(ROUTES.setupBiometrics); // not yet the tabs
+    await u.press(screen.getByTestId('setup-biometrics-continue'));
     expect(
       await screen.findByTestId('credentials-screen', {}, { timeout: 3000 }),
     ).toBeOnTheScreen();
-    expect(await isBiometricEnabled()).toBe(true);
+  });
+
+  it('turning it on: the progress state stays at least 600 ms', async () => {
+    phone('strong');
+    const u = await setPin();
+    await u.press(screen.getByTestId('setup-continue'));
+    await screen.findByText('Use fingerprint to unlock?');
+    const start = Date.now();
+    await u.press(screen.getByRole('button', { name: 'Turn on' }));
+    await screen.findByText('Unlock with fingerprint is on', {}, { timeout: 3000 });
+    expect(Date.now() - start).toBeGreaterThanOrEqual(PROCESSING_MIN_MS);
+    // the PIN verifier vanished before Continue: setup is not completed, and it says so
+    secureStore.clear();
+    await u.press(screen.getByTestId('setup-biometrics-continue'));
+    expect(await screen.findByText(en.setup.notCompleted)).toBeOnTheScreen();
+    expect(screen).toHavePathname(ROUTES.setupBiometrics);
   });
 
   it('cancelled at the OS prompt: stays off with a message; Not now → the tabs', async () => {

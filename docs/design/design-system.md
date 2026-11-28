@@ -35,7 +35,7 @@ A quick test: blur your eyes at any screen. You should see mostly light grey and
 ### Holder wallet (light and dark themes)
 
 - **60%:** `bg` screens, a `surface` bottom tab bar with a `border` top edge, and `surface` list rows.
-- **30%:** a `brand` header on the home screen, and credential cards in `brand` with `radius-lg`. On a card, the credential title is `on-brand`, and the issuer and expiry are `on-brand-muted`. The status badge sits on the card in its own `status-*-bg` badge (`radius-sm`).
+- **30%:** a `brand` header on every tab screen and every screen inside a tab (compact header with back arrow); full-screen flows (onboarding, setup, lock) are the exceptions. Credential cards in `brand` with `radius-lg`. On a card, the credential title is `on-brand`, and the issuer and expiry are `on-brand-muted`. The status badge sits on the card in its own `status-*-bg` badge (`radius-sm`).
 - **10%:** the primary action on each screen ("Scan QR", "Accept credential", "Share"), and the active tab icon and label in the bottom bar.
 - **Disclosure screen:** show the verifier's name and logo in a `brand-soft` panel at the top, the attribute checkboxes on `surface`, and one `accent` "Share" button at the bottom. Biometric or PIN confirmation follows.
 - **Offline notice:** a `status-expired-bg` banner with `status-expired-text`, saying when the status was last checked ("Status last checked 2 hours ago").
@@ -69,20 +69,25 @@ Rules:
 
 - Always show the icon and the word together ("Valid", "වලංගුයි"). Never rely on colour alone, so colour-blind users can still read the status.
 - Never use a status colour for decoration, a chart series or a brand moment.
+- Status colours (`status-valid`, `-expired`, `-revoked`, `-pending` and their `-bg` / `-text`) mean ONLY a credential's or a verification's status. A confirmation that an action worked ("PIN set", "Saved", "Accepted by the holder's wallet") is not a status: accent, `brand-soft` and `text-muted`. Allowed uses: the status badge, credential and verification results, the offline notice (expired colours for a stale status), an offer running out or expired, error and failure messages and destructive actions (revoked colours), the dashboard status breakdown, and Diagnostics pass / fail (development builds only). `wallet/test/status-colours.test.ts` and `portal-ui/test/tokens.test.ts` fail when any other file uses a status colour.
 - Verification failures and anomalies use the revoked colours. Stale or offline status uses the expired colours.
 - A status icon never sits directly on navy (`brand`, `brand-hover`): on a credential card or in the top bar it is always inside its own `status-*-bg` badge (`radius-sm`). Several status colours are below 3:1 on navy (revoked 2.38:1 and pending 2.03:1 on light `brand`), but every one passes inside its badge.
 
 ## Buttons
 
-| Kind        | Fill                                | Label               | When                                                 |
-| ----------- | ----------------------------------- | ------------------- | ---------------------------------------------------- |
-| Primary     | `accent` (hover `accent-hover`)     | `on-accent`         | The one main action on the screen                    |
-| Secondary   | `surface`, 1px `border-strong` edge | `text`              | Every other action                                   |
-| Text button | none                                | `accent-text`       | Low-weight actions such as "View details"            |
-| Destructive | `status-revoked`                    | `on-status-revoked` | Revoke, deactivate device, delete                    |
-| On brand    | `role-tag-bg`                       | `on-brand`          | Actions inside the navy top bar or a credential card |
+| Kind          | Fill                                | Label               | When                                                                         |
+| ------------- | ----------------------------------- | ------------------- | ---------------------------------------------------------------------------- |
+| Primary       | `accent` (hover `accent-hover`)     | `on-accent`         | The one main action on the screen                                            |
+| Secondary     | `surface`, 1px `border-strong` edge | `text`              | Every other action                                                           |
+| Text button   | none                                | `accent-text`       | Low-weight actions such as "View details"                                    |
+| Destructive   | `status-revoked`                    | `on-status-revoked` | Revoke, deactivate device, delete                                            |
+| On brand      | `role-tag-bg`                       | `on-brand`          | Actions inside the navy top bar or a credential card                         |
+| Inverse       | `on-brand`                          | `brand`             | Primary on navy – only on full-navy screens such as the lock screen          |
+| Text on brand | none                                | `on-brand`          | A secondary text button on a full-navy screen ("Use PIN" on the lock screen) |
 
 Buttons use `radius-md` and a minimum height of 44px in the wallet (touch targets) and 40px in the portals. Labels are verb first and in sentence case: "Issue credential", not "Submit".
+
+The focus ring (keyboard or switch access) is 2px, 2px outside the button's edge: `focus-ring`, or `focus-ring-on-brand` for the three navy kinds (On brand, Inverse, Text on brand). Contrast (28 Nov 2026): the inverse label `brand` on `on-brand` is 15.39:1 in light and 10.83:1 in dark, the inverse fill against the navy screen the same (3:1 needed for its edge), Text on brand (`on-brand` on `brand`) 15.39:1 / 10.83:1, `focus-ring-on-brand` on `brand` 15.39:1 / 10.83:1. An inverse button counts as the screen's one primary action.
 
 ## Typography
 
@@ -149,25 +154,98 @@ The content fades in briefly (220 ms) only while the phone's reduce-motion setti
 
 ### Processing state
 
-When the holder waits for slow work they started (hashing or saving the PIN, checking the PIN):
-stay on the same screen, disable the controls, and show an indeterminate spinner with what is
-happening ("Saving your PIN…", "Checking your PIN…") as one busy progress element announced to
-screen readers. Keep it up for at least 600 ms so it never flickers, let the UI draw before the
-work starts, and move on only when the work has finished. A failure replaces it with the error
-and "Try again" (never the success screen).
+When the holder waits for slow work they started, show an indeterminate spinner with what is
+happening in plain words ("Securing your PIN…", "Checking your PIN…"; never "key" or "hash") as
+one busy progress element announced to screen readers. Keep it up for at least 600 ms so it never
+flickers, let the UI draw before the work starts, and move on only when the work has finished.
+
+- **Inline** (`ProcessingState`): under the content it belongs to, the controls disabled.
+- **Full screen** (`ProcessingState fullScreen`): a step of its own, a large spinner and the
+  message centred, nothing else on the screen (so nothing can be typed): after the new PIN is
+  confirmed ("Securing your PIN…"), while a PIN is checked ("Checking your PIN…", see "PIN
+  checking pattern"; at least 400 ms there) and while fingerprint unlock is turned on in setup
+  ("Turning on unlock with fingerprint…", the OS prompt on top). A failure never shows the success state: the
+  PIN goes back to Create PIN with "Something went wrong. Please create your PIN again.", the
+  fingerprint step back to its question with a short message.
+
+### PIN checking pattern
+
+Every time a PIN is entered to verify it (the lock screen's PIN path, the PIN prompt of every
+approval: Test unlock, turning biometric unlock off, later shares) the same flow runs (wallet
+`src/security/PinCheck.tsx`):
+
+1. The title, the reason and the keypad. After a wrong PIN, a plain message ABOVE the keypad:
+   "That PIN isn't right. Try again.", plus "2 attempts left before a short wait." (then "1
+   attempt left…") when that few remain before the next lockout.
+2. The 6th digit replaces the keypad and dots with the full-screen progress state "Checking your
+   PIN…" (announced), at least 400 ms. Nothing else is on screen: no status text, no Cancel, and
+   Back is ignored.
+3. Correct: straight on to where the holder was going (the unlocked app, the action that asked):
+   no success screen. Screen readers hear "PIN correct".
+4. Wrong: back to step 1 with the digits cleared and a short shake (none with reduce motion); the
+   message is announced.
+5. The limit reached: straight from checking to the lockout countdown, no keypad, until it runs
+   out.
+
+Creating a PIN keeps its own "Securing your PIN…" step with the same progress component.
+
+### Success state
+
+After a setup step succeeds (`SuccessState`): a large circle-check in `accent` inside a 96 pt
+`brand-soft` circle (dark theme: the dark values of the same tokens), the `h2` heading in `text`
+("PIN set", "Unlock with fingerprint is on") and one line under it, centred as one group (at most
+320 pt wide), Continue full width in the footer. A confirmation is not a status, so never a status
+colour. The heading is announced to screen readers. The check mark scales in briefly (from 0.6,
+250 ms); with reduce motion on it is simply there.
+
+### Headers
+
+Every tab screen (Credentials, Scan, History, Settings) has the `brand` navy header: the title in
+`on-brand` (`h2`, the taller bar), any header actions as `on-brand` icons or text buttons (never
+azure on navy), focus ring `focus-ring-on-brand`. Every screen inside a tab (credential detail,
+history detail, every Settings screen, Diagnostics, UI kit) has the compact navy header: an
+`on-brand` back arrow and the title (`h3`). So moving around the app never switches between navy
+and white headers. Light status-bar icons on all of them in both themes. Implemented once, in the
+tab stacks' shared options (`useStackScreenOptions('brand')`, one `Header`). The full-screen flows
+keep their own layouts: onboarding, `/setup/*` and the lock screen; the only surface headers are
+outside the tabs (onboarding's Privacy details, "not found").
+
+### Lock screen pattern
+
+The lock screen is ONE navy surface, the same `brand` as the privacy cover, so leaving the app
+and coming back look seamless: the UniVault mark (shield + name), "UniVault is locked" in
+`on-brand` and "Unlock to continue" in `on-brand-muted`, centred vertically as one group; the
+lockout countdown under them in `on-brand`; the buttons at the bottom with `space-4` padding plus
+the bottom safe-area inset, on the navy itself (no `surface` footer, no border): **Unlock** in
+the Inverse kind, **Use PIN** as Text on brand. Light status-bar icons in both themes. In dark
+mode the same names give the dark `brand` (#16335C) with the dark `on-brand`, still one surface.
+This and the privacy cover are the only full-navy screens.
+
+### Toast
+
+Toasts appear at the top below the safe area, one at a time (inverted: `text` as the fill, `bg`
+as the text). They dismiss themselves after 4 s, with the visible close (×) button, by swiping
+left or right, or with the screen reader's "dismiss" action (screen-reader users cannot swipe).
+The toast follows the finger horizontally; released past 35% of its width, or flicked faster than
+800 pt/s in the drag's direction, it slides out; otherwise it springs back. The timer pauses while
+the finger is on the toast and resumes with the time that was left. With reduce motion on it is
+dismissed (or put back) without the slide or the spring. Never put credential data or error
+details in a toast.
 
 ## Do and don't
 
-| Do                                                                           | Don't                                                                |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| One azure button per screen                                                  | Two primary buttons side by side                                     |
-| Navy for the frame and the credential cards                                  | Navy as a page background in the light theme                         |
-| Icon and word for every status                                               | A coloured dot alone                                                 |
-| White or soft tags inside the navy top bar                                   | Azure text or buttons on navy in the light theme (only 3:1 contrast) |
-| `text-muted` for helper text                                                 | `text-subtle` for anything the user must read to act                 |
-| `accent-text-on-soft` for links on `brand-soft` (selected rows, soft panels) | `accent-text` on `brand-soft` (4.35:1, below AA)                     |
-| `focus-ring-on-brand` for focus inside navy areas                            | The azure `focus-ring` on navy (below 3:1)                           |
-| Flat colours                                                                 | Gradients, glows or a blue-to-purple fade                            |
+| Do                                                                                            | Don't                                                                                   |
+| --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| One azure button per screen                                                                   | Two primary buttons side by side                                                        |
+| Navy for the frame and the credential cards                                                   | Navy as a page background in the light theme (except the lock screen and privacy cover) |
+| Icon and word for every status                                                                | A coloured dot alone                                                                    |
+| White or soft tags inside the navy top bar; the Inverse kind as primary on a full-navy screen | Azure text or buttons on navy in the light theme (only 3:1 contrast)                    |
+| `text-muted` for helper text                                                                  | `text-subtle` for anything the user must read to act                                    |
+| `accent-text-on-soft` for links on `brand-soft` (selected rows, soft panels)                  | `accent-text` on `brand-soft` (4.35:1, below AA)                                        |
+| `focus-ring-on-brand` for focus inside navy areas                                             | The azure `focus-ring` on navy (below 3:1)                                              |
+| Success confirmations: an accent check in a `brand-soft` circle                               | Status green for "saved" or "done"                                                      |
+| The navy header on every tab screen and every screen inside a tab                             | A white header on one tab screen and a navy one on the next                             |
+| Flat colours                                                                                  | Gradients, glows or a blue-to-purple fade                                               |
 
 ## Accessibility
 

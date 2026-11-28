@@ -198,7 +198,8 @@ cleanly.)
   @expo-google-fonts/noto-sans 0.4.2 and noto-sans-sinhala 0.4.2 (imported per weight: 5 font files),
   @expo/vector-icons 15.1.1,
   @react-native-async-storage/async-storage 2.2.0, react-native-svg 15.16.0, expo-secure-store
-  58.0.3, expo-screen-capture 58.0.6, expo-local-authentication 58.0.3, @noble/hashes 2.4.0 (as
+  58.0.3, expo-screen-capture 58.0.6, expo-local-authentication 58.0.3, react-native-gesture-handler
+  3.3.0, react-native-reanimated 4.7.1, react-native-worklets 0.13.0, @noble/hashes 2.4.0 (as
   crypto-core), jest 30.5.2, jest-expo
   58.0.16, @testing-library/react-native 14.1.0, test-renderer 1.3.1, @expo/ngrok 4.1.3. Add
   Expo-managed packages ONLY with `npx expo install <pkg>`, then pin the installed version
@@ -235,9 +236,9 @@ migrations by hand.
 ```
 cd crypto-core && npm test                  # crypto-core tests (158) + coverage: npm run test:coverage
 cd claims-validation && npm test | test:coverage | build | typecheck   # shared claim validation (23 tests)
-cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (97 tests); build regenerates theme.css
+cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (101 tests); build regenerates theme.css
 cd wallet && npm start                      # Metro :8081 (LAN), scan with Expo Go; start:tunnel = ngrok
-cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 730 tests; doctor = expo-doctor (20/20)
+cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 810 tests; doctor = expo-doctor (20/20)
 cd wallet && npm run android | ios | fixture:diagnostics | art:placeholder
 cd issuer-portal && npm run dev             # http://localhost:5173 (backend: npm run dev in backend/)
 cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 424 tests; build also checks the bundle
@@ -417,7 +418,11 @@ hash }` (scrypt N 2^12 r 8 p 1, 16-byte `expo-crypto` salt) via `savePin()` in
     the OS releasing the `univault.biometricUnlockSecret` item (`requireAuthentication: true`,
     this device only); only `available-strong` may be enabled; no device-passcode fallback, the
     app PIN is the only fallback; changed biometrics (null read, or no strong biometric any more)
-    → delete the secret, `biometricEnabled` false, PIN + message. PIN attempts go through
+    → delete the secret, `biometricEnabled` false, PIN + message. **Every PIN verification uses
+    the shared `PinCheck` flow** (`src/security/PinCheck.tsx`: full-screen "Checking your PIN…"
+    ≥ 400 ms, no Cancel / Back while checking, correct → straight on, wrong → message + attempts
+    left, the limit → countdown; `test/pin-check.test.tsx` fails on any other `verifyPin()` /
+    `checkPinWithLimits()` caller or keypad); PIN attempts go through
     `checkPinWithLimits()` (4 free, then 30 s / 1 min / 5 min / 15 min / 1 h, stored in the secure
     store). Turning biometric unlock off needs `pinOnly`. iOS Expo Go: PIN only. Wherever
     biometric unlock can be turned on, show `SharedBiometricNotice` (the OS cannot tell whose
@@ -437,8 +442,9 @@ hash }` (scrypt N 2^12 r 8 p 1, 16-byte `expo-crypto` salt) via `savePin()` in
   - **Theme:** `useTheme()` uses the EFFECTIVE scheme (`src/theme/appearance.tsx`): Settings →
     Appearance ("Automatic" default, stored as `system`; Light; Dark), or the phone's scheme (live)
     for Automatic. Never call `useColorScheme()` in a component. The status bar is ONE
-    computed `<StatusBar>` (`src/navigation/status-bar.tsx`): navy-header screens call
-    `useBrandStatusBar()`; never `setStatusBarStyle()`. Stacks use `useStackScreenOptions()`
+    computed `<StatusBar>` (`src/navigation/status-bar.tsx`): the brand stack header calls
+    `useBrandStatusBarWhileFocused()` (every screen in a tab), the lock screen and privacy cover
+    `useBrandStatusBarWhile()`; never `setStatusBarStyle()`. Stacks use `useStackScreenOptions()`
     (reduce motion → `animation: 'none'`).
   - **Dev-only screens and data:** Diagnostics (`diagnosticsEnabled()`), UI kit (`uiKitEnabled()`)
     and the synthetic sample credentials/history (`sampleDataEnabled()`) are `__DEV__` only. Gate a
@@ -496,7 +502,10 @@ hash }` (scrypt N 2^12 r 8 p 1, 16-byte `expo-crypto` salt) via `savePin()` in
 
 All UI follows docs/design/design-system.md. Colours, fonts, spacing and radius come only from
 portal-ui/src/tokens.ts (CSS variables in the portals, the theme object in the wallet). Never write
-a hex value in a component. Status colours mean valid, expired, revoked and pending only. One
+a hex value in a component. **Status colours mean ONLY a credential's or a verification's status**
+(valid, expired, revoked, pending); a confirmation that something worked ("PIN set", "Saved") uses
+accent / brand-soft / text-muted; errors and destructive actions use the revoked colours; the
+allow-lists in `wallet/test/status-colours.test.ts` and `portal-ui/test/tokens.test.ts` enforce it. One
 primary (azure) action per screen. The verifier portal uses the same AppShell with the 'Verifier
 portal' role tag. **Wallet typography and layout** (design-system.md section of that name, tested
 on every route by `wallet/test/design-system.test.tsx`): body 16/26; secondary text 14 in
@@ -533,10 +542,18 @@ Details (Decision 024):
   `text-body-sm`); fonts self-hosted via @fontsource. `issuer-portal/test/design-system.test.tsx`
   checks at most one primary per page.
 - **Wallet:** light + dark from the same names (Settings → Appearance, default the phone); bg
-  screens, surface tab bar (border top, active tab accent), brand header on the Credentials home
-  only, CredentialCard brand + radius-lg; onboarding illustrations original SVG on a brand panel in
+  screens, surface tab bar (border top, active tab accent), **the navy (`brand`) header on every
+  tab screen and every screen inside a tab** (tall on tab roots, compact with an on-brand back
+  arrow inside a tab; ONE `Header` via `useStackScreenOptions('brand')` in `TabStack`, never per
+  screen; light status-bar icons; onboarding, setup and the lock screen keep their full-screen
+  layouts), CredentialCard brand + radius-lg; onboarding illustrations original SVG on a brand panel in
   on-brand / on-brand-muted / brand-hover / role-tag-bg only;
-  `Button` kinds as above (min 44 pt); `OfflineNotice` (expired colours); the disclosure panel
+  `Button` kinds as above plus `inverse` (on-brand fill, brand label: primary on navy, ONLY on
+  full-navy screens such as the lock screen) and `textOnBrand` (min 44 pt; focus ring
+  `focus-ring-on-brand` on the navy kinds); the lock screen is one `brand` surface like the privacy
+  cover; toasts swipe to dismiss (gesture-handler + reanimated, a "dismiss" accessibility action,
+  reduce motion: no slide); `ProcessingState fullScreen` + `SuccessState` after setup steps;
+  `OfflineNotice` (expired colours); the disclosure panel
   token set (`componentTokens.disclosurePanel`, brand-soft) is shown in the UI kit for later.
 
 ## Credential lifecycle (important)
@@ -888,10 +905,10 @@ statements, 93.89% branches, 100% functions, 99.14% lines), **backend
 571 tests** (23 files in two Vitest projects; 90.74% statements, 88.08% branches, 94.52% functions,
 91.13% lines; thresholds 90 / 86 / 93 / 90), **issuer-portal 424 tests** (18
 files; 97.56% statements, 92.2% branches, 98.02% functions, 98.57% lines;
-thresholds 96 / 91 / 97 / 98) plus **10 Playwright e2e tests**, **portal-ui 97
+thresholds 96 / 91 / 97 / 98) plus **10 Playwright e2e tests**, **portal-ui 101
 tests** (8 files; 100% statements, 98.73% branches, 100% functions, 100% lines;
-thresholds 99 / 94 / 99 / 99), **wallet 730 tests** (22 files, Jest + RNTL; 99.31% statements,
-96.42% branches, 99.22% functions, 99.8% lines; thresholds 99 / 96 / 99 / 99) and
+thresholds 99 / 94 / 99 / 99), **wallet 810 tests** (25 files, Jest + RNTL; 99.36% statements,
+96.18% branches, 99.26% functions, 99.88% lines; thresholds 99 / 96 / 99 / 99) and
 **claims-validation 23 tests** (1 file; 98.63%
 statements, 90.47% branches, 100% functions, 98.57% lines; thresholds 98 / 89 / 100 / 98),
 all passing.
@@ -1064,7 +1081,10 @@ replaces }`.
   Immediately / 30 s / 1 min / 5 min delay and the clock rule, privacy cover in every build, lock
   screen above the mounted navigator (one auto prompt, Unlock / Use PIN, lockout countdown,
   Android back leaves, deep links after unlock), `onLock` hook, Settings → Security "Lock after
-  leaving the app" + "Lock now", Diagnostics last lock reason. Follow-up: prompt exemption
+  leaving the app" + "Lock now", Diagnostics last lock reason. Later: navy header on every tab screen, status colours only for
+  status (accent success confirmations, allow-list tests), the shared PinCheck flow (full-screen
+  checking); one-navy lock screen with the `inverse` button, PIN and
+  fingerprint setup progress and success screens, swipe-to-dismiss toasts. Follow-up: prompt exemption
   limited to min(delay, 30 s) (longer → lock, prompt dismissed as cancelled, re-check on every
   prompt end); whole-wallet screen-capture block in release builds (blank Android recents card),
   dev-only Diagnostics switch.

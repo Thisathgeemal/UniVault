@@ -118,6 +118,10 @@ export const DESIGN_PAIRS: readonly TokenPair[] = [
     kind: 'text',
   },
   { use: 'focus-ring-on-brand on brand', fg: 'focusRingOnBrand', bg: 'brand', kind: 'focus' },
+  // Inverse button (primary on navy, only on full-navy screens such as the lock screen): brand
+  // label on the on-brand fill, and the fill's edge against the navy screen
+  { use: 'brand on on-brand (inverse button label)', fg: 'brand', bg: 'onBrand', kind: 'text' },
+  { use: 'on-brand fill (inverse button) on brand', fg: 'onBrand', bg: 'brand', kind: 'border' },
   {
     use: 'focus-ring-on-brand on brand-hover',
     fg: 'focusRingOnBrand',
@@ -223,7 +227,27 @@ export function colorPairs(c: ThemeColors, scheme: 'light' | 'dark'): ColorPair[
         pairs.push({ use: `${variant} button on ${name}`, fg: b.fg, bg: c[name], kind: 'text' });
       }
     } else if (b.on === 'brand') {
-      pairs.push({ use: `${variant} button`, fg: b.fg, bg: b.bg, under: c.brand, kind: 'text' });
+      if (b.bg === 'transparent') {
+        // a text button straight on navy
+        pairs.push({ use: `${variant} button on brand`, fg: b.fg, bg: c.brand, kind: 'text' });
+      } else {
+        pairs.push({ use: `${variant} button`, fg: b.fg, bg: b.bg, under: c.brand, kind: 'text' });
+      }
+      if (b.bg.startsWith('#')) {
+        // an opaque fill on navy (inverse): its edge must stand out from the screen
+        pairs.push({
+          use: `${variant} button fill on brand`,
+          fg: b.bg,
+          bg: c.brand,
+          kind: 'border',
+        });
+      }
+      pairs.push({
+        use: `${variant} button focus ring on brand`,
+        fg: b.focus,
+        bg: c.brand,
+        kind: 'focus',
+      });
     } else {
       pairs.push({ use: `${variant} button`, fg: b.fg, bg: b.bg, kind: 'text' });
     }
@@ -251,6 +275,13 @@ export function colorPairs(c: ThemeColors, scheme: 'light' | 'dark'): ColorPair[
     { use: 'illustration mark on navy fill', fg: c.onBrand, bg: c.brand, kind: 'icon' },
     { use: 'illustration tick in accent circle', fg: c.onAccent, bg: c.accent, kind: 'icon' },
     { use: 'illustration label on brand-soft', fg: c.text, bg: c.brandSoft, kind: 'text' },
+    // Success state (PIN set, fingerprint on): the accent circle-check in a brand-soft circle
+    {
+      use: 'success check (accent) in brand-soft circle',
+      fg: c.accent,
+      bg: c.brandSoft,
+      kind: 'icon',
+    },
     // Onboarding rows: icon rows (icon in a brand-soft circle), numbered rows (accent circle on
     // bg with an on-accent number), progress dots on the footer, the "I understand" checkbox
     {

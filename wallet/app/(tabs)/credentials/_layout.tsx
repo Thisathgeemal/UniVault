@@ -9,7 +9,7 @@ export default function CredentialsStack() {
   return (
     <TabStack
       screens={[
-        { name: 'index', title: t('credentials.title'), brandHeader: true },
+        { name: 'index', title: t('credentials.title') },
         { name: '[id]', title: t('credentials.detailTitle') },
       ]}
     />
