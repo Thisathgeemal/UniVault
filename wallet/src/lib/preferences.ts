@@ -4,13 +4,13 @@
  * STORAGE RULE: AsyncStorage is unencrypted, readable by anyone with a device backup or a
  * rooted phone. It holds NON-SECRET preferences only: the language, the appearance (theme) and
  * the onboarding progress flags. Never a key, credential, SD-JWT, claim, token, PIN or anything
- * personal: those go in secure storage (expo-secure-store: Keychain / Android Keystore) from the
- * holder-key and vault tasks. Every key is listed in PREFERENCE_KEYS; test/preferences.test.tsx
+ * personal: those go in secure storage (expo-secure-store: Keychain / Android Keystore): the PIN
+ * verifier already does (src/security/pin.ts). Every key is listed in PREFERENCE_KEYS; test/preferences.test.tsx
  * checks nothing else is ever written, and that each key only ever gets its allowed values.
  *
  * The onboarding flags only decide which screen opens first (src/onboarding/gate.ts). They
- * protect nothing: the PIN task replaces the securitySetupCompleted placeholder with a check
- * against the secure store (src/onboarding/security-setup.ts).
+ * protect nothing. Whether security is set up is NOT a preference: it is "a PIN verifier exists
+ * in the secure store" (src/onboarding/security-setup.ts, Decision 025).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isLanguage, type Language } from '../i18n/languages';
@@ -21,15 +21,15 @@ export const PREFERENCE_KEYS = {
   appearance: 'univault.appearance',
   onboardingCompleted: 'univault.onboardingCompleted',
   privacyAcknowledgedAt: 'univault.privacyAcknowledgedAt',
-  /** PLACEHOLDER until the PIN task: see src/onboarding/security-setup.ts. */
-  securitySetupCompleted: 'univault.securitySetupCompleted',
 } as const;
 
-/** The onboarding keys "Reset onboarding" (Diagnostics) removes; language and appearance stay. */
+/**
+ * The onboarding keys "Reset onboarding" (Diagnostics) removes; language and appearance stay.
+ * (The PIN verifier is in the secure store: src/security/pin.ts deletePinData.)
+ */
 export const SETUP_PROGRESS_KEYS = [
   PREFERENCE_KEYS.onboardingCompleted,
   PREFERENCE_KEYS.privacyAcknowledgedAt,
-  PREFERENCE_KEYS.securitySetupCompleted,
 ] as const;
 
 /** Stored value of a true flag (a missing key is false). */
@@ -155,26 +155,7 @@ export async function saveOnboardingCompleted(
   }
 }
 
-/** PLACEHOLDER flag read by isSecuritySetupComplete() until the PIN task. */
-export async function loadSecuritySetupFlag(): Promise<boolean> {
-  try {
-    return (await AsyncStorage.getItem(PREFERENCE_KEYS.securitySetupCompleted)) === FLAG_TRUE;
-  } catch {
-    return false;
-  }
-}
-
-/** PLACEHOLDER: marks security setup done (development builds only, see app/setup/security). */
-export async function saveSecuritySetupFlag(): Promise<boolean> {
-  try {
-    await AsyncStorage.setItem(PREFERENCE_KEYS.securitySetupCompleted, FLAG_TRUE);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Removes the onboarding, privacy and security-setup flags (keeps language and appearance). */
+/** Removes the onboarding and privacy flags (keeps language and appearance). */
 export async function clearSetupProgress(): Promise<boolean> {
   try {
     await AsyncStorage.multiRemove([...SETUP_PROGRESS_KEYS]);

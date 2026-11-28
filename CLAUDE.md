@@ -121,17 +121,20 @@ wallet/           React Native, Expo SDK 58 + Expo Router (Decision 022; docs/fr
   app/              routes: _layout (providers; saved language, appearance and setup state restored
                     under the splash), index (→ where the gate says), +not-found, onboarding/ (gate;
                     language, welcome, how-it-works, selective-disclosure, security, privacy,
-                    privacy-details), setup/ (gate; security = "Set up your PIN" placeholder),
+                    privacy-details), setup/ (gate; security = the PIN flow: create, confirm, "PIN set"),
                     (tabs)/ (gate) with a Stack per tab: credentials/ (index, [id]), scan/, history/
                     (index, [id]), settings/ (index, language, appearance, security, about,
                     diagnostics and ui-kit: dev only)
   src/components/   Header, Button, Card, CredentialCard, StatusBadge, Badge, ListItem, SectionHeader,
                     LoadingState, EmptyState, ErrorState, OfflineNotice, Toast, ConfirmDialog, Icon,
-                    Screen, AppText, ErrorBoundary, ChoiceList (radio group), Checkbox
+                    Screen, AppText, ErrorBoundary, ChoiceList (radio group), Checkbox, PinPad,
+                    BottomActions (onboarding/setup footer), Section (heading + content)
   src/onboarding/   steps.ts (order), gate.ts (THE gate rule, PRIVACY_POLICY_VERSION), SetupProvider
-                    (setup state + actions), security-setup.ts (isSecuritySetupComplete: PLACEHOLDER),
+                    (setup state + actions), security-setup.ts (isSecuritySetupComplete = PIN verifier exists),
                     OnboardingStep (frame: Skip, Back/Next, swipe, Android back, progress),
                     illustrations (react-native-svg, tokens only)
+  src/security/     pin.ts (scrypt verifier in the secure store, verifyPin, attempt record),
+                    pin-rules.ts, constant-time.ts, screen-capture.ts, setup-flow.ts (biometric hook)
   src/credentials/  status.ts: walletStatusFromBackend() = THE backend → wallet status mapping
   src/navigation/   routes.ts = THE route table (ROUTES, ROUTE_FILES), tabs.ts, TabStack, stack-options,
                     status-bar.tsx (the ONE computed StatusBar), navigation-theme.ts
@@ -192,7 +195,8 @@ cleanly.)
   (exact), typescript 6.0.3, i18next 27.2.7, react-i18next 18.0.3,
   @expo-google-fonts/noto-sans 0.4.2 and noto-sans-sinhala 0.4.2 (imported per weight: 5 font files),
   @expo/vector-icons 15.1.1,
-  @react-native-async-storage/async-storage 2.2.0, react-native-svg 15.16.0, jest 30.5.2, jest-expo
+  @react-native-async-storage/async-storage 2.2.0, react-native-svg 15.16.0, expo-secure-store
+  58.0.3, expo-screen-capture 58.0.6, @noble/hashes 2.4.0 (as crypto-core), jest 30.5.2, jest-expo
   58.0.16, @testing-library/react-native 14.1.0, test-renderer 1.3.1, @expo/ngrok 4.1.3. Add
   Expo-managed packages ONLY with `npx expo install <pkg>`, then pin the installed version
   exactly; `npm run doctor` must stay 20/20.
@@ -230,7 +234,7 @@ cd crypto-core && npm test                  # crypto-core tests (158) + coverage
 cd claims-validation && npm test | test:coverage | build | typecheck   # shared claim validation (23 tests)
 cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (97 tests); build regenerates theme.css
 cd wallet && npm start                      # Metro :8081 (LAN), scan with Expo Go; start:tunnel = ngrok
-cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 473 tests; doctor = expo-doctor (20/20)
+cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 599 tests; doctor = expo-doctor (20/20)
 cd wallet && npm run android | ios | fixture:diagnostics | art:placeholder
 cd issuer-portal && npm run dev             # http://localhost:5173 (backend: npm run dev in backend/)
 cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 424 tests; build also checks the bundle
@@ -373,10 +377,10 @@ of `D:/...`. See Sprint 1, Issue 6.
     `PREFERENCE_KEYS` (`src/lib/preferences.ts`; test-enforced: only these keys, each only with its
     allowed values): `univault.language` (`en`|`si`), `univault.appearance`
     (`system`|`light`|`dark`), `univault.onboardingCompleted` (`true`),
-    `univault.privacyAcknowledgedAt` (JSON `{ at: ISO instant, version: "privacy-v1" }`) and the
-    PLACEHOLDER `univault.securitySetupCompleted` (`true`; goes in the PIN task). Keys,
-    credentials, SD-JWTs, claims, tokens, PINs and anything personal go in secure storage
-    (`expo-secure-store`) from the holder-key / vault tasks, never AsyncStorage. All of it is
+    `univault.privacyAcknowledgedAt` (JSON `{ at: ISO instant, version: "privacy-v1" }`). Keys,
+    credentials, SD-JWTs, claims, tokens, PIN material and anything personal go in secure storage
+    (`expo-secure-store`), never AsyncStorage: today `univault.pinVerifier` and
+    `univault.pinAttempts` (Decision 025). All of it is
     restored before the first frame (root layout waits for `restoreAppState()` under the splash
     screen: no flash of the wrong language, theme or screen).
   - **Gate rule (`src/onboarding/gate.ts`, `requiredArea()`): the tabs are reachable only when
@@ -387,10 +391,22 @@ of `D:/...`. See Sprint 1, Issue 6.
     `onboarding`, `setup`) redirects with `useGateRedirect(area)`, so deep links and typed URLs
     are handled like the app start. NO route may let a holder skip security setup: Skip stops at
     Privacy, `/setup/security` has no way into the tabs except completing setup.
-    `isSecuritySetupComplete()` (`src/onboarding/security-setup.ts`) is the ONE security check:
-    today a placeholder on the preference (set only by a dev-only button, inline `__DEV__` gate);
-    the PIN task replaces its body with a secure-store check. Change setup state only through
-    `SetupProvider` (`acknowledgePrivacy`, `completeSecuritySetup`, `resetOnboarding`).
+    `isSecuritySetupComplete()` (`src/onboarding/security-setup.ts`) is the ONE security check: a
+    well-formed PIN verifier in the secure store (async, awaited under the splash: no tab flash).
+    Change setup state only through `SetupProvider` (`acknowledgePrivacy`, `completeSecuritySetup`,
+    `resetOnboarding`, which also deletes the PIN data).
+  - **PIN (Decision 025, `docs/security/wallet-pin.md`):** 6 digits, weak ones refused
+    (`src/security/pin-rules.ts`). Store ONLY a verifier `{ v: 1, alg: "scrypt", params, salt,
+hash }` (scrypt N 2^12 r 8 p 1, 16-byte `expo-crypto` salt) via `savePin()` in
+    `src/security/pin.ts`, with `SECURE_STORE_OPTIONS` (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`,
+    `requireAuthentication: false`). Check with `verifyPin()` (stored params, constant-time,
+    never throws). The PIN string: clear it from state as soon as it is hashed or verified; NEVER
+    log it, put it in route params, an error message or any storage (`PinStoreError` has fixed
+    messages; `test/pin-flow.test.tsx` searches logs, routes, storage and errors). Failed attempts:
+    `readPinAttempts` / `writePinAttempts` (for app lock). PIN screens call `useBlockScreenCapture()`
+    (blocks capture in release builds only). Biometrics plug in at `stepAfterPinCreated()`
+    (`src/security/setup-flow.ts`). Tune the KDF only after Diagnostics → PIN hashing time on a
+    real phone; old verifiers keep their stored parameters.
   - **Theme:** `useTheme()` uses the EFFECTIVE scheme (`src/theme/appearance.tsx`): Settings →
     Appearance ("Use device setting" default, Light, Dark), or the phone's scheme (live) for
     "Use device setting". Never call `useColorScheme()` in a component. The status bar is ONE
@@ -455,7 +471,13 @@ All UI follows docs/design/design-system.md. Colours, fonts, spacing and radius 
 portal-ui/src/tokens.ts (CSS variables in the portals, the theme object in the wallet). Never write
 a hex value in a component. Status colours mean valid, expired, revoked and pending only. One
 primary (azure) action per screen. The verifier portal uses the same AppShell with the 'Verifier
-portal' role tag.
+portal' role tag. **Wallet typography and layout** (design-system.md section of that name, tested
+on every route by `wallet/test/design-system.test.tsx`): body 16/26; secondary text 14 in
+text-muted (`<AppText tone="muted">` is 14 by default); captions 12 for metadata only; headings
+h1 24 / h2 20 / h3 16 at 600, no other sizes; left-align text, lists and forms (centre only
+onboarding/setup hero headings, illustrations and the PIN pad); `Screen` gives space-4 sides,
+space-6 between sections and a 560 pt max width; group a heading with its content in `Section`;
+list rows ≥ 56 pt; buttons 16 / 600; onboarding/setup buttons full width in `BottomActions`.
 
 Details (Decision 024):
 
@@ -693,8 +715,10 @@ documented, unavoidable third-party noise only and is empty). Fix the cause, nev
   calls".
 - A test that expects an error (ErrorBoundary) mocks `console.error` itself. `clearMocks` is on
   (fresh call counts per test).
-- `test/setup.ts` installs the official AsyncStorage mock (cleared before each test, then seeded
-  with a holder who finished onboarding and the placeholder security setup, `test/setup-state.ts`,
+- `test/setup.ts` installs the official AsyncStorage mock and an in-memory `expo-secure-store`
+  mock (`mockStore`; `expo-crypto` random bytes from Node's CSPRNG), both cleared before each
+  test and then seeded with a holder who finished onboarding and has a PIN verifier for
+  `TEST_PIN` (`test/setup-state.ts`,
   so the gate opens the tabs; gate / onboarding tests start with `freshInstall()` or
   `seedOnboardedWithoutSecurity()`) and mocks the Sinhala font and splash screen for the root
   layout. The mock's `setItem` goes through `multiSet` (a write shows in both call lists). **Never `jest.spyOn` + restore the
@@ -820,21 +844,22 @@ secrets or personal data may appear in responses or logs.
   | 022 | Expo Router + Expo Go for S2; development build for push / OS offer links | Draft – review |
   | 023 | Wallet storage tiers: secure store, encrypted vault, AsyncStorage prefs   | Draft – review |
   | 024 | One shared "Navy and azure" palette, portals told apart by a role tag     | Draft – review |
+  | 025 | Wallet PIN: salted scrypt verifier in the secure store, attempt limits    | Draft – review |
 
 - **Evidence screenshots:** `docs/dev-log/evidence/s<sprint>-<YYYY-MM-DD>-<feature>-<what>.png`.
 - **Commits:** include the Jira key, e.g. `SCRUM-XX: <summary>`.
 
 ## Done so far (Sprint 1, and Sprint 2 from 27 Nov)
 
-Test totals (28 Nov 2026, wallet onboarding and Appearance; other packages unchanged since 27 Nov): **crypto-core 158 tests** (6 files; 97.63%
+Test totals (28 Nov 2026, wallet PIN and typography pass; other packages unchanged since 27 Nov): **crypto-core 158 tests** (6 files; 97.63%
 statements, 93.89% branches, 100% functions, 99.14% lines), **backend
 571 tests** (23 files in two Vitest projects; 90.74% statements, 88.08% branches, 94.52% functions,
 91.13% lines; thresholds 90 / 86 / 93 / 90), **issuer-portal 424 tests** (18
 files; 97.56% statements, 92.2% branches, 98.02% functions, 98.57% lines;
 thresholds 96 / 91 / 97 / 98) plus **10 Playwright e2e tests**, **portal-ui 97
 tests** (8 files; 100% statements, 98.73% branches, 100% functions, 100% lines;
-thresholds 99 / 94 / 99 / 99), **wallet 473 tests** (17 files, Jest + RNTL; 99.54% statements,
-95.93% branches, 99.32% functions, 99.87% lines; thresholds 99 / 95 / 99 / 99) and
+thresholds 99 / 94 / 99 / 99), **wallet 599 tests** (20 files, Jest + RNTL; 99.56% statements,
+96.27% branches, 99.43% functions, 99.9% lines; thresholds 99 / 96 / 99 / 99) and
 **claims-validation 23 tests** (1 file; 98.63%
 statements, 90.47% branches, 100% functions, 98.57% lines; thresholds 98 / 89 / 100 / 98),
 all passing.
@@ -988,5 +1013,13 @@ replaces }`.
   `/setup/security` placeholder with `isSecuritySetupComplete()` on a placeholder flag (dev-only
   Continue); Diagnostics → Reset onboarding (dev only; Diagnostics now inline-gated, stripped from
   release bundles); `ChoiceList`, `Checkbox`; contrast 83 / 82 pairs.
+- **Wallet PIN and typography pass** (28 Nov, Sprint 2, `docs/security/wallet-pin.md`, Decision
+  025, `docs/frontend/mobile-wallet.md` §16–17): `/setup/security` is the PIN flow (intro, create
+  with weak-PIN rules, confirm with mismatch / 3-strike restart, "PIN set", biometric hook);
+  `PinPad` (dots announced as a count, 56 pt keys, shake unless reduce motion); scrypt verifier in
+  `expo-secure-store` (this device only), constant-time `verifyPin`, attempt record for app lock;
+  the gate checks for the verifier (placeholder preference and dev Continue removed); release-only
+  screen-capture blocking; Diagnostics → PIN hashing time, Reset onboarding deletes the PIN. Wallet
+  typography and layout rules in the design system, applied to every screen and tested per route.
 - **Planned routes (return `501` until built):** wallet redemption
   (`/credential-offers/token`, `/credential`), verifications.

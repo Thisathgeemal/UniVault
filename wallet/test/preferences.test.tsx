@@ -19,16 +19,15 @@ import {
   loadAppearancePreference,
   loadLanguagePreference,
   loadOnboardingProgress,
-  loadSecuritySetupFlag,
   parsePrivacyAcknowledgement,
   PREFERENCE_KEYS,
   saveAppearancePreference,
   saveLanguagePreference,
   saveOnboardingCompleted,
-  saveSecuritySetupFlag,
   SETUP_PROGRESS_KEYS,
 } from '../src/lib/preferences';
 import { ROUTES } from '../src/navigation/routes';
+import * as SecureStore from 'expo-secure-store';
 import { freshInstall } from './setup-state';
 
 const APP_DIR = join(__dirname, '..', 'app');
@@ -134,16 +133,12 @@ describe('appearance and onboarding preferences', () => {
     }
   });
 
-  it('security placeholder flag; reset removes only the setup keys', async () => {
-    await freshInstall();
-    expect(await loadSecuritySetupFlag()).toBe(false);
-    expect(await saveSecuritySetupFlag()).toBe(true);
-    expect(await loadSecuritySetupFlag()).toBe(true);
+  it('reset removes only the onboarding keys; language and appearance stay', async () => {
+    await saveOnboardingCompleted(ACK);
     await saveLanguagePreference('si');
     await saveAppearancePreference('dark');
     expect(await clearSetupProgress()).toBe(true);
     expect(multiRemove).toHaveBeenCalledWith([...SETUP_PROGRESS_KEYS]);
-    expect(await loadSecuritySetupFlag()).toBe(false);
     expect(await loadOnboardingProgress()).toEqual({
       onboardingCompleted: false,
       privacyAcknowledgement: null,
@@ -158,19 +153,16 @@ describe('appearance and onboarding preferences', () => {
       onboardingCompleted: false,
       privacyAcknowledgement: null,
     });
-    getItem.mockRejectedValueOnce(new Error('disk'));
-    expect(await loadSecuritySetupFlag()).toBe(false);
     multiSet.mockRejectedValueOnce(new Error('disk'));
     expect(await saveOnboardingCompleted(ACK)).toBe(false);
-    setItem.mockRejectedValueOnce(new Error('disk'));
-    expect(await saveSecuritySetupFlag()).toBe(false);
     multiRemove.mockRejectedValueOnce(new Error('disk'));
     expect(await clearSetupProgress()).toBe(false);
   });
 
   it('restoreAppState reads everything together and never rejects', async () => {
-    // five reads: language, appearance, the two onboarding keys, the security flag
-    for (let i = 0; i < 5; i++) getItem.mockRejectedValueOnce(new Error('disk'));
+    // four AsyncStorage reads (language, appearance, the two onboarding keys) and the PIN verifier
+    for (let i = 0; i < 4; i++) getItem.mockRejectedValueOnce(new Error('disk'));
+    (SecureStore.getItemAsync as jest.Mock).mockRejectedValueOnce(new Error('keystore'));
     expect(await restoreAppState()).toEqual({
       language: 'en',
       appearance: 'system',
@@ -189,7 +181,6 @@ const ALLOWED_VALUES: Record<string, (value: string) => boolean> = {
   'univault.appearance': (v) => ['system', 'light', 'dark'].includes(v),
   'univault.onboardingCompleted': (v) => v === 'true',
   'univault.privacyAcknowledgedAt': (v) => parsePrivacyAcknowledgement(v) !== null,
-  'univault.securitySetupCompleted': (v) => v === 'true',
 };
 
 describe('storage rule: preferences only', () => {
@@ -198,14 +189,13 @@ describe('storage rule: preferences only', () => {
     await chooseLanguage('en');
     for (const value of ['dark', 'light', 'system'] as const) await saveAppearancePreference(value);
     await saveOnboardingCompleted({ at: new Date().toISOString(), version: 'privacy-v1' });
-    await saveSecuritySetupFlag();
 
     const writes: [string, string][] = [
       ...(setItem.mock.calls as [string, string][]),
       ...(multiSet.mock.calls as [[string, string][]][]).flatMap(([pairs]) => pairs),
     ];
     // (the official mock's setItem goes through multiSet, so a write can appear in both lists)
-    expect(new Set(writes.map(([key]) => key)).size).toBe(5);
+    expect(new Set(writes.map(([key]) => key)).size).toBe(4);
     for (const [key, value] of writes) {
       expect([key, ALLOWED_VALUES[key]?.(value) ?? 'not a preference key']).toEqual([key, true]);
     }

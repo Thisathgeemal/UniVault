@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import { MIN_TOUCH_TARGET } from '../theme';
+import { LIST_ROW_MIN_HEIGHT, MIN_TOUCH_TARGET } from '../theme';
 import { useTheme } from '../theme/use-theme';
 import { AppText } from './AppText';
 import { Icon } from './Icon';
@@ -58,7 +58,7 @@ export function ChoiceList<T extends string>({
             style={[
               styles.option,
               {
-                minHeight: large ? MIN_TOUCH_TARGET + theme.space(5) : MIN_TOUCH_TARGET,
+                minHeight: large ? MIN_TOUCH_TARGET + theme.space(5) : LIST_ROW_MIN_HEIGHT,
                 borderRadius: theme.radius.md,
                 borderColor: isSelected ? theme.colors.accent : theme.colors.borderStrong,
                 backgroundColor: isSelected ? theme.colors.accent : theme.colors.surface,
@@ -74,7 +74,7 @@ export function ChoiceList<T extends string>({
               color={isSelected ? theme.colors.onAccent : theme.colors.accentText}
             />
             <AppText
-              variant={large ? 'h2' : 'label'}
+              variant={large ? 'h2' : 'body'}
               style={[
                 styles.label,
                 { color: isSelected ? theme.colors.onAccent : theme.colors.text },

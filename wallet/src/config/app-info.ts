@@ -36,11 +36,10 @@ export const uiKitEnabled = (): boolean => __DEV__;
 export const sampleDataEnabled = (): boolean => __DEV__;
 
 /**
- * PLACEHOLDER until the PIN task: the "Continue" button on /setup/security that marks security
- * setup as done (src/onboarding/security-setup.ts). Development builds only, so a release build
- * can never reach the wallet without real security setup.
+ * Screenshots and screen recording are blocked on the PIN screens in RELEASE builds only
+ * (src/security/screen-capture.ts), so development screenshots for the evidence still work.
  */
-export const securitySetupPlaceholderEnabled = (): boolean => __DEV__;
+export const screenCaptureBlockingEnabled = (): boolean => !__DEV__;
 
 /** Diagnostics → "Reset onboarding" (development builds only). */
 export const onboardingResetEnabled = (): boolean => __DEV__;

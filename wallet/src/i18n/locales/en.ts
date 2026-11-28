@@ -195,16 +195,40 @@ export const en = {
       version: 'Privacy text version: {{version}}',
     },
   },
-  /** After onboarding, before the wallet: security setup (placeholder until the PIN task). */
+  /** After onboarding, before the wallet: the PIN (app/setup/security.tsx). */
   setup: {
     title: 'Set up security',
-    heading: 'Set up your PIN',
-    body: 'Next, you choose a PIN for this wallet. You will use it, or your fingerprint, to open the wallet and before every share.',
-    comingSoon: 'PIN setup comes in the next version of the app.',
-    devNote:
-      'Development builds only: this marks security as set up so you can reach the wallet. The real PIN setup replaces it.',
-    devContinue: 'Continue (development placeholder)',
-    notSaved: 'Could not save this. You may see this screen again next time.',
+    intro: {
+      title: 'Set up your PIN',
+      body: 'Create a 6-digit PIN. You’ll use it to open UniVault and approve every share.',
+      cta: 'Create PIN',
+    },
+    create: {
+      title: 'Create your PIN',
+      body: 'Enter 6 digits. Choose numbers that are hard to guess.',
+    },
+    confirm: {
+      title: 'Confirm your PIN',
+      body: 'Enter the same 6 digits again.',
+    },
+    success: {
+      title: 'PIN set',
+      body: 'You’ll use your PIN to open UniVault and before every share. Never tell anyone your PIN.',
+      cta: 'Continue',
+    },
+    weak: 'This PIN is too easy to guess. Avoid repeated or consecutive numbers.',
+    mismatch: 'The PINs don’t match. Enter your new PIN again.',
+    restart: 'Let’s start again',
+    saveFailed: 'Your PIN could not be saved. Please create it again.',
+    saving: 'Saving your PIN…',
+    startAgain: 'Start again',
+    notCompleted: 'Something went wrong. Please try again.',
+  },
+  /** The PIN keypad (src/components/PinPad.tsx). Never the digits in a label. */
+  pin: {
+    dots: '{{count}} of {{total}} digits entered',
+    keypad: 'Number pad',
+    delete: 'Delete',
   },
   about: {
     title: 'About',
@@ -326,7 +350,7 @@ export const en = {
     notConfigured: 'Set the API base URL first.',
     resetTitle: 'Onboarding',
     resetDescription:
-      'Shows the first-start screens again. Clears the onboarding, privacy and security-setup flags; keeps the language and appearance.',
+      'Shows the first-start screens again. Clears the onboarding and privacy flags and deletes the PIN (verifier and attempt record); keeps the language and appearance.',
     resetButton: 'Reset onboarding',
     resetConfirmTitle: 'Reset onboarding?',
     resetConfirmMessage:
@@ -334,6 +358,11 @@ export const en = {
     resetConfirm: 'Reset',
     resetDone: 'Onboarding reset',
     resetFailed: 'Could not reset onboarding.',
+    pinTitle: 'PIN hashing time',
+    pinDescription:
+      'Times one scrypt derivation with the default PIN parameters on random data (never a PIN). Target: 250–500 ms on a mid-range Android phone.',
+    pinParams: 'scrypt N = {{N}}, r = {{r}}, p = {{p}} ({{mib}} MiB)',
+    pinResult: '{{ms}} ms',
   },
   errors: {
     title: 'Something went wrong',

@@ -12,9 +12,11 @@ status badges in the issuer portal's words, the "Navy and azure" design system
 tokens, Noto Sans + Noto Sans Sinhala, WCAG AA contrast tested in both themes), the saved
 language preference, About, and the dev-only Diagnostics and UI kit.
 **28 Nov 2026:** onboarding on the first start (language, welcome, how it works, selective
-disclosure, security, privacy with "I understand"), then a "Set up your PIN" placeholder; a
-**gate** opens the tabs only when onboarding AND security setup are complete; **Settings →
-Appearance** (Use device setting / Light / Dark).
+disclosure, security, privacy with "I understand"), then **PIN setup** (create and confirm a
+6-digit PIN; a salted scrypt verifier in the secure store, this device only:
+[docs/security/wallet-pin.md](../docs/security/wallet-pin.md)); a **gate** opens the tabs only
+when onboarding is done AND a PIN exists; **Settings → Appearance** (Use device setting / Light /
+Dark); a typography and layout pass over every screen.
 Credentials and History show **synthetic sample data in development builds only**; credential
 redemption, the vault, the camera and presentation follow in the next Sprint 2 tasks. Design
 doc: [docs/frontend/mobile-wallet.md](../docs/frontend/mobile-wallet.md).
@@ -99,7 +101,7 @@ bundle; never put a secret in one.
 | `npm run typecheck`           | `tsc --noEmit` (TypeScript 6.0.3)                                              |
 | `npm run lint`                | Root ESLint config on `wallet/`, 0 warnings allowed                            |
 | `npm test`                    | Jest (jest-expo) + React Native Testing Library                                |
-| `npm run test:coverage`       | Same with coverage; fails below 99 / 95 / 99 / 99 (stmts/branches/funcs/lines) |
+| `npm run test:coverage`       | Same with coverage; fails below 99 / 96 / 99 / 99 (stmts/branches/funcs/lines) |
 | `npm run doctor`              | `npx expo-doctor`: SDK version alignment, config and dependency checks         |
 | `npm run fixture:diagnostics` | Regenerates the synthetic SD-JWT used by Diagnostics (throwaway keys)          |
 | `npm run art:placeholder`     | Regenerates the placeholder icon and splash PNGs from the design tokens        |
@@ -120,7 +122,7 @@ wallet/
     index.tsx              / → where the gate says (onboarding, setup or /credentials)
     onboarding/            _layout (gate) + language, welcome, how-it-works, selective-disclosure,
                            security, privacy, privacy-details
-    setup/                 _layout (gate) + security ("Set up your PIN" placeholder)
+    setup/                 _layout (gate) + security (the PIN flow: create, confirm, "PIN set")
     +not-found.tsx
     (tabs)/_layout.tsx     Credentials · Scan · History · Settings (backBehavior firstRoute; gate)
     (tabs)/credentials/    _layout (Stack), index (list), [id] (detail placeholder)
@@ -133,8 +135,10 @@ wallet/
                            SectionHeader, LoadingState, EmptyState, ErrorState, OfflineNotice,
                            Toast, ConfirmDialog, Icon, Screen, AppText, ErrorBoundary, ChoiceList,
                            Checkbox
-    onboarding/            steps, gate (THE gate rule), SetupProvider, security-setup (placeholder),
+    onboarding/            steps, gate (THE gate rule), SetupProvider, security-setup (PIN exists?),
                            OnboardingStep, illustrations (react-native-svg)
+    security/              pin (verifier, verifyPin, attempt record), pin-rules, constant-time,
+                           screen-capture (release builds), setup-flow (biometric hook)
     credentials/           status.ts: backend status → wallet state (the one mapping)
     theme/                 the shared tokens (design names, light/dark); useTheme; appearance
                            (Appearance setting); reduce-motion; contrast.ts
@@ -156,22 +160,23 @@ wallet/
 
 `@react-native-async-storage/async-storage` holds **non-secret preferences only** (Decision 023):
 `univault.language`, `univault.appearance`, `univault.onboardingCompleted`,
-`univault.privacyAcknowledgedAt` (ISO date + privacy text version) and the placeholder
-`univault.securitySetupCompleted` (replaced by a secure-store check in the PIN task). It is
-unencrypted: never put a key, credential, SD-JWT, claim, token, PIN or anything personal in it.
-Those go in secure storage (`expo-secure-store`) from the holder-key and vault tasks. Every
+`univault.privacyAcknowledgedAt` (ISO date + privacy text version). It is unencrypted: never put
+a key, credential, SD-JWT, claim, token, PIN or anything personal in it. Those go in secure
+storage (`expo-secure-store`): today the PIN verifier (`univault.pinVerifier`) and the
+failed-attempt record (`univault.pinAttempts`), readable only on this phone while it is unlocked. Every
 AsyncStorage key is listed in `src/lib/preferences.ts` (table in
 [mobile-wallet.md](../docs/frontend/mobile-wallet.md) §9).
 
 ## First start and the gate
 
 A fresh install opens onboarding (`/onboarding/language` … `/onboarding/privacy`), then
-`/setup/security`, and only then the tabs; any URL into the tabs before that is redirected
-(`src/onboarding/gate.ts`, [mobile-wallet.md](../docs/frontend/mobile-wallet.md) §15). Until the
-PIN task, `/setup/security` is a placeholder: in a **development build** its "Continue
-(development placeholder)" button marks security as set up; a release build cannot get past it.
-To see onboarding again: **Settings → Diagnostics → Reset onboarding** (development builds only;
-keeps the language and appearance).
+`/setup/security` (create and confirm the PIN), and only then the tabs; any URL into the tabs
+before that is redirected (`src/onboarding/gate.ts`, [mobile-wallet.md](../docs/frontend/mobile-wallet.md)
+§15–16). Screenshots are blocked on the PIN screen in release builds only, so development
+screenshots work. To see onboarding again: **Settings → Diagnostics → Reset onboarding**
+(development builds only; deletes the PIN, keeps the language and appearance). **Settings →
+Diagnostics → PIN hashing time** shows how long one PIN derivation takes on your phone (target
+250–500 ms).
 
 ## Design system
 
@@ -184,7 +189,7 @@ theme follows the phone unless **Settings → Appearance** fixes it to Light or 
 ## Developer screens
 
 **Settings → Developer** (development builds only): **Diagnostics** (versions, crypto-core and
-API checks, Reset onboarding) and **UI kit** (every component, variant and status in the current language and
+API checks, PIN hashing time, Reset onboarding) and **UI kit** (every component, variant and status in the current language and
 colour scheme; switch the phone to dark mode to see the dark theme). Neither is reachable in a
 release build.
 

@@ -223,6 +223,46 @@ store, issuer portal) is logged in [sprint-1.md](sprint-1.md).
   [s2-wallet-onboarding-guide.md](evidence/s2-wallet-onboarding-guide.md) (screenshots to be
   taken).
 
+### Sat 28 Nov (wallet PIN, and the wallet typography and layout pass)
+
+- **Done:** **PIN** (Decision 025, draft; [wallet-pin.md](../security/wallet-pin.md)):
+  `/setup/security` is now the PIN flow: intro ("Create a 6-digit PIN. You'll use it to open
+  UniVault and approve every share.") → create → confirm → "PIN set" → Continue →
+  `stepAfterPinCreated()` (the biometric task's hook; today it completes setup and the gate opens
+  the tabs). Weak PINs refused (all the same, consecutive incl. wrapping, repeated blocks,
+  counting pairs, mirrored, 23 common keypad/number patterns: 2,053 of 1,000,000); mismatch
+  message and cleared entry, back to create after 3 ("Let's start again"). `PinPad`: six dots
+  announced as "3 of 6 digits entered", 1–9 / 0 / Delete, 56 pt keys, no system keyboard, shake
+  on error unless reduce motion. Storage: a `{ v: 1, alg: "scrypt", params, salt, hash }` verifier
+  (scrypt N 2^12, r 8, p 1, 4 MiB; 16-byte salt from expo-crypto; `@noble/hashes` 2.4.0 pinned in
+  the wallet) in `expo-secure-store` 58.0.3 with `WHEN_UNLOCKED_THIS_DEVICE_ONLY` and no OS prompt,
+  excluded from Android backup (secure-store config plugin); `verifyPin` re-derives with the
+  stored parameters, constant-time compare, never throws; a separate `{ failedAttempts,
+lockedUntil }` record with helpers for app lock. The PIN is cleared from state at once and
+  never logged, put in route params, errors or storage (a test searches all of them). Screen
+  capture blocked on the PIN screen in release builds only (`expo-screen-capture` 58.0.6). Gate:
+  `isSecuritySetupComplete()` = a valid verifier exists (awaited under the splash: no tab flash);
+  the placeholder preference and the dev-only Continue button are gone. Diagnostics: **PIN
+  hashing time** (one derivation with the defaults on random data) and Reset onboarding now
+  deletes the PIN data. **KDF choice:** 15 ms on the PC (V8); Hermes on a mid-range Android
+  estimated 10–40× slower, so about 150–600 ms; to be measured on the phone. **Typography and
+  layout pass** (design-system.md "Wallet typography and layout", mobile-wallet.md §17 lists every
+  change per screen): muted text is 14, button labels 16/600, section headings h3 with `Section`
+  grouping, screens space-4 / space-6 / 560 pt, list rows 56 pt with field labels above values,
+  states and lists left-aligned, onboarding hero headings centred and buttons full width and
+  stacked in `BottomActions`; a test checks the rules on every route. Wallet tests 473 → **599**
+  (20 files), coverage 99.56 / 96.27 / 99.43 / 99.9 (branches threshold raised 95 → 96).
+  expo-doctor 20/20; Metro Android bundle 1,523 modules (dev-only PIN-hashing card and Reset
+  absent from it); root lint 0 warnings, format and secrets checks pass.
+- **Next:** Measure **PIN hashing time** on a mid-range Android phone and tune N (wallet-pin.md
+  §5); check the common-PIN list against the cited studies; native-speaker review of the new
+  Sinhala strings (about 30); screenshots ([s2-wallet-pin-guide.md](evidence/s2-wallet-pin-guide.md));
+  biometric setup at the hook; app lock with the attempt policy.
+- **Blockers:** None.
+- **Evidence:** `wallet/test/pin-rules.test.ts` (60), `pin.test.ts` (21), `pin-flow.test.tsx`
+  (24), `design-system.test.tsx` (38, typography per route),
+  [s2-wallet-pin-guide.md](evidence/s2-wallet-pin-guide.md) (screenshots to be taken).
+
 ## Backlog
 
 - **Sample data in the release bundle:** `src/fixtures/sample-data.ts` (synthetic, never shown
@@ -242,9 +282,13 @@ store, issuer portal) is logged in [sprint-1.md](sprint-1.md).
 - **Native-speaker review** of `wallet/src/i18n/locales/si.ts` (27 Nov: about 110 new strings
   for the shell, UI kit included; 28 Nov: about 70 more for onboarding, setup, Appearance and
   Reset onboarding, including "Step X of Y" = "පියවර Y න් X වැන්න").
-- **Security-setup placeholder:** `isSecuritySetupComplete()` reads the
-  `univault.securitySetupCompleted` preference and a development-only button sets it; the PIN task
-  replaces both with a secure-store check (until then a release build stops at `/setup/security`).
+- **"Change PIN"** in Settings → Security (requires the current PIN; then `savePin()` with a
+  new salt; clears the attempt record).
+- **KDF parameters on a real phone:** record Diagnostics → PIN hashing time on a mid-range Android
+  (and an iPhone if available) and tune `DEFAULT_KDF_PARAMS` (wallet-pin.md §5); consider re-hashing
+  old verifiers after a successful unlock (app-lock task).
+- **Common-PIN list:** compare `COMMON_PINS` with the published lists (Markert et al. 2020; Wang et
+  al. 2017) before release.
 - **Final app icon and splash** (the current ones are generated placeholders).
 
 ## Testing evidence
@@ -253,10 +297,12 @@ Record the tests that show the sprint goal is met, with links to output in `evid
 
 | Test / check                         | Type (unit / integration / manual)           | Result         | Evidence                                                                          |
 | ------------------------------------ | -------------------------------------------- | -------------- | --------------------------------------------------------------------------------- |
-| Wallet unit and component tests      | unit / component (Jest + RNTL)               | 473 passed     | `wallet/test/`                                                                    |
+| Wallet unit and component tests      | unit / component (Jest + RNTL)               | 599 passed     | `wallet/test/`                                                                    |
 | Onboarding gate and flows            | component (real `app/` tree)                 | 83 passed      | `wallet/test/onboarding.test.tsx`                                                 |
 | Appearance setting and status bar    | component (simulated system changes)         | 19 passed      | `wallet/test/appearance.test.tsx`                                                 |
 | Onboarding on the phone              | manual (Expo Go)                             | to be recorded | [s2-wallet-onboarding-guide.md](evidence/s2-wallet-onboarding-guide.md)           |
+| PIN rules, verifier, flow, secrecy   | unit / component (Jest + RNTL)               | 105 passed     | `wallet/test/pin-rules.test.ts`, `pin.test.ts`, `pin-flow.test.tsx`               |
+| PIN hashing time on a phone          | manual (Diagnostics, dev build)              | to be recorded | [s2-wallet-pin-guide.md](evidence/s2-wallet-pin-guide.md)                         |
 | Wallet status words = issuer portal  | unit (parity test, en + si)                  | passed         | `wallet/test/status.test.tsx`                                                     |
 | WCAG AA contrast, light and dark     | unit (83 / 82 design + component pairs)      | passed         | `wallet/test/contrast.test.ts`                                                    |
 | One primary action per page / screen | component (portal and wallet)                | passed         | `issuer-portal/test/design-system.test.tsx`, `wallet/test/design-system.test.tsx` |
@@ -466,3 +512,28 @@ android` (a release bundle) still contained the kit's test IDs.
 - **Resolution:** Spread the real module and replace only `StatusBar`
   (`{{ ...jest.requireActual('expo-status-bar'), StatusBar }}`).
 - **Lesson:** Partial mocks of a module the framework itself uses must keep its other exports.
+
+### Issue 13: A PowerShell one-liner corrupted a test file's quotes (28 Nov 2026)
+
+- **Task:** Diagnostics test for the PIN hashing time
+- **Symptom:** After adding one import with `(Get-Content … -Raw) -replace … | Set-Content -Encoding
+utf8`, the unrelated health-check test failed: its expected text "server status “ok”" had become
+  "â€œokâ€", and the file started with a byte-order mark.
+- **Cause:** Windows PowerShell 5.1 reads files in the ANSI code page by default and writes UTF-8
+  WITH a BOM; the curly quotes were decoded as three Windows-1252 characters each.
+- **Resolution:** Restored the quotes and removed the BOM (the diff then showed only the new
+  lines). Edits to source files go through the editor or a UTF-8 Python script, never
+  Get-Content / Set-Content without `-Encoding utf8` on both sides.
+- **Lesson:** The console guard and the test caught it; check `git diff` for unrelated changes
+  after any scripted edit.
+
+### Issue 14: `useRef(new Animated.Value(0)).current` fails the React Compiler lint (28 Nov 2026)
+
+- **Task:** PinPad shake
+- **Symptom:** `react-hooks/refs`: "Cannot access refs during render" on the common React Native
+  idiom.
+- **Cause:** react-hooks 7 (React Compiler rules) forbids reading `ref.current` while rendering.
+- **Resolution:** `const [shake] = useState(() => new Animated.Value(0))`: created once, no ref
+  read in render. The colour keyword `'transparent'` moved to a theme constant (`TRANSPARENT`) for
+  `react-native/no-color-literals`.
+- **Lesson:** Prefer a lazy `useState` for values that are created once and never replaced.

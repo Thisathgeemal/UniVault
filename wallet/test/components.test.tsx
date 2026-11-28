@@ -32,7 +32,14 @@ import {
 import { diagnosticsEnabled, getAppInfo } from '../src/config/app-info';
 import { en } from '../src/i18n/locales/en';
 import { formatDate } from '../src/lib/format';
-import { buttonColors, lightColors, MIN_TOUCH_TARGET, radius, toneColors } from '../src/theme';
+import {
+  buttonColors,
+  lightColors,
+  LIST_ROW_MIN_HEIGHT,
+  MIN_TOUCH_TARGET,
+  radius,
+  toneColors,
+} from '../src/theme';
 import { renderWithProviders, TEST_SAFE_AREA } from './render';
 
 function Bomb({ explode }: { explode: boolean }) {
@@ -233,7 +240,7 @@ describe('Header', () => {
 });
 
 describe('ListItem and SectionHeader', () => {
-  it('a pressable row is one labelled 44 pt button with a chevron', async () => {
+  it('a pressable row is one labelled 56 pt button with a chevron', async () => {
     const user = userEvent.setup();
     const onPress = jest.fn();
     await renderWithProviders(
@@ -247,7 +254,8 @@ describe('ListItem and SectionHeader', () => {
       />,
     );
     const row = screen.getByRole('button', { name: 'Language, English, Whole app' });
-    expect(row).toHaveStyle({ minHeight: MIN_TOUCH_TARGET });
+    expect(row).toHaveStyle({ minHeight: LIST_ROW_MIN_HEIGHT });
+    expect(LIST_ROW_MIN_HEIGHT).toBe(56);
     expect(row.props.accessibilityHint).toBe('Opens');
     await user.press(row);
     expect(onPress).toHaveBeenCalled();

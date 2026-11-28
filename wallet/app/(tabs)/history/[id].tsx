@@ -34,12 +34,12 @@ export default function HistoryEntryScreen() {
   return (
     <Screen testID="history-detail-screen" title={t(`history.kinds.${entry.kind}`)}>
       <Card>
-        <ListItem title={t('history.fields.with')} subtitle={entry.party} />
-        <ListItem title={t('history.fields.when')} subtitle={formatDate(entry.at, i18n.language)} />
+        <ListItem label={t('history.fields.with')} title={entry.party} />
+        <ListItem label={t('history.fields.when')} title={formatDate(entry.at, i18n.language)} />
         {credential ? (
           <ListItem
-            title={t('history.fields.credential')}
-            subtitle={t(`credentialTypes.${credential.type}`)}
+            label={t('history.fields.credential')}
+            title={t(`credentialTypes.${credential.type}`)}
             onPress={() => router.navigate(ROUTES.credential(credential.id))}
           />
         ) : null}

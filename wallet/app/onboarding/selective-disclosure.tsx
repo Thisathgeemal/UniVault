@@ -29,7 +29,7 @@ export default function OnboardingSelectiveDisclosureScreen() {
           {t('onboarding.selectiveDisclosure.exampleTitle')}
         </AppText>
         {/* text on brand-soft is text or text-muted, never text-subtle (dark 4.04:1) */}
-        <AppText tone="muted">{t('onboarding.selectiveDisclosure.example')}</AppText>
+        <AppText>{t('onboarding.selectiveDisclosure.example')}</AppText>
       </View>
     </OnboardingStep>
   );

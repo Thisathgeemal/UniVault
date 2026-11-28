@@ -28,7 +28,8 @@ export interface ButtonProps {
 
 /**
  * Accessible button in the design system's kinds: role "button", disabled/busy state announced,
- * at least 44 × 44 pt, radius-md, label type step.
+ * at least 44 × 44 pt, radius-md, label 16 / weight 600. On onboarding and setup screens buttons
+ * sit full width in BottomActions.
  */
 export function Button({
   label,
@@ -72,7 +73,8 @@ export function Button({
         ) : icon ? (
           <Icon name={icon} size={20} color={colors.fg} />
         ) : null}
-        <AppText variant="label" style={[styles.label, { color: colors.fg }]}>
+        {/* button labels: 16 / weight 600 (the h3 step; wallet typography) */}
+        <AppText variant="h3" style={[styles.label, { color: colors.fg }]}>
           {label}
         </AppText>
       </View>

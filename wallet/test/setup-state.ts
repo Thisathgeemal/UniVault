@@ -1,20 +1,33 @@
 /**
- * Saved setup states for tests. test/setup.ts seeds COMPLETED (onboarded + placeholder security
- * flag) before every test, because most tests are about the wallet itself, which the gate opens
- * only for a holder who finished setup. Tests of the gate and onboarding start from
- * freshInstall() or seedOnboardedWithoutSecurity() instead.
+ * Saved setup states for tests. test/setup.ts seeds COMPLETED (onboarded + a PIN verifier in the
+ * secure store) before every test, because most tests are about the wallet itself, which the
+ * gate opens only for a holder who finished setup. Tests of the gate, onboarding and the PIN start
+ * from freshInstall() or seedOnboardedWithoutSecurity() instead.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { FLAG_TRUE, PREFERENCE_KEYS } from '../src/lib/preferences';
 import { PRIVACY_POLICY_VERSION, type SetupState } from '../src/onboarding/gate';
+import { createPinVerifier, PIN_VERIFIER_KEY } from '../src/security/pin';
 
 export const ACKNOWLEDGED = { at: '2026-11-28T08:00:00.000Z', version: PRIVACY_POLICY_VERSION };
+
+/** The PIN behind the seeded verifier (passes the rules; searched for by pin-secrecy tests). */
+export const TEST_PIN = '274913';
 
 export const COMPLETED_SETUP: SetupState = {
   onboardingCompleted: true,
   privacyAcknowledgement: ACKNOWLEDGED,
   securitySetupComplete: true,
 };
+
+/** The in-memory secure store of the expo-secure-store mock (test/setup.ts). */
+export const secureStore = (SecureStore as unknown as { mockStore: Map<string, string> }).mockStore;
+
+/** One real verifier for TEST_PIN per test file (scrypt with the default parameters, once). */
+let seededVerifier: Promise<string> | null = null;
+const verifierJson = () =>
+  (seededVerifier ??= createPinVerifier(TEST_PIN).then((v) => JSON.stringify(v)));
 
 const onboardedEntries = (): [string, string][] => [
   [PREFERENCE_KEYS.onboardingCompleted, FLAG_TRUE],
@@ -23,23 +36,30 @@ const onboardedEntries = (): [string, string][] => [
 
 /** Mock call lists start empty in every test (seeding must not count as the test's writes). */
 function forgetSeedCalls() {
-  (AsyncStorage.multiSet as jest.Mock).mockClear();
-  (AsyncStorage.setItem as jest.Mock).mockClear();
-  (AsyncStorage.clear as jest.Mock).mockClear();
+  for (const fn of [
+    AsyncStorage.multiSet,
+    AsyncStorage.setItem,
+    AsyncStorage.clear,
+    SecureStore.setItemAsync,
+    SecureStore.getItemAsync,
+    SecureStore.deleteItemAsync,
+  ]) {
+    (fn as jest.Mock).mockClear();
+  }
 }
 
-/** Onboarding done and the placeholder security flag set: the gate opens the tabs. */
+/** Onboarding done and a PIN set: the gate opens the tabs. */
 export async function seedCompletedSetup() {
-  await AsyncStorage.multiSet([
-    ...onboardedEntries(),
-    [PREFERENCE_KEYS.securitySetupCompleted, FLAG_TRUE],
-  ]);
+  secureStore.clear();
+  await AsyncStorage.multiSet(onboardedEntries());
+  secureStore.set(PIN_VERIFIER_KEY, await verifierJson());
   forgetSeedCalls();
 }
 
-/** Onboarding done, security not set up: the gate opens /setup/security. */
+/** Onboarding done, no PIN: the gate opens /setup/security. */
 export async function seedOnboardedWithoutSecurity() {
   await AsyncStorage.clear();
+  secureStore.clear();
   await AsyncStorage.multiSet(onboardedEntries());
   forgetSeedCalls();
 }
@@ -47,5 +67,6 @@ export async function seedOnboardedWithoutSecurity() {
 /** Nothing saved (first start): the gate opens onboarding. */
 export async function freshInstall() {
   await AsyncStorage.clear();
+  secureStore.clear();
   forgetSeedCalls();
 }

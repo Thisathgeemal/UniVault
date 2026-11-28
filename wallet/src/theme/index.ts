@@ -30,8 +30,22 @@ export const space = (steps: number): number => 4 * steps;
 
 export const radius = radiusTokens;
 
-/** Standard screen padding (points): space-4. */
+/**
+ * Wallet layout (design-system.md, "Wallet typography and layout"):
+ * - SCREEN_PADDING: space-4 left and right on phones (and at the top of a screen);
+ * - SECTION_GAP: space-6 between the sections of a screen;
+ * - CARD_GAP: space-2 between the lines inside a card (space-3 between groups in a card);
+ * - LIST_ROW_MIN_HEIGHT: 56 pt rows;
+ * - MAX_READABLE_WIDTH: text and forms stop at 560 pt and centre on tablets.
+ */
 export const SCREEN_PADDING = space(4);
+export const SECTION_GAP = space(6);
+export const CARD_GAP = space(2);
+export const LIST_ROW_MIN_HEIGHT = space(14);
+export const MAX_READABLE_WIDTH = space(140);
+
+/** No fill (empty PIN dots, the keypad's Delete key): a keyword, not a colour value. */
+export const TRANSPARENT = 'transparent';
 
 /** Minimum touch target and button height in the wallet (design system: 44). */
 export const MIN_TOUCH_TARGET = minButtonHeight.wallet;

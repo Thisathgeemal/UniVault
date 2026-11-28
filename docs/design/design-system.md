@@ -96,6 +96,29 @@ Buttons use `radius-md` and a minimum height of 44px in the wallet (touch target
 
 Spacing runs on a 4px base: `space-1` 4, `space-2` 8, `space-3` 12, `space-4` 16, `space-6` 24, `space-8` 32. Radius: `radius-sm` 6 for inputs and badges, `radius-md` 10 for buttons and portal cards, `radius-lg` 16 for wallet credential cards, `radius-pill` for tags.
 
+## Wallet typography and layout
+
+Every wallet screen follows these rules (values from `portal-ui/src/tokens.ts`; the wallet's
+`src/theme` constants and `wallet/test/design-system.test.tsx` check them on every route):
+
+- **Type:** body 16 / 26 for what people read; secondary text (hints, subtitles, field names,
+  trailing values) `body-sm` 14 in `text-muted`; `caption` 12 only for metadata (dates, versions,
+  "Step 2 of 6", durations); headings `h1` 24, `h2` 20, `h3` 16, all weight 600 (Noto Sans
+  Sinhala SemiBold in Sinhala). No other sizes (`mono` 13 only on developer screens). Text-muted
+  is never larger than 14.
+- **Alignment:** body text, lists and forms are left-aligned. Centre only the hero heading of an
+  onboarding or setup screen, illustrations (and the labels inside them) and the PIN dots and
+  keypad. Empty, error and loading states are left-aligned too.
+- **Spacing:** `space-4` at the sides (and top) of every phone screen, `space-6` between
+  sections and at the bottom; a section's heading (`h3`) sits `space-2` above its content; inside
+  a card `space-2` between lines and `space-3` between groups. List rows are at least 56 pt high.
+  Text and forms stop at 560 pt wide and centre on tablets.
+- **Buttons:** label 16, weight 600. On onboarding and setup screens the buttons are full width,
+  stacked at the bottom in one `surface` footer (border top, `space-4` padding plus the safe-area
+  inset), the primary first and Back or another secondary below it. One primary per screen.
+- **PIN entry:** six dots (filled = entered, outlined = empty: shape, not only colour) and a
+  0–9 pad in the phone layout with Delete, keys at least 56 pt, centred, at most 360 pt wide.
+
 ## Do and don't
 
 | Do                                                                           | Don't                                                                |

@@ -321,7 +321,7 @@ export function HowItWorksIllustration({
       </Drawing>
       <View style={styles.labels}>
         {labels.map((label) => (
-          <AppText key={label} variant="caption" tone="onBrand" style={styles.label}>
+          <AppText key={label} variant="bodySm" tone="onBrand" style={styles.label}>
             {label}
           </AppText>
         ))}

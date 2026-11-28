@@ -66,6 +66,7 @@ describe('translations', () => {
       'about.sdkVersion',
       'history.entrySubtitle', // only placeholders and a separator
       'uiKit.disclosureVerifier', // an invented organisation name
+      'diagnostics.pinParams', // KDF parameter names and numbers
     ]);
     for (const key of keys) {
       if (latinOnly.has(key)) continue;

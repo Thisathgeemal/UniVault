@@ -50,7 +50,13 @@ import {
 import { darkColors, lightColors } from '../src/theme';
 import { useSetup } from '../src/onboarding/SetupProvider';
 import { renderWithProviders } from './render';
-import { ACKNOWLEDGED, freshInstall, seedOnboardedWithoutSecurity } from './setup-state';
+import { PIN_ATTEMPTS_KEY, PIN_VERIFIER_KEY } from '../src/security/pin';
+import {
+  ACKNOWLEDGED,
+  freshInstall,
+  secureStore,
+  seedOnboardedWithoutSecurity,
+} from './setup-state';
 
 const APP_DIR = join(__dirname, '..', 'app');
 const flat = (style: unknown) => StyleSheet.flatten(style as never) as Record<string, unknown>;
@@ -450,8 +456,8 @@ describe('Privacy: "I understand" and the acknowledgement', () => {
     expect(stored.at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(Date.parse(stored.at)).toBeGreaterThanOrEqual(before - 1000);
     expect(Date.parse(stored.at)).toBeLessThanOrEqual(Date.now());
-    // security is still not set up: the tabs stay closed
-    expect(await AsyncStorage.getItem(PREFERENCE_KEYS.securitySetupCompleted)).toBeNull();
+    // security is still not set up: no PIN yet, the tabs stay closed
+    expect(secureStore.has(PIN_VERIFIER_KEY)).toBe(false);
   });
 
   it('a failed save still moves on this session and says so', async () => {
@@ -626,50 +632,21 @@ describe('design: dark theme, large text, one primary action', () => {
         expect(text.props.adjustsFontSizeToFit).toBeUndefined();
         expect(text.props.allowFontScaling).not.toBe(false);
       }
-      // the footer buttons wrap onto their own lines instead of squeezing the labels
+      // full-width buttons stacked in the bottom actions (primary first), never squeezed side by side
       const next = within(step).getByTestId('onboarding-next');
-      expect(flat(next.parent?.props.style).flexBasis).toBe('40%');
-      expect(flat(next.parent?.parent?.props.style).flexWrap).toBe('wrap');
+      expect(next.parent?.props.testID).toBe('onboarding-actions-buttons');
+      expect(flat(next.parent?.props.style).flexDirection).toBeUndefined();
+      const back = within(step).queryByTestId('onboarding-back');
+      if (back)
+        expect(next.parent?.children.indexOf(next)).toBeLessThan(
+          next.parent?.children.indexOf(back) ?? -1,
+        );
       const primaries = within(step)
         .getAllByRole('button')
         .filter((el) => flat(el.props.style)?.backgroundColor === lightColors.accent);
       expect(primaries).toHaveLength(1);
     },
   );
-});
-
-describe('security setup (placeholder until the PIN task)', () => {
-  it('explains the PIN and, in development builds, continues to the wallet', async () => {
-    await seedOnboardedWithoutSecurity();
-    const user = userEvent.setup();
-    await openApp(ROUTES.setupSecurity);
-    await screen.findByTestId('setup-security-screen');
-    expect(screen.getByText(en.setup.heading)).toBeOnTheScreen();
-    expect(screen.getByRole('header', { name: en.setup.title })).toBeOnTheScreen();
-    await user.press(screen.getByTestId('setup-dev-continue'));
-    expect(await screen.findByTestId('credentials-screen')).toBeOnTheScreen();
-    expect(await AsyncStorage.getItem(PREFERENCE_KEYS.securitySetupCompleted)).toBe(FLAG_TRUE);
-  });
-
-  it('says so if the placeholder flag could not be saved', async () => {
-    await seedOnboardedWithoutSecurity();
-    (AsyncStorage.setItem as jest.Mock).mockRejectedValueOnce(new Error('disk'));
-    const user = userEvent.setup();
-    await openApp(ROUTES.setupSecurity);
-    await user.press(await screen.findByTestId('setup-dev-continue'));
-    expect(await screen.findByText(en.setup.notSaved)).toBeOnTheScreen();
-  });
-
-  it('release build: no way past this screen (no placeholder button, inline __DEV__ gate)', async () => {
-    jest.spyOn(appInfo, 'securitySetupPlaceholderEnabled').mockReturnValue(false);
-    await seedOnboardedWithoutSecurity();
-    await openApp(ROUTES.setupSecurity);
-    await screen.findByTestId('setup-security-screen');
-    expect(screen.getByTestId('setup-coming-soon')).toHaveTextContent(en.setup.comingSoon);
-    expect(screen.queryByTestId('setup-dev-continue')).toBeNull();
-    const source = readFileSync(join(APP_DIR, 'setup', 'security.tsx'), 'utf8');
-    expect(source).toContain('__DEV__ && securitySetupPlaceholderEnabled()');
-  });
 });
 
 describe('Diagnostics → Reset onboarding (development builds only)', () => {
@@ -689,10 +666,12 @@ describe('Diagnostics → Reset onboarding (development builds only)', () => {
     for (const key of [
       PREFERENCE_KEYS.onboardingCompleted,
       PREFERENCE_KEYS.privacyAcknowledgedAt,
-      PREFERENCE_KEYS.securitySetupCompleted,
     ]) {
       expect(await AsyncStorage.getItem(key)).toBeNull();
     }
+    // the PIN verifier and the attempt record are gone from the secure store
+    expect(secureStore.has(PIN_VERIFIER_KEY)).toBe(false);
+    expect(secureStore.has(PIN_ATTEMPTS_KEY)).toBe(false);
     expect(await AsyncStorage.getItem(PREFERENCE_KEYS.language)).toBe('en');
     expect(await AsyncStorage.getItem(PREFERENCE_KEYS.appearance)).toBe('dark');
     expect(flat(screen.getByTestId('onboarding-language').props.style).backgroundColor).toBe(

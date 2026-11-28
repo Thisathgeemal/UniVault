@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { CARD_GAP } from '../theme';
 import { useTheme } from '../theme/use-theme';
 import { AppText } from './AppText';
 
@@ -22,7 +23,7 @@ export function Card({ title, children, testID }: CardProps) {
           borderColor: theme.colors.border,
           borderRadius: theme.radius.md,
           padding: theme.space(4),
-          gap: theme.space(2),
+          gap: CARD_GAP,
         },
       ]}
     >

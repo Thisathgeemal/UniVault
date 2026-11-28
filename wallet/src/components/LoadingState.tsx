@@ -22,17 +22,14 @@ export function LoadingState({ message, testID }: LoadingStateProps) {
       accessibilityLabel={text}
       accessibilityState={{ busy: true }}
       accessibilityLiveRegion="polite"
-      style={[styles.root, { gap: theme.space(3), padding: theme.space(6) }]}
+      style={[styles.root, { gap: theme.space(3), paddingVertical: theme.space(6) }]}
     >
       <ActivityIndicator size="large" color={theme.colors.accentText} />
-      <AppText tone="muted" style={styles.center}>
-        {text}
-      </AppText>
+      <AppText tone="muted">{text}</AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  center: { textAlign: 'center' },
+  root: { alignItems: 'flex-start' },
 });

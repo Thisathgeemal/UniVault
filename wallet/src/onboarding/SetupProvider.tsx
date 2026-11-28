@@ -9,8 +9,8 @@ import {
   clearSetupProgress,
   loadOnboardingProgress,
   saveOnboardingCompleted,
-  saveSecuritySetupFlag,
 } from '../lib/preferences';
+import { deletePinData } from '../security/pin';
 import {
   gateRedirect,
   INITIAL_SETUP_STATE,
@@ -24,9 +24,15 @@ export interface SetupApi {
   state: SetupState;
   /** Privacy screen, "Set up security": stores the acknowledgement (now + text version). */
   acknowledgePrivacy: (now?: Date) => Promise<boolean>;
-  /** PLACEHOLDER until the PIN task (app/setup/security.tsx, development builds only). */
+  /**
+   * After the PIN flow (and, later, biometrics): re-checks isSecuritySetupComplete() (a PIN
+   * verifier in the secure store); resolves true when the gate may open the tabs.
+   */
   completeSecuritySetup: () => Promise<boolean>;
-  /** Diagnostics (development builds only): back to the first onboarding screen. */
+  /**
+   * Diagnostics (development builds only): back to the first onboarding screen; removes the
+   * onboarding flags, the PIN verifier and the attempt record.
+   */
   resetOnboarding: () => Promise<boolean>;
 }
 
@@ -51,16 +57,17 @@ export function SetupProvider({ initial, children }: { initial: SetupState; chil
   }, []);
 
   const completeSecuritySetup = useCallback(async () => {
-    setState((s) => ({ ...s, securitySetupComplete: true }));
-    return saveSecuritySetupFlag();
+    const complete = await isSecuritySetupComplete();
+    setState((s) => ({ ...s, securitySetupComplete: complete }));
+    return complete;
   }, []);
 
   const resetOnboarding = useCallback(async () => {
-    const cleared = await clearSetupProgress();
-    if (cleared) {
+    const [cleared, pinDeleted] = await Promise.all([clearSetupProgress(), deletePinData()]);
+    if (cleared && pinDeleted) {
       setState(INITIAL_SETUP_STATE);
     }
-    return cleared;
+    return cleared && pinDeleted;
   }, []);
 
   const api = useMemo(

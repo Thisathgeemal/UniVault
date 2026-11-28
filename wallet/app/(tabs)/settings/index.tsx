@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Card, ListItem, Screen, SectionHeader } from '../../../src/components';
+import { Card, ListItem, Screen, Section } from '../../../src/components';
 import { diagnosticsEnabled, getAppInfo, uiKitEnabled } from '../../../src/config/app-info';
 import { isLanguage } from '../../../src/i18n';
 import { ROUTES } from '../../../src/navigation/routes';
@@ -19,46 +19,47 @@ export default function SettingsScreen() {
 
   return (
     <Screen testID="settings-screen">
-      <SectionHeader title={t('settings.sections.preferences')} />
-      <Card>
-        <ListItem
-          testID="settings-language"
-          icon="language-outline"
-          title={t('settings.language')}
-          value={t(`language.${language}`)}
-          onPress={() => router.push(ROUTES.language)}
-        />
-        <ListItem
-          testID="settings-appearance"
-          icon="contrast-outline"
-          title={t('settings.appearance')}
-          value={t(`appearance.${appearance}`)}
-          onPress={() => router.push(ROUTES.appearance)}
-        />
-        <ListItem
-          testID="settings-security"
-          icon="lock-closed-outline"
-          title={t('settings.security')}
-          subtitle={t('settings.securityHint')}
-          onPress={() => router.push(ROUTES.security)}
-        />
-      </Card>
+      <Section title={t('settings.sections.preferences')}>
+        <Card>
+          <ListItem
+            testID="settings-language"
+            icon="language-outline"
+            title={t('settings.language')}
+            value={t(`language.${language}`)}
+            onPress={() => router.push(ROUTES.language)}
+          />
+          <ListItem
+            testID="settings-appearance"
+            icon="contrast-outline"
+            title={t('settings.appearance')}
+            value={t(`appearance.${appearance}`)}
+            onPress={() => router.push(ROUTES.appearance)}
+          />
+          <ListItem
+            testID="settings-security"
+            icon="lock-closed-outline"
+            title={t('settings.security')}
+            subtitle={t('settings.securityHint')}
+            onPress={() => router.push(ROUTES.security)}
+          />
+        </Card>
+      </Section>
 
-      <SectionHeader title={t('settings.sections.app')} />
-      <Card>
-        <ListItem
-          testID="settings-about"
-          icon="information-circle-outline"
-          title={t('settings.about')}
-          value={getAppInfo().appVersion}
-          subtitle={t('settings.aboutHint')}
-          onPress={() => router.push(ROUTES.about)}
-        />
-      </Card>
+      <Section title={t('settings.sections.app')}>
+        <Card>
+          <ListItem
+            testID="settings-about"
+            icon="information-circle-outline"
+            title={t('settings.about')}
+            value={getAppInfo().appVersion}
+            subtitle={t('settings.aboutHint')}
+            onPress={() => router.push(ROUTES.about)}
+          />
+        </Card>
+      </Section>
 
       {showDeveloper ? (
-        <>
-          <SectionHeader title={t('settings.sections.developer')} />
+        <Section title={t('settings.sections.developer')}>
           <Card>
             {diagnosticsEnabled() ? (
               <ListItem
@@ -79,7 +80,7 @@ export default function SettingsScreen() {
               />
             ) : null}
           </Card>
-        </>
+        </Section>
       ) : null}
     </Screen>
   );

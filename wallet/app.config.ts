@@ -51,6 +51,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-localization',
     'expo-font',
+    // PIN verifier (Decision 025): keeps secure-store entries out of Android auto-backup, so the
+    // verifier never leaves the phone in a backup (its keystore key could not decrypt it anyway)
+    ['expo-secure-store', { configureAndroidBackup: true }],
     [
       'expo-splash-screen',
       {

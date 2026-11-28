@@ -13,7 +13,7 @@ export default function OnboardingWelcomeScreen() {
       illustration={<WelcomeIllustration />}
     >
       <AppText>{t('onboarding.welcome.body')}</AppText>
-      <AppText tone="muted">{t('onboarding.welcome.body2')}</AppText>
+      <AppText>{t('onboarding.welcome.body2')}</AppText>
     </OnboardingStep>
   );
 }

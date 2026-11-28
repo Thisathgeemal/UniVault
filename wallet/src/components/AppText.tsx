@@ -36,12 +36,14 @@ export interface AppTextProps extends Omit<TextProps, 'style'> {
 
 /**
  * Themed text in the design type scale (generous line heights: 26 for 16 body), Noto Sans or
- * Noto Sans Sinhala by weight and UI language. Text keeps scaling with the OS text size
+ * Noto Sans Sinhala by weight and UI language. Wallet typography (design-system.md): body 16/26
+ * for what people read; SECONDARY text is 14 in text-muted, so `tone="muted"` without a variant
+ * is `bodySm`; captions 12 for metadata only; headings h1 / h2 / h3 at weight 600. Text keeps scaling with the OS text size
  * (dynamic type); maxFontSizeMultiplier only stops extreme sizes from breaking layouts.
  */
 export function AppText({
-  variant = 'body',
   tone = 'default',
+  variant = tone === 'muted' ? 'bodySm' : 'body',
   style,
   children,
   ...rest

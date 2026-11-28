@@ -38,6 +38,7 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 | [022](#decision-022-expo-router--expo-go-for-sprint-2-development-build-when-push-notifications-or-os-level-offer-links-are-needed)                                 | Expo Router + Expo Go for Sprint 2; development build when push notifications or OS-level offer links are needed                                  | Fri 27 Nov 2026 | S2                       | Draft – review | NFR-05, NFR-06                                                |
 | [023](#decision-023-wallet-storage-tiers-secure-store-for-keys-and-credential-secrets-encrypted-vault-for-credentials-asyncstorage-only-for-non-secret-preferences) | Wallet storage tiers: secure store for keys and credential secrets, encrypted vault for credentials, AsyncStorage only for non-secret preferences | Fri 27 Nov 2026 | S2                       | Draft – review | FR-WAL-03, NFR-08                                             |
 | [024](#decision-024-one-shared-navy-and-azure-palette-for-all-three-apps-portals-distinguished-by-a-role-tag)                                                       | One shared 'Navy and azure' palette for all three apps, portals distinguished by a role tag                                                       | Fri 27 Nov 2026 | S2                       | Draft – review | NFR-05, NFR-04                                                |
+| [025](#decision-025-wallet-pin-6-digits-salted-slow-kdf-verifier-in-the-secure-store-this-device-only-attempt-limits-in-app-lock)                                   | Wallet PIN: 6 digits, salted slow KDF verifier in the secure store (this device only), attempt limits in app lock                                 | Sat 28 Nov 2026 | S2                       | Draft – review | FR-WAL-07, FR-WAL-03, NFR-08                                  |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -2127,6 +2128,9 @@ Sri Lanka's PDPA (NFR-08) applies to the personal data in the credentials.
   holder saw and when; it is not personal data (no name, no device id) and never leaves the phone.
   Onboarding counts as complete only for the CURRENT text version (`PRIVACY_POLICY_VERSION`):
   changing the privacy text means bumping the version, and every holder sees onboarding again.
+- **28 Nov, later the same day (Decision 025):** the placeholder `univault.securitySetupCompleted`
+  is gone; `isSecuritySetupComplete()` checks for a PIN verifier in the secure store, and the
+  dev-only Continue button was removed. `PREFERENCE_KEYS` now has four keys.
 - **No skipping security setup:** the wallet's tabs open only when onboarding is complete AND
   `isSecuritySetupComplete()` is true (`wallet/src/onboarding/gate.ts`, applied by every layout,
   so deep links and typed URLs are redirected too). Until the PIN task,
@@ -2211,3 +2215,84 @@ checked for WCAG AA in both themes, instead of one list per app.
   replaced by the test that `theme.css` equals what `tokens.ts` generates.
 - **Fonts self-hosted** in the portals (Noto Sans, Noto Sans Sinhala, JetBrains Mono through
   @fontsource; the CSP forbids CDNs); the wallet bundles only the five weights it uses.
+
+## Decision 025: Wallet PIN: 6 digits, salted slow KDF verifier in the secure store (this device only), attempt limits in app lock
+
+- **Date:** Sat 28 Nov 2026
+- **Sprint:** S2
+- **Status:** Draft – review
+- **Requirements:** FR-WAL-07, FR-WAL-03, NFR-08
+- **Related:** Decision 007 (ES256 holder keys), Decision 022 (Expo Go modules only),
+  Decision 023 (storage tiers), [wallet-pin.md](../security/wallet-pin.md),
+  [mobile-wallet.md](../frontend/mobile-wallet.md) §15
+- **Evidence:** `wallet/src/security/pin.ts`, `pin-rules.ts`, `wallet/test/pin.test.ts`,
+  `pin-rules.test.ts`, `pin-flow.test.tsx` (verifier format, secure-store options, constant-time
+  compare, no PIN in logs, routes, storage or errors); Diagnostics → PIN hashing time (on-device
+  timing, to be recorded)
+
+### Context
+
+The wallet needs a PIN before the holder can use it (end of onboarding) to open the app and to
+approve every share; biometrics come later and need a fallback. The PIN must be checkable on the
+phone without the server and without storing it. Sprint 2 runs in Expo Go (Decision 022), so only
+pure-JavaScript KDFs and Expo modules are available: no native Argon2 or PBKDF2. A 6-digit PIN
+has 1,000,000 values, so no KDF can make an extracted verifier strong by itself.
+
+### Options considered
+
+1. **Plain hash (SHA-256 of the PIN, maybe salted) in the secure store:** instant to check, but
+   one GPU computes all 1,000,000 hashes in well under a second if the record is ever extracted.
+2. **Slow KDF verifier in AsyncStorage:** slows offline guessing, but AsyncStorage is unencrypted
+   and in device backups (Decision 023 forbids secrets there): the verifier would leave the phone.
+3. **Salted slow KDF verifier in the secure store, this device only (chosen),** plus attempt
+   limits in the app.
+4. **PIN-derived vault key** (the KDF output encrypts the credentials, nothing to compare): no
+   verifier to steal, but the PIN then IS the encryption strength of the vault (1,000,000 guesses
+   against a backup of the encrypted data), and changing the PIN means re-encrypting everything.
+   Better to wrap the vault key with a key kept in the secure store (the vault task).
+
+### Decision
+
+**Option 3.**
+
+- **6 digits**, with weak PINs refused (all the same, consecutive incl. wrapping, repeated
+  blocks, counting pairs, mirrored halves, a short list of common keypad and number patterns:
+  2,053 PINs, 0.21 %).
+- **Verifier** `{ v: 1, alg: "scrypt", params: { N: 4096, r: 8, p: 1, dkLen: 32 }, salt, hash }`
+  (16-byte random salt from `expo-crypto`, `@noble/hashes` scrypt), in `expo-secure-store` under
+  `univault.pinVerifier` with `WHEN_UNLOCKED_THIS_DEVICE_ONLY` and `requireAuthentication: false`;
+  excluded from Android auto-backup. Never in AsyncStorage.
+- **Verification** re-derives with the stored salt and parameters and compares in constant time;
+  `true` / `false`, never an exception carrying the PIN.
+- **Attempt limits** belong to the app-lock task: a separate secure-store record
+  `{ failedAttempts, lockedUntil }` exists now with read / write helpers; the policy is set there.
+- **The gate:** `isSecuritySetupComplete()` = a well-formed verifier exists (replaces the
+  placeholder preference of 28 Nov).
+- **Screen capture** blocked on the PIN screens in release builds.
+
+### Reason
+
+- **Layers, because a 6-digit space is small:** the secure store keeps the verifier on this
+  phone, unreadable while it is locked and out of backups (the main protection); attempt limits
+  stop guessing through the app; the salt prevents precomputed tables; scrypt makes each offline
+  guess cost 4 MiB and real time if the record is extracted anyway.
+- **scrypt over PBKDF2:** memory-hard, so GPUs gain less; at the same phone time PBKDF2 would
+  get only about 12,000 iterations. Argon2id is a candidate once measured on Hermes (the `alg`
+  field allows the switch).
+- **N = 2^12:** 15 ms on the developer's PC (V8); Hermes without a JIT on a mid-range Android is
+  estimated 10–40 times slower, so about 150–600 ms, around the 250–500 ms target. The parameters
+  travel with each verifier, so tuning after an on-device measurement breaks nothing.
+- **Holder control and privacy (FR-WAL-03, NFR-08):** everything stays on the phone; nothing about
+  the PIN reaches the backend.
+
+### Consequences
+
+- The real hashing time must be measured on a mid-range Android phone (Diagnostics → PIN hashing
+  time) and N raised to 2^13 if it is under 250 ms (wallet-pin.md §5).
+- Losing the phone or reinstalling loses the PIN with the wallet (by design: this device only);
+  there is no PIN recovery, only setting up again (and reissued credentials).
+- The app-lock task adds the attempt policy and may re-hash verifiers with a newer default after a
+  successful unlock. "Change PIN" (Settings → Security, needs the current PIN) is backlog.
+- The PIN string must never be logged, put in route params, errors or storage; tests enforce it.
+- The weak-PIN list was compiled from the patterns in published PIN studies, not copied from a
+  table: check it against them before release.

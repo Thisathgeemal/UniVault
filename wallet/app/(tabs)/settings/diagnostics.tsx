@@ -1,8 +1,9 @@
 /**
  * Diagnostics (DEVELOPMENT BUILDS ONLY): build facts, the configured API URL, a crypto-core
- * check on a bundled synthetic SD-JWT, an API reachability check (GET /health) and "Reset
- * onboarding" (clears the onboarding, privacy and security-setup flags; keeps language and
- * appearance; the gate then opens onboarding).
+ * check on a bundled synthetic SD-JWT, an API reachability check (GET /health), the PIN hashing
+ * time (scrypt with the default parameters) and "Reset onboarding" (clears the onboarding and
+ * privacy flags and deletes the PIN verifier and attempt record; keeps language and appearance;
+ * the gate then opens onboarding).
  * In a release build (`__DEV__` false) the screen shows only "not available"; the inline
  * `!__DEV__` gate lets Metro drop everything below it from release bundles.
  */
@@ -25,6 +26,7 @@ import {
 } from '../../../src/config/app-info';
 import { getApiConfig } from '../../../src/config/env';
 import { runCryptoCoreCheck, type CryptoCheckResult } from '../../../src/lib/crypto-check';
+import { DEFAULT_KDF_PARAMS, measurePinHashing } from '../../../src/security/pin';
 import { useSetup } from '../../../src/onboarding/SetupProvider';
 import { checkHealth, getApiClient, type HealthResult } from '../../../src/services/api-client';
 
@@ -42,8 +44,8 @@ function Row({
 }) {
   return (
     <View style={styles.row}>
-      <AppText variant="label">{label}</AppText>
-      <AppText variant={mono ? 'mono' : 'body'} tone="muted" testID={testID} selectable>
+      <AppText tone="muted">{label}</AppText>
+      <AppText variant={mono ? 'mono' : 'body'} testID={testID} selectable>
         {value}
       </AppText>
     </View>
@@ -62,6 +64,51 @@ function ResultBadge({ pass, testID }: { pass: boolean | null; testID: string })
       icon={pass ? 'checkmark-circle' : 'close-circle'}
       testID={testID}
     />
+  );
+}
+
+/**
+ * PIN hashing time: one scrypt derivation with the DEFAULT parameters on random throwaway data
+ * (never a PIN), so the real time on a phone can be compared with the 250–500 ms target
+ * (docs/security/wallet-pin.md §5). Informational: no pass / fail.
+ */
+function PinHashingCard() {
+  const { t } = useTranslation();
+  const [ms, setMs] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { N, r, p } = DEFAULT_KDF_PARAMS;
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      setMs((await measurePinHashing()).ms);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title={t('diagnostics.pinTitle')} testID="pin-hashing">
+      <AppText variant="bodySm" tone="muted">
+        {t('diagnostics.pinDescription')}
+      </AppText>
+      <AppText variant="mono" testID="pin-hashing-params">
+        {t('diagnostics.pinParams', { N, r, p, mib: (128 * r * N) / 2 ** 20 })}
+      </AppText>
+      {ms !== null ? (
+        <AppText variant="h3" testID="pin-hashing-result">
+          {t('diagnostics.pinResult', { ms })}
+        </AppText>
+      ) : null}
+      <Button
+        variant="secondary"
+        label={busy ? t('common.running') : t('diagnostics.run')}
+        accessibilityLabel={t('diagnostics.runLabel', { name: t('diagnostics.pinTitle') })}
+        loading={busy}
+        onPress={() => void run()}
+        testID="run-pin-hashing"
+      />
+    </Card>
   );
 }
 
@@ -228,6 +275,8 @@ export default function DiagnosticsScreen() {
           testID="run-api-check"
         />
       </Card>
+
+      <PinHashingCard />
 
       {onboardingResetEnabled() ? <ResetOnboardingCard /> : null}
     </Screen>

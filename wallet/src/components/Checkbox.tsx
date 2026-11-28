@@ -35,9 +35,7 @@ export function Checkbox({ label, checked, onChange, testID }: CheckboxProps) {
         size={28}
         color={theme.colors.accentText}
       />
-      <AppText variant="label" style={styles.label}>
-        {label}
-      </AppText>
+      <AppText style={styles.label}>{label}</AppText>
     </Pressable>
   );
 }

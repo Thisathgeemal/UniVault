@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { MIN_TOUCH_TARGET } from '../theme';
+import { LIST_ROW_MIN_HEIGHT } from '../theme';
 import { useTheme } from '../theme/use-theme';
 import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
 
 export interface ListItemProps {
+  /** A field name shown small and muted ABOVE the title (detail rows: "Issuer" over the name). */
+  label?: string;
   title: string;
   subtitle?: string;
   /** Decorative leading icon (the title says what the row is). */
@@ -20,8 +22,13 @@ export interface ListItemProps {
   children?: ReactNode;
 }
 
-/** One row of a settings-style list: leading icon, title, subtitle, trailing value/chevron. */
+/**
+ * One row of a settings-style list inside a Card (the card gives the side padding): leading icon
+ * (text-muted), optional field label (14, muted), title (body 16), subtitle (14, muted),
+ * trailing value (14, muted) and chevron. Rows are at least 56 pt; text is left-aligned and wraps.
+ */
 export function ListItem({
+  label: fieldLabel,
   title,
   subtitle,
   icon,
@@ -32,17 +39,14 @@ export function ListItem({
   children,
 }: ListItemProps) {
   const theme = useTheme();
-  const label = [title, value, subtitle].filter(Boolean).join(', ');
+  const label = [fieldLabel, title, value, subtitle].filter(Boolean).join(', ');
   const body = (
     <>
       {icon ? <Icon name={icon} color={theme.colors.textMuted} /> : null}
       <View style={styles.text}>
-        <AppText variant="label">{title}</AppText>
-        {subtitle ? (
-          <AppText variant="caption" tone="muted">
-            {subtitle}
-          </AppText>
-        ) : null}
+        {fieldLabel ? <AppText tone="muted">{fieldLabel}</AppText> : null}
+        <AppText>{title}</AppText>
+        {subtitle ? <AppText tone="muted">{subtitle}</AppText> : null}
         {children}
       </View>
       {value ? (
@@ -54,8 +58,7 @@ export function ListItem({
     </>
   );
   const rowStyle = {
-    paddingHorizontal: theme.space(4),
-    paddingVertical: theme.space(3),
+    paddingVertical: theme.space(2),
     gap: theme.space(3),
     backgroundColor: theme.colors.surface,
   };
@@ -81,7 +84,7 @@ export function ListItem({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: MIN_TOUCH_TARGET },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: LIST_ROW_MIN_HEIGHT },
   text: { flex: 1, flexShrink: 1, gap: 2 },
-  value: { flexShrink: 1, textAlign: 'right' },
+  value: { flexShrink: 1 },
 });

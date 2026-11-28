@@ -21,15 +21,14 @@ export function ErrorState({ title, message, onRetry, retryLabel, testID }: Erro
   const { t } = useTranslation();
   const theme = useTheme();
   return (
-    <View testID={testID} style={[styles.root, { gap: theme.space(3), padding: theme.space(6) }]}>
+    <View
+      testID={testID}
+      style={[styles.root, { gap: theme.space(3), paddingVertical: theme.space(6) }]}
+    >
       <StateIcon name="alert-circle-outline" danger />
-      <View accessible accessibilityRole="alert" style={[styles.text, { gap: theme.space(2) }]}>
-        <AppText variant="h2" style={styles.center}>
-          {title ?? t('errors.title')}
-        </AppText>
-        <AppText tone="muted" style={styles.center}>
-          {message}
-        </AppText>
+      <View accessible accessibilityRole="alert" style={{ gap: theme.space(2) }}>
+        <AppText variant="h2">{title ?? t('errors.title')}</AppText>
+        <AppText tone="muted">{message}</AppText>
       </View>
       {onRetry ? <Button label={retryLabel ?? t('common.tryAgain')} onPress={onRetry} /> : null}
     </View>
@@ -37,7 +36,5 @@ export function ErrorState({ title, message, onRetry, retryLabel, testID }: Erro
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  text: { alignItems: 'center' },
-  center: { textAlign: 'center' },
+  root: { alignItems: 'flex-start' },
 });

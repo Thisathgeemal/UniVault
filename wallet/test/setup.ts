@@ -1,8 +1,8 @@
 /**
- * Jest setup: English UI, AsyncStorage (official mock) emptied and then seeded with a holder who
- * finished onboarding and (placeholder) security setup (test/setup-state.ts: the gate opens the
- * tabs; gate and onboarding tests start from freshInstall()), font and splash mocks for the
- * root layout, the crypto runtime set up exactly as in the app (index.ts imports
+ * Jest setup: English UI, AsyncStorage (official mock) and an in-memory secure store emptied and
+ * then seeded with a holder who finished onboarding and set a PIN (test/setup-state.ts: the gate
+ * opens the tabs; gate, onboarding and PIN tests start from freshInstall()), font and splash
+ * mocks for the root layout, the crypto runtime set up exactly as in the app (index.ts imports
  * src/lib/crypto-setup first), the real app config for expo-constants, and a console guard.
  *
  * CONSOLE GUARD: any console.error or console.warn during a test FAILS that test (after it
@@ -42,6 +42,37 @@ jest.mock('expo-font', () => ({
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn(() => Promise.resolve()),
   hideAsync: jest.fn(() => Promise.resolve()),
+}));
+
+// expo-secure-store: an in-memory Keychain/Keystore (the real constants, e.g.
+// WHEN_UNLOCKED_THIS_DEVICE_ONLY, come from jest-expo's native-module mock). Emptied before every
+// test; tests read `mockStore` and the options each call received.
+jest.mock('expo-secure-store', () => {
+  const actual = jest.requireActual<Record<string, unknown>>('expo-secure-store');
+  const store = new Map<string, string>();
+  return {
+    ...actual,
+    setItemAsync: jest.fn(async (key: string, value: string) => {
+      store.set(key, value);
+    }),
+    getItemAsync: jest.fn(async (key: string) => store.get(key) ?? null),
+    deleteItemAsync: jest.fn(async (key: string) => {
+      store.delete(key);
+    }),
+    mockStore: store,
+  };
+});
+
+// expo-crypto's native getRandomValues is a no-op in Jest: fill from Node's CSPRNG instead, so a
+// salt is really random per call (the PIN tests check that)
+jest.mock('expo-crypto', () => ({
+  ...jest.requireActual<Record<string, unknown>>('expo-crypto'),
+  getRandomValues: jest.fn(
+    <T extends ArrayBufferView>(array: T): T =>
+      jest
+        .requireActual<typeof import('node:crypto')>('node:crypto')
+        .webcrypto.getRandomValues(array as unknown as Uint8Array) as unknown as T,
+  ),
 }));
 
 // jest-expo's expo-constants mock has no app config: give it the real one (app.config.ts)

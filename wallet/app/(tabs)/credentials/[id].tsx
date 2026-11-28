@@ -35,11 +35,11 @@ export default function CredentialDetailScreen() {
     <Screen testID="credential-detail-screen" title={t(`credentialTypes.${credential.type}`)}>
       <StatusBadge status={status} />
       <Card>
-        <ListItem title={t('credentials.fields.issuer')} subtitle={credential.issuerName} />
-        <ListItem title={t('credentials.fields.holder')} subtitle={credential.holderName} />
+        <ListItem label={t('credentials.fields.issuer')} title={credential.issuerName} />
+        <ListItem label={t('credentials.fields.holder')} title={credential.holderName} />
         <ListItem
-          title={t('credentials.fields.expires')}
-          subtitle={formatDate(credential.expiresAt, i18n.language)}
+          label={t('credentials.fields.expires')}
+          title={formatDate(credential.expiresAt, i18n.language)}
         />
       </Card>
       <AppText tone="muted">{t('credentials.detailPlaceholder')}</AppText>

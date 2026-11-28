@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MAX_READABLE_WIDTH, SECTION_GAP } from '../theme';
 import { useTheme } from '../theme/use-theme';
 import { AppText } from './AppText';
 
@@ -13,11 +14,26 @@ export interface ScreenProps {
   testID?: string;
 }
 
-/** A themed, safe-area-aware page with an optional heading. */
+/**
+ * A themed, safe-area-aware page with an optional heading (h1, left-aligned). Wallet layout:
+ * space-4 at the sides and top, space-6 between sections and at the bottom, content at most
+ * 560 pt wide (centred on tablets).
+ */
 export function Screen({ title, children, scroll = true, testID }: ScreenProps) {
   const theme = useTheme();
   const content = (
-    <View style={[styles.content, { padding: theme.space(4), gap: theme.space(4) }]}>
+    <View
+      testID={testID ? `${testID}-content` : undefined}
+      style={[
+        styles.content,
+        {
+          paddingHorizontal: theme.space(4),
+          paddingTop: theme.space(4),
+          paddingBottom: SECTION_GAP,
+          gap: SECTION_GAP,
+        },
+      ]}
+    >
       {title ? (
         <AppText variant="h1" accessibilityRole="header">
           {title}
@@ -40,5 +56,5 @@ export function Screen({ title, children, scroll = true, testID }: ScreenProps) 
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { flexGrow: 1 },
-  content: { flexGrow: 1 },
+  content: { flexGrow: 1, width: '100%', maxWidth: MAX_READABLE_WIDTH, alignSelf: 'center' },
 });

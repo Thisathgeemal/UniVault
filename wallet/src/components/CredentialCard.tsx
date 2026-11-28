@@ -70,7 +70,7 @@ export function CredentialCard({
           </AppText>
         </View>
         <View style={styles.titles}>
-          <AppText variant="caption" tone="onBrandMuted">
+          <AppText variant="bodySm" tone="onBrandMuted">
             {issuerName}
           </AppText>
           <AppText variant="h3" tone="onBrand">

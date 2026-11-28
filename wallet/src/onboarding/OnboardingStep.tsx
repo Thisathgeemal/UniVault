@@ -1,7 +1,8 @@
 /**
  * The frame of every onboarding step (app/onboarding/*): an optional Skip (explanation steps
- * only, goes to Privacy), the illustration on a navy panel, the title and the step's text, and
- * a footer with the progress dots ("Step X of Y" for screen readers) and Back / Next.
+ * only, goes to Privacy), the illustration on a navy panel, the title and the step's text, and a
+ * BottomActions footer: the progress dots ("Step X of Y" for screen readers), then Next (full
+ * width, the primary) above Back.
  *
  * Navigation (order in src/onboarding/steps.ts):
  *   - Next (the ONE primary button) pushes the next step; Privacy passes its own primary
@@ -25,8 +26,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '../components/AppText';
+import { BottomActions } from '../components/BottomActions';
 import { Button } from '../components/Button';
 import { Icon, type IconName } from '../components/Icon';
+import { MAX_READABLE_WIDTH } from '../theme';
 import { useTheme } from '../theme/use-theme';
 import {
   canSkip,
@@ -164,7 +167,10 @@ export function OnboardingStep({
       ]}
     >
       <ScrollView
-        contentContainerStyle={[styles.content, { padding: theme.space(4), gap: theme.space(4) }]}
+        contentContainerStyle={[
+          styles.content,
+          { padding: theme.space(4), paddingBottom: theme.space(6), gap: theme.space(4) },
+        ]}
       >
         {canSkip(step) ? (
           <View style={styles.skip}>
@@ -189,51 +195,35 @@ export function OnboardingStep({
             {illustration}
           </View>
         ) : null}
-        <AppText variant="h1" accessibilityRole="header">
+        {/* the hero heading is the one centred text; the step's sentences stay left-aligned */}
+        <AppText variant="h1" accessibilityRole="header" style={styles.heroTitle}>
           {title}
         </AppText>
         {children}
       </ScrollView>
 
-      <View
-        style={[
-          styles.footer,
-          {
-            backgroundColor: theme.colors.surface,
-            borderTopColor: theme.colors.border,
-            padding: theme.space(4),
-            paddingBottom: insets.bottom + theme.space(4),
-            gap: theme.space(3),
-          },
-        ]}
+      <BottomActions
+        testID="onboarding-actions"
+        above={<ProgressDots current={stepNumber(step)} label={stepLabel} />}
       >
-        <ProgressDots current={stepNumber(step)} label={stepLabel} />
-        <View style={[styles.buttons, { gap: theme.space(2) }]}>
-          {goBack ? (
-            <View style={styles.button}>
-              <Button
-                variant="secondary"
-                label={t('common.back')}
-                onPress={goBack}
-                testID="onboarding-back"
-              />
-            </View>
-          ) : null}
-          {action ? (
-            <View style={styles.button}>
-              <Button
-                label={action.label}
-                onPress={action.onPress}
-                disabled={action.disabled ?? false}
-                {...(action.accessibilityHint
-                  ? { accessibilityHint: action.accessibilityHint }
-                  : {})}
-                testID="onboarding-next"
-              />
-            </View>
-          ) : null}
-        </View>
-      </View>
+        {action ? (
+          <Button
+            label={action.label}
+            onPress={action.onPress}
+            disabled={action.disabled ?? false}
+            {...(action.accessibilityHint ? { accessibilityHint: action.accessibilityHint } : {})}
+            testID="onboarding-next"
+          />
+        ) : null}
+        {goBack ? (
+          <Button
+            variant="secondary"
+            label={t('common.back')}
+            onPress={goBack}
+            testID="onboarding-back"
+          />
+        ) : null}
+      </BottomActions>
     </View>
   );
 }
@@ -259,14 +249,11 @@ export function OnboardingPoint({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { flexGrow: 1 },
+  content: { flexGrow: 1, width: '100%', maxWidth: MAX_READABLE_WIDTH, alignSelf: 'center' },
+  heroTitle: { textAlign: 'center' },
   skip: { alignItems: 'flex-end' },
-  footer: { borderTopWidth: StyleSheet.hairlineWidth },
   progress: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   dots: { flexDirection: 'row', alignItems: 'center' },
-  // side by side; each wraps onto its own line when large text makes them too wide
-  buttons: { flexDirection: 'row', flexWrap: 'wrap' },
-  button: { flexGrow: 1, flexBasis: '40%' },
   point: { flexDirection: 'row', alignItems: 'flex-start' },
   pointText: { flex: 1, flexShrink: 1 },
 });

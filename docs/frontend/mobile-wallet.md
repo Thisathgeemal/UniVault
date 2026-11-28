@@ -9,9 +9,11 @@ The holder's app. This document describes the project as initialised on 27 Nov 2
 same day: a stack per tab, the shared component set, credential status badges, light/dark
 theming with a contrast rule, saved preferences and the developer UI kit. On 28 Nov 2026 it gained
 **onboarding** (first start), the **gate** that keeps the wallet closed until onboarding and
-security setup are done (section 15), and the **Appearance** setting (section 7). Credential
-redemption (OpenID4VCI), the PIN and the encrypted vault and presentations are added by the next
-Sprint 2 tasks and will extend this document.
+security setup are done (section 15), and the **Appearance** setting (section 7); later that
+day the **PIN** (section 16, [wallet-pin.md](../security/wallet-pin.md), Decision 025) and the
+**wallet typography and layout pass** (section 17). Credential redemption (OpenID4VCI),
+biometrics, app lock, the encrypted vault and presentations are added by the next Sprint 2 tasks
+and will extend this document.
 
 ## 1. Stack
 
@@ -23,6 +25,7 @@ Sprint 2 tasks and will extend this document.
 | i18n        | i18next 27.2.7 + react-i18next 18.0.3 + expo-localization                                                            |
 | Preferences | `@react-native-async-storage/async-storage` 2.2.0 (language, appearance, onboarding flags; section 9)                |
 | Drawings    | `react-native-svg` 15.16.0 (`npx expo install`; the onboarding illustrations, section 15)                            |
+| PIN         | `expo-secure-store` 58.0.3, `expo-screen-capture` 58.0.6 (`npx expo install`), `@noble/hashes` 2.4.0 (scrypt)        |
 | Fonts       | Noto Sans 400/500/600 + Noto Sans Sinhala 400/600 (`@expo-google-fonts/*` 0.4.2, OFL, per-weight imports), expo-font |
 | Icons       | `@expo/vector-icons` (Ionicons), decorative only                                                                     |
 | Tests       | Jest 30 + jest-expo 58 + React Native Testing Library 14                                                             |
@@ -46,7 +49,9 @@ wallet/
   src/components/           the shared components, section 5
   src/credentials/          status.ts: backend status → wallet state, tone and icon (section 6)
   src/onboarding/           steps.ts, gate.ts (THE gate rule), SetupProvider, security-setup.ts
-                            (placeholder), OnboardingStep, illustrations (section 15)
+                            (a PIN verifier exists), OnboardingStep, illustrations (section 15)
+  src/security/             pin.ts (verifier, verifyPin, attempt record), pin-rules.ts,
+                            constant-time.ts, screen-capture.ts, setup-flow.ts (section 16)
   src/theme/                theme from the shared tokens (light/dark), useTheme(), appearance.tsx
                             (Appearance setting), reduce-motion.ts, contrast.ts
   src/i18n/                 i18next; languages.ts; locales/en.ts, locales/si.ts
@@ -71,7 +76,7 @@ flowchart TD
   Root["app/_layout.tsx<br/>root Stack + providers"] --> Index["/ (index.tsx)<br/>redirect by the gate"]
   Index -.-> CL
   Index -.-> OB["onboarding/_layout.tsx<br/>six steps (section 15)"]
-  Index -.-> SU["setup/security<br/>placeholder"]
+  Index -.-> SU["setup/security<br/>PIN (section 16)"]
   Root --> OB
   Root --> SU
   Root --> Tabs["(tabs)/_layout.tsx<br/>bottom tabs, backBehavior firstRoute"]
@@ -111,7 +116,7 @@ flowchart TD
 | `/settings/diagnostics` | `(tabs)/settings/diagnostics.tsx` | Dev builds only (section 11)                                            |
 | `/settings/ui-kit`      | `(tabs)/settings/ui-kit.tsx`      | Dev builds only (section 10)                                            |
 | `/onboarding/*`         | `onboarding/*.tsx`                | The six onboarding steps and Privacy details (section 15)               |
-| `/setup/security`       | `setup/security.tsx`              | "Set up your PIN" placeholder (section 15)                              |
+| `/setup/security`       | `setup/security.tsx`              | Create and confirm the 6-digit PIN, "PIN set" (section 16)              |
 | anything else           | `+not-found.tsx`                  | "Page not found" + Go to my credentials                                 |
 
 ### 3.2 Typed, stable route names
@@ -191,28 +196,30 @@ Themed only from the tokens, accessible (section 8) and tested (`test/components
 Text comes in already translated (`t()`); the few fixed words a component shows itself (Back,
 Cancel, Try again, Loading…, Dismiss message, Status last checked …) it translates itself.
 
-| Component        | One line                                                                                                                                                                                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AppText`        | Themed text in the design type scale (`display` … `caption`; `mono` = system monospace, Diagnostics only), tones text / muted / subtle / accent / error / on-brand / on-brand-muted, Noto Sans or Noto Sans Sinhala by weight, dynamic type (capped 2×) |
-| `Screen`         | `bg` page, safe-area aware (left/right; the Header handles the top), 16 pt padding, scrolls by default                                                                                                                                                  |
-| `Header`         | Title (wraps), optional back button, up to two icon actions, pads below the status bar; `tone` surface or brand (the Credentials home)                                                                                                                  |
-| `Button`         | Design kinds `primary` (accent), `secondary` (surface + border-strong), `text` (accent-text), `destructive` (status-revoked), `onBrand` (role-tag-bg, on navy only); `loading` and `disabled`; optional icon; 44 pt, radius-md                          |
-| `ChoiceList`     | A single choice as a radio group (`radio` + `checked`, filled / empty radio icon, selected = accent fill); `size="large"` (64 pt, h2 text) for the first-start language step                                                                            |
-| `Checkbox`       | A `checkbox` row with its checked state, box / ticked-box icon, 44 pt, wrapping label ("I understand")                                                                                                                                                  |
-| `Card`           | `surface` with a hairline `border` and an optional `h3` header title                                                                                                                                                                                    |
-| `CredentialCard` | `brand` card, radius-lg: issuer initial on a role-tag-bg circle, issuer and expiry `on-brand-muted`, title and holder `on-brand`, StatusBadge in its own pill; pressable                                                                                |
-| `StatusBadge`    | A credential's state: icon + word in its status set's pill (section 6)                                                                                                                                                                                  |
-| `Badge`          | Pill (radius-sm) with a word and optional icon: a status set (valid, expired, revoked, pending) or neutral                                                                                                                                              |
-| `ListItem`       | `surface` row: leading icon (text-muted), title, subtitle, trailing value and chevron; a pressable row is one button                                                                                                                                    |
-| `SectionHeader`  | Heading above a group of rows or cards                                                                                                                                                                                                                  |
-| `LoadingState`   | Spinner + visible message, announced as busy                                                                                                                                                                                                            |
-| `EmptyState`     | Decorative icon (text-muted on surface-sunken), title, explanation, optional action                                                                                                                                                                     |
-| `ErrorState`     | Alert icon (revoked colours), title, message announced as an alert, optional "Try again"                                                                                                                                                                |
-| `OfflineNotice`  | Stale / offline banner: `status-expired-bg` with `status-expired-text` and an offline icon, "Status last checked …" (for the status-check task; in the UI kit now)                                                                                      |
-| `Toast`          | `ToastProvider` + `useToast().show({ message, tone })`: inverted (text colour as background), one at a time, FIFO queue (max 3), 4 s, close button                                                                                                      |
-| `ConfirmDialog`  | Modal title + message, Confirm / Cancel, destructive variant, loading; back button and backdrop (brand scrim) cancel                                                                                                                                    |
-| `Icon`           | The one wrapper over `@expo/vector-icons` Ionicons: theme colour, decorative unless given a `label`                                                                                                                                                     |
-| `ErrorBoundary`  | Friendly fallback with "Try again"; reports the error name only                                                                                                                                                                                         |
+| Component        | One line                                                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AppText`        | Themed text in the design type scale (`display` … `caption`; `mono` = system monospace, Diagnostics only), tones text / muted / subtle / accent / error / on-brand / on-brand-muted, Noto Sans or Noto Sans Sinhala by weight, dynamic type (capped 2×)            |
+| `Screen`         | `bg` page, safe-area aware (left/right; the Header handles the top), space-4 sides and top, space-6 between sections and at the bottom, at most 560 pt wide (centred on tablets), scrolls by default                                                               |
+| `Header`         | Title (wraps), optional back button, up to two icon actions, pads below the status bar; `tone` surface or brand (the Credentials home)                                                                                                                             |
+| `Button`         | Design kinds `primary` (accent), `secondary` (surface + border-strong), `text` (accent-text), `destructive` (status-revoked), `onBrand` (role-tag-bg, on navy only); `loading` and `disabled`; optional icon; 44 pt, radius-md, label 16 / 600                     |
+| `ChoiceList`     | A single choice as a radio group (`radio` + `checked`, filled / empty radio icon, selected = accent fill); `size="large"` (64 pt, h2 text) for the first-start language step                                                                                       |
+| `Checkbox`       | A `checkbox` row with its checked state, box / ticked-box icon, 44 pt, wrapping label ("I understand")                                                                                                                                                             |
+| `Card`           | `surface` with a hairline `border` and an optional `h3` header title                                                                                                                                                                                               |
+| `CredentialCard` | `brand` card, radius-lg: issuer initial on a role-tag-bg circle, issuer and expiry `on-brand-muted`, title and holder `on-brand`, StatusBadge in its own pill; pressable                                                                                           |
+| `StatusBadge`    | A credential's state: icon + word in its status set's pill (section 6)                                                                                                                                                                                             |
+| `Badge`          | Pill (radius-sm) with a word and optional icon: a status set (valid, expired, revoked, pending) or neutral                                                                                                                                                         |
+| `ListItem`       | Row inside a Card (min 56 pt): leading icon (text-muted), optional field `label` above the title (14, muted), title (16), subtitle and trailing value (14, muted), chevron; a pressable row is one button                                                          |
+| `SectionHeader`  | `h3` heading above a group; `Section` = heading + content kept together (space-2), the Screen puts space-6 between sections                                                                                                                                        |
+| `PinPad`         | Six dots (filled / outlined) announced as "3 of 6 digits entered" (never the digits, polite live region) and a 1–9 / 0 / Delete pad, keys ≥ 56 pt, no system keyboard, shake on error unless reduce motion; controlled (the parent clears the value on completion) |
+| `BottomActions`  | Footer of onboarding and setup screens: surface, border top, full-width buttons stacked (primary first), space-4 + bottom inset, ≤ 560 pt                                                                                                                          |
+| `LoadingState`   | Spinner + visible message, announced as busy                                                                                                                                                                                                                       |
+| `EmptyState`     | Decorative icon (text-muted on surface-sunken), title, explanation, optional action                                                                                                                                                                                |
+| `ErrorState`     | Alert icon (revoked colours), title, message announced as an alert, optional "Try again"                                                                                                                                                                           |
+| `OfflineNotice`  | Stale / offline banner: `status-expired-bg` with `status-expired-text` and an offline icon, "Status last checked …" (for the status-check task; in the UI kit now)                                                                                                 |
+| `Toast`          | `ToastProvider` + `useToast().show({ message, tone })`: inverted (text colour as background), one at a time, FIFO queue (max 3), 4 s, close button                                                                                                                 |
+| `ConfirmDialog`  | Modal title + message, Confirm / Cancel, destructive variant, loading; back button and backdrop (brand scrim) cancel                                                                                                                                               |
+| `Icon`           | The one wrapper over `@expo/vector-icons` Ionicons: theme colour, decorative unless given a `label`                                                                                                                                                                |
+| `ErrorBoundary`  | Friendly fallback with "Try again"; reports the error name only                                                                                                                                                                                                    |
 
 ## 6. Credential status badge
 
@@ -314,17 +321,22 @@ own icon and word. Anything else (including `pending`, which never reaches a wal
   lists every key in `PREFERENCE_KEYS`; `test/preferences.test.tsx` checks nothing else is ever
   written and each key only ever gets its allowed values:
 
-  | Key                               | Values                                                | Written by                                             | Read for                           |
-  | --------------------------------- | ----------------------------------------------------- | ------------------------------------------------------ | ---------------------------------- |
-  | `univault.language`               | `en` \| `si` (same name as the portals' key)          | Settings → Language, onboarding language step          | i18n before the first frame        |
-  | `univault.appearance`             | `system` \| `light` \| `dark` (missing = system)      | Settings → Appearance                                  | the effective theme                |
-  | `univault.onboardingCompleted`    | `true` (missing = not done)                           | Privacy step, "Set up security" (with the next key)    | the gate                           |
-  | `univault.privacyAcknowledgedAt`  | JSON `{ "at": ISO instant, "version": "privacy-v1" }` | Privacy step, "Set up security" (one `multiSet`)       | the gate (version must be current) |
-  | `univault.securitySetupCompleted` | `true` (missing = not done). **PLACEHOLDER**          | `/setup/security` "Continue" (development builds only) | `isSecuritySetupComplete()`        |
+  | Key                              | Values                                                | Written by                                          | Read for                           |
+  | -------------------------------- | ----------------------------------------------------- | --------------------------------------------------- | ---------------------------------- |
+  | `univault.language`              | `en` \| `si` (same name as the portals' key)          | Settings → Language, onboarding language step       | i18n before the first frame        |
+  | `univault.appearance`            | `system` \| `light` \| `dark` (missing = system)      | Settings → Appearance                               | the effective theme                |
+  | `univault.onboardingCompleted`   | `true` (missing = not done)                           | Privacy step, "Set up security" (with the next key) | the gate                           |
+  | `univault.privacyAcknowledgedAt` | JSON `{ "at": ISO instant, "version": "privacy-v1" }` | Privacy step, "Set up security" (one `multiSet`)    | the gate (version must be current) |
 
-  Diagnostics → Reset onboarding removes the last three keys (`SETUP_PROGRESS_KEYS`) and keeps
-  the language and appearance. The onboarding flags only choose the first screen; they protect
-  nothing. The PIN task replaces the placeholder flag with a check against the secure store.
+  Diagnostics → Reset onboarding removes the two onboarding keys (`SETUP_PROGRESS_KEYS`) and the
+  PIN data, and keeps the language and appearance. The onboarding flags only choose the first
+  screen; they protect nothing. Whether security is set up is NOT a preference: it is "a PIN
+  verifier exists in the secure store". (The placeholder `univault.securitySetupCompleted` of
+  the onboarding task was removed with the PIN.)
+
+- **Secure store (`expo-secure-store`)**: `univault.pinVerifier` (the scrypt verifier) and
+  `univault.pinAttempts` (failed-attempt record for app lock), both
+  `WHEN_UNLOCKED_THIS_DEVICE_ONLY`, no OS prompt, excluded from Android backup (section 16).
 
 - **Never in AsyncStorage:** keys, credentials, SD-JWTs, claims, tokens, PINs or anything
   personal. AsyncStorage is unencrypted (device backups, rooted phones). Those go in **secure
@@ -363,12 +375,13 @@ Gated by `__DEV__` (false in release builds; the Settings link is hidden and the
 `!__DEV__ || !diagnosticsEnabled()`, so Metro drops its checks (and Reset onboarding) from release
 bundles (checked with `npx expo export --platform android`: their test IDs are absent).
 
-| Check             | What it does                                                                                                                                                                                                         |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App and device    | App version, Expo SDK, platform + OS version, Hermes on/off, API base URL (or what is wrong with it)                                                                                                                 |
-| crypto-core check | Decodes `src/fixtures/diagnostics-credential.ts` with `decodeSdJwt`, re-validates every digest with `validateDisclosures`, checks the `vct` and the 5 expected claim names: "5 of 5 disclosures decoded" + Pass/Fail |
-| Reset onboarding  | `onboardingResetEnabled()` (dev only): a ConfirmDialog, then removes the onboarding, privacy and security-setup flags (keeps language and appearance); the gate opens `/onboarding/language`                         |
-| API reachability  | `GET <EXPO_PUBLIC_API_BASE_URL>/health` (8 s timeout): Reachable with the server status (`ok` / `degraded`) and HTTP code, or the error code (`NETWORK_ERROR`, `TIMEOUT`, …)                                         |
+| Check             | What it does                                                                                                                                                                                                                 |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App and device    | App version, Expo SDK, platform + OS version, Hermes on/off, API base URL (or what is wrong with it)                                                                                                                         |
+| crypto-core check | Decodes `src/fixtures/diagnostics-credential.ts` with `decodeSdJwt`, re-validates every digest with `validateDisclosures`, checks the `vct` and the 5 expected claim names: "5 of 5 disclosures decoded" + Pass/Fail         |
+| Reset onboarding  | `onboardingResetEnabled()` (dev only): a ConfirmDialog, then removes the onboarding and privacy flags and deletes the PIN verifier and attempt record (keeps language and appearance); the gate opens `/onboarding/language` |
+| PIN hashing time  | One scrypt derivation with the default PIN parameters on random data (never a PIN): shows N / r / p, memory and the time in ms, to compare with the 250–500 ms target on a real phone (wallet-pin.md §5)                     |
+| API reachability  | `GET <EXPO_PUBLIC_API_BASE_URL>/health` (8 s timeout): Reachable with the server status (`ok` / `degraded`) and HTTP code, or the error code (`NETWORK_ERROR`, `TIMEOUT`, …)                                                 |
 
 The fixture is synthetic: invented claims, an `.example` issuer, signed by a throwaway RS256 key
 that `npm run fixture:diagnostics` generates and discards (no private key exists anywhere; the
@@ -412,12 +425,13 @@ OS-level offer links are needed (Sprint 4–5 at the latest for the Android rele
 
 ## 14. Tests
 
-`wallet/test/` (Jest + React Native Testing Library), 17 files, 473 tests. `test/setup.ts`
+`wallet/test/` (Jest + React Native Testing Library), 20 files, 599 tests. `test/setup.ts`
 fails any test that writes an unexpected `console.error` or `console.warn` (fix the cause;
 the allow-list for unavoidable third-party noise is empty), so the suite runs silent. It also
 installs AsyncStorage's official in-memory mock (emptied before every test, then seeded with a
-holder who finished onboarding and the placeholder security setup, `test/setup-state.ts`, so the
-gate opens the tabs; gate and onboarding tests start from `freshInstall()` or
+holder who finished onboarding and has a PIN verifier for `TEST_PIN` in an in-memory secure-store
+mock, `test/setup-state.ts`, so the gate opens the tabs; `expo-crypto`'s random fill comes from
+Node's CSPRNG; gate and onboarding tests start from `freshInstall()` or
 `seedOnboardedWithoutSecurity()`), the per-weight font
 mocks and expo-font's `useFonts`, and the splash-screen mock for the root layout. Never `spyOn` +
 restore the AsyncStorage mock's functions: restoring a `jest.fn` removes its in-memory
@@ -425,11 +439,14 @@ implementation (use `mock…Once`).
 
 | File                     | Tests | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------ | ----: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `onboarding.test.tsx`    |    83 | **The gate** (rule; first start → onboarding; onboarded without security → setup; both → tabs; typed tab URLs and `/setup/security` redirected; finished holders can't re-enter; an old privacy-text version re-runs onboarding); every step in **en and si**; language applies at once; **Next / Back / swipe / Skip**, Skip never passes Privacy; **"I understand" required, acknowledgement stored with date and version**; Privacy details; **Android back** (exit on step 1, previous step after, also after Skip); **"Step X of Y"** labels and live region (en, si); **reduce motion** (stack and dialog); **dark theme** and large-text-safe layout, one primary per step; setup placeholder (dev only, inline gate); **Reset onboarding** (confirm, keeps language and appearance, failure, hidden in release) |
+| `onboarding.test.tsx`    |    80 | **The gate** (rule; first start → onboarding; onboarded without security → setup; both → tabs; typed tab URLs and `/setup/security` redirected; finished holders can't re-enter; an old privacy-text version re-runs onboarding); every step in **en and si**; language applies at once; **Next / Back / swipe / Skip**, Skip never passes Privacy; **"I understand" required, acknowledgement stored with date and version**; Privacy details; **Android back** (exit on step 1, previous step after, also after Skip); **"Step X of Y"** labels and live region (en, si); **reduce motion** (stack and dialog); **dark theme** and large-text-safe layout, one primary per step; setup placeholder (dev only, inline gate); **Reset onboarding** (confirm, keeps language and appearance, failure, hidden in release) |
+| `pin-rules.test.ts`      |    60 | Six digits only; every weak pattern (all the same, 20 sequences incl. wrapping, repeated blocks, counting pairs, mirrored, the common list, none duplicating a rule); 2,053 of 1,000,000 refused; ordinary PINs pass; the message has no PIN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `pin.test.ts`            |    21 | Verifier `{ v, alg, params, salt, hash }`; random salt per setup; WHEN_UNLOCKED_THIS_DEVICE_ONLY + no prompt on every call; nothing in AsyncStorage; verifyPin right / wrong / malformed / failing (never throws), constant-time compare used, stored parameters used; bounds; gate check; delete; attempt record; Diagnostics timing                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `pin-flow.test.tsx`      |    24 | PinPad keys, labels, ≥ 56 pt, dots "n of 6 digits entered", Delete, shake / reduce motion; flow intro → create (weak refused) → confirm (mismatch, retry, back to create after 3, start again, save failure) → "PIN set" → tabs; biometric hook route; Android back; gate (no verifier → setup, verifier → tabs, no tab flash); screen capture only when !**DEV**; **the PIN never in logs, routes, storage or errors**                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `appearance.test.tsx`    |    19 | Effective scheme; native `Appearance.setColorScheme`; Settings row below Language with its value; **each option** applies at once (screen, header, tab bar, other tabs, dialog) and is saved; not-saved toast; **simulated restart: first frame already dark**; **"Use device setting" follows a simulated live system change, Light / Dark ignore it**; **status bar per theme** and light on the navy header (also during a live change); root view colour via expo-system-ui                                                                                                                                                                                                                                                                                                                                         |
 | `navigation.test.tsx`    |    18 | Real `app/` tree: `/` → Credentials, four labelled tabs, tab switching, each stack in and back, deep link keeps the list, Android BackHandler steps, not-found and unknown ids                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `routes.test.tsx`        |    16 | Route table = files in `app/` (both ways), a Stack per tab, id encoding, every route renders at its path, `/` redirect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `design-system.test.tsx` |    15 | At most one primary (azure) button on every screen but the UI kit; brand header on the Credentials home only, surface elsewhere; screens on `bg`; active tab label in `accent`, inactive `text-muted`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `design-system.test.tsx` |    38 | One primary per screen; brand header on the Credentials home only; screens on `bg`; active tab in `accent`; **wallet typography and layout on every route, onboarding step and the PIN screen** (only scale sizes, text-muted ≤ 14, headings 24 / 20 / 16, centred text only for hero headings, drawing labels and buttons; button labels 16 / 600; rows ≥ 56 pt; screen padding, section gap, 560 pt)                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `components.test.tsx`    |    37 | Every component: the five Button kinds (token colours, radius-md, 44 pt), Badge status sets + neutral (radius-sm), roles / labels / states, hidden decorative icons, Header insets and tones, CredentialCard in brand with the badge in its own pill, OfflineNotice, Toast queue and timing, ConfirmDialog back/backdrop, AppText type scale and fonts                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `status.test.tsx`        |    26 | Backend → wallet mapping, unknown values → Not checked yet, **the status mapping table** (set, icon, English, Sinhala), distinct icon + word per state, **label parity with the issuer portal (en + si)**, type names                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `contrast.test.ts`       |   175 | WCAG maths incl. translucent compositing; no status colour on navy; text-subtle still lighter than text-muted; the before/after of the 27 Nov fixes; the one light-only pair; 83 pairs in light and 82 in dark (incl. onboarding illustrations, progress dots, checkbox), each ≥ 4.5:1 (text) or 3:1 (borders, focus, icons)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -439,12 +456,12 @@ implementation (use `mock…Once`).
 | `i18n.test.tsx`          |     7 | Language switch changes text and font; About (version, SDK, font licence); key parity, Sinhala script, placeholders; review marker; device language                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `theme.test.ts`          |     6 | Theme = the tokens (design names, light and dark), 4 pt spacing, radii, 44 pt, type scale and fonts per weight and script, tones and button colours, no hex colour in `src/` or `app/`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `app.test.tsx`           |    10 | Root layout waits for fonts and language, hides the splash, system-font fallback; only the five font weights imported; app config identifiers, permission texts, token colours, no secrets                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `diagnostics.test.tsx`   |     7 | Facts shown; crypto check pass/fail; health reachable/unreachable; missing URL disables the check; release build shows "not available"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `diagnostics.test.tsx`   |     8 | Facts shown; crypto check pass/fail; health reachable/unreachable; missing URL disables the check; release build shows "not available"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `crypto.test.ts`         |    11 | crypto-core check on the fixture; forged disclosure, wrong vct / claims, garbage fail; no private key in the fixture; Hermes polyfill and capability checks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `api-client.test.ts`     |     9 | URL from `EXPO_PUBLIC_API_BASE_URL` (empty, placeholder, invalid, loopback); `GET <base>/health`; degraded, network error, timeout, non-JSON                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
-Coverage (28 Nov 2026, onboarding and Appearance): 99.54 % statements, 95.93 % branches, 99.32 %
-functions, 99.87 % lines; thresholds 99 / 95 / 99 / 99 (functions raised from 98).
+Coverage (28 Nov 2026, PIN and typography pass): 99.56 % statements, 96.27 % branches, 99.43 %
+functions, 99.9 % lines; thresholds 99 / 96 / 99 / 99 (branches raised from 95).
 
 ## 15. Onboarding and the gate
 
@@ -459,7 +476,7 @@ flowchart TD
   Start(["App start, deep link or typed URL"]) --> Restore["Root layout, splash screen up:<br/>restoreAppState() = language, appearance, setup state"]
   Restore --> Gate{"Gate<br/>src/onboarding/gate.ts"}
   Gate -- "onboarding not complete" --> L["1 Language<br/>/onboarding/language"]
-  Gate -- "onboarded, security not set up" --> S["/setup/security<br/>Set up your PIN (placeholder)"]
+  Gate -- "onboarded, no PIN verifier" --> S["/setup/security<br/>create and confirm the PIN"]
   Gate -- "both complete" --> T["Tabs<br/>/credentials"]
 
   L -- Next --> W["2 Welcome"]
@@ -474,7 +491,7 @@ flowchart TD
   PR -- "Privacy details" --> PD["/onboarding/privacy-details"]
   PD -- Back --> PR
   PR -- "I understand + Set up security:<br/>saves onboardingCompleted + privacyAcknowledgedAt" --> Gate
-  S -- "Continue (development builds only):<br/>saves securitySetupCompleted (placeholder)" --> Gate
+  S -- "PIN set → Continue:<br/>verifier in the secure store" --> Gate
   T -- "Diagnostics → Reset onboarding (dev only)" --> Gate
 ```
 
@@ -499,29 +516,29 @@ as the app start.
   the current `PRIVACY_POLICY_VERSION` (`privacy-v1`). Changing the privacy text means bumping the
   version, which sends every holder through onboarding again.
 - **Security set up** = `isSecuritySetupComplete()` (`src/onboarding/security-setup.ts`), the ONE
-  function for it. **Placeholder:** it reads the `univault.securitySetupCompleted` preference. The
-  PIN and biometric task replaces its body with a check against the secure store (and removes the
-  preference and the placeholder button); nothing else changes.
+  function for it: a well-formed PIN verifier exists in the secure store (section 16). It is
+  async; the root layout awaits it under the splash screen, so the tabs never flash first (tested
+  with a held secure-store read).
 - **No route skips security setup:** the tabs need both; `/setup/security` has no link into the
   tabs; Skip lands on Privacy, never past it; swipes never move forward from Privacy.
 - State: `SetupProvider` (`src/onboarding/SetupProvider.tsx`) holds it, restored under the splash
-  screen, and changes it only through `acknowledgePrivacy()`, `completeSecuritySetup()`
-  (placeholder) and `resetOnboarding()`. Each updates the state at once (the gate redirects
+  screen, and changes it only through `acknowledgePrivacy()`, `completeSecuritySetup()` (re-checks
+  for the verifier after "PIN set") and `resetOnboarding()`. Each updates the state at once (the gate redirects
   straight away) and saves it; a failed save is reported in a toast and the holder continues for
   this session.
 
 ### 15.3 Screens
 
-| Step | Route                              | Purpose                                                                                                                                                                                                                               |
-| ---: | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|    1 | `/onboarding/language`             | Choose English / සිංහල first: large radio options (`ChoiceList size="large"`), applied at once and saved like Settings                                                                                                                 |
-|    2 | `/onboarding/welcome`              | "UniVault keeps your digital identity on your phone." You decide what to share                                                                                                                                                        |
-|    3 | `/onboarding/how-it-works`         | Issuer → holder → verifier: an organisation (employer or bank) gives you a credential, you keep it in the wallet, you show it to someone who checks it; a three-part drawing with the role names under it                             |
-|    4 | `/onboarding/selective-disclosure` | You choose what to share, with the example "Prove you are over 18 without showing your birthday" on a `brand-soft` panel                                                                                                              |
-|    5 | `/onboarding/security`             | PIN or fingerprint before every share, encrypted on this phone, works without the internet                                                                                                                                            |
-|    6 | `/onboarding/privacy`              | What stays on the phone, what is shared and only when you approve, nothing sent to UniVault when you share; "Privacy details" link; **"I understand" checkbox required** before "Set up security"                                     |
-|    – | `/onboarding/privacy-details`      | Static text (on the phone, sharing, what UniVault receives, removing the app) and the text version; shared header with Back                                                                                                           |
-|    – | `/setup/security`                  | **Placeholder:** "Set up your PIN" and a short explanation; "PIN setup comes in the next version". Development builds: "Continue (development placeholder)" sets the placeholder flag (inline `__DEV__` gate: not in release bundles) |
+| Step | Route                              | Purpose                                                                                                                                                                                                   |
+| ---: | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|    1 | `/onboarding/language`             | Choose English / සිංහල first: large radio options (`ChoiceList size="large"`), applied at once and saved like Settings                                                                                     |
+|    2 | `/onboarding/welcome`              | "UniVault keeps your digital identity on your phone." You decide what to share                                                                                                                            |
+|    3 | `/onboarding/how-it-works`         | Issuer → holder → verifier: an organisation (employer or bank) gives you a credential, you keep it in the wallet, you show it to someone who checks it; a three-part drawing with the role names under it |
+|    4 | `/onboarding/selective-disclosure` | You choose what to share, with the example "Prove you are over 18 without showing your birthday" on a `brand-soft` panel                                                                                  |
+|    5 | `/onboarding/security`             | PIN or fingerprint before every share, encrypted on this phone, works without the internet                                                                                                                |
+|    6 | `/onboarding/privacy`              | What stays on the phone, what is shared and only when you approve, nothing sent to UniVault when you share; "Privacy details" link; **"I understand" checkbox required** before "Set up security"         |
+|    – | `/onboarding/privacy-details`      | Static text (on the phone, sharing, what UniVault receives, removing the app) and the text version; shared header with Back                                                                               |
+|    – | `/setup/security`                  | The PIN flow (section 16): intro, create, confirm, "PIN set"                                                                                                                                              |
 
 ### 15.4 Navigation, accessibility and design
 
@@ -556,7 +573,77 @@ as the app start.
 ### 15.5 Reset onboarding (development builds only)
 
 Diagnostics → Onboarding → "Reset onboarding" asks first (ConfirmDialog, destructive), then
-`resetOnboarding()` removes `univault.onboardingCompleted`, `univault.privacyAcknowledgedAt` and
-`univault.securitySetupCompleted` (language and appearance stay), and the gate opens
+`resetOnboarding()` removes `univault.onboardingCompleted` and `univault.privacyAcknowledgedAt`
+and deletes the PIN verifier and attempt record from the secure store (language and appearance
+stay), and the gate opens
 `/onboarding/language`. Hidden in release builds (`onboardingResetEnabled()`, inside Diagnostics'
 inline `__DEV__` gate; absent from the exported bundle).
+
+## 16. PIN (security setup)
+
+Details and the threat model: [docs/security/wallet-pin.md](../security/wallet-pin.md);
+Decision 025.
+
+### 16.1 Flow (`app/setup/security.tsx`)
+
+```mermaid
+flowchart TD
+  I["Intro: Set up your PIN<br/>'Create a 6-digit PIN…'"] -- "Create PIN" --> C["Create your PIN<br/>(PinPad)"]
+  C -- "weak (pin-rules)" --> C
+  C -- "6 digits, OK" --> F["Confirm your PIN"]
+  F -- "mismatch 1–2:<br/>'The PINs don't match…'" --> F
+  F -- "3rd mismatch / Start again:<br/>'Let's start again'" --> C
+  F -- "match" --> SV["savePin: scrypt verifier → secure store"]
+  SV -- "failed" --> C
+  SV --> OK["PIN set"]
+  OK -- "Continue: stepAfterPinCreated()" --> B{"biometric step?<br/>(next task)"}
+  B -- "today: none → completeSecuritySetup()" --> G["Gate → tabs"]
+```
+
+- The entry is in state until its 6th digit, then cleared at once; the first PIN waits in a ref
+  until it is confirmed and hashed, then cleared (also after 3 mismatches, Start again, Android
+  back or a failed save). Nothing goes into route params: the whole flow is one screen.
+- **Biometric hook:** `stepAfterPinCreated()` in `src/security/setup-flow.ts` returns
+  `{ kind: 'complete' }` today; the biometric task returns `{ kind: 'route', href }` for its
+  screen, which then calls `completeSecuritySetup()` itself.
+- Android back: confirm → create → intro → (unhandled) the app goes to the background.
+- **Screen capture** is blocked on this screen in release builds only (`useBlockScreenCapture`).
+- Hero heading centred; the sentence under it left-aligned; full-width buttons in `BottomActions`
+  on the intro, confirm (Start again, secondary) and success steps; the pad steps have no primary.
+
+### 16.2 Rules, verifier, gate
+
+- **Rules** (`src/security/pin-rules.ts`): 6 digits; refused: all the same, consecutive (up,
+  down, wrapping), repeated blocks, counting pairs, mirrored, a short common-PIN list (2,053 of
+  1,000,000). One message: "This PIN is too easy to guess. Avoid repeated or consecutive numbers."
+- **Verifier** (`src/security/pin.ts`): `{ v: 1, alg: "scrypt", params: { N: 4096, r: 8, p: 1,
+dkLen: 32 }, salt, hash }` (hex) in the secure store under `univault.pinVerifier`;
+  `verifyPin()` re-derives with the stored parameters and compares in constant time.
+- **Gate:** no well-formed verifier → `/setup/security`; verifier → the tabs.
+- **Diagnostics → PIN hashing time** measures the real time on the phone (section 11).
+
+## 17. Wallet typography and layout
+
+The rules are in [design-system.md](../design/design-system.md), "Wallet typography and layout",
+and are tested on every route (`test/design-system.test.tsx`). Applied on 28 Nov 2026:
+
+| Where                                      | Change                                                                                                                                                                                                                                                   |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppText`                                  | `tone="muted"` without a variant is `bodySm` 14: every hint, notice and description below became 14 in text-muted                                                                                                                                        |
+| `Button`                                   | Label 16 / 600 (was `label` 14 / 500)                                                                                                                                                                                                                    |
+| `Screen`                                   | Sides and top space-4, space-6 between sections (was 16) and at the bottom, content ≤ 560 pt and centred                                                                                                                                                 |
+| `Card`, `Section`, `SectionHeader`         | Card gap space-2; new `Section` keeps a heading with its content (space-2); section headings `h3` 16 / 600 in text (were `label` 14 muted)                                                                                                               |
+| `ListItem`                                 | Min 56 pt (was 44); title 16 (was 14 / 500); subtitle and trailing value 14 muted (were 12 / 16) and left-aligned (value was right-aligned); new `label` for field names; no double side padding inside cards                                            |
+| `EmptyState`, `ErrorState`, `LoadingState` | Left-aligned (were centred); messages 14 muted                                                                                                                                                                                                           |
+| `ChoiceList`, `Checkbox`                   | Option and box labels 16 (were 14 / 500); options ≥ 56 pt                                                                                                                                                                                                |
+| `CredentialCard`                           | Issuer name 14 (was the 12 caption; the expiry stays a caption: metadata)                                                                                                                                                                                |
+| Credentials list, History list             | Sample-data notice 14 muted                                                                                                                                                                                                                              |
+| Credential detail, History detail          | Field name small above its value ("Issuer" / issuer name) instead of the value in 12 under a 14 title; placeholder sentence 14 muted                                                                                                                     |
+| Scan, not-found, unknown ids               | Empty state left-aligned                                                                                                                                                                                                                                 |
+| Settings                                   | Preferences / App / Developer as `Section`s (h3 headings, space-6 apart); 56 pt rows                                                                                                                                                                     |
+| Language, Appearance                       | Hint 14 muted; options 16 and 56 pt                                                                                                                                                                                                                      |
+| About                                      | Licences as a `Section`                                                                                                                                                                                                                                  |
+| Diagnostics                                | Row names 14 muted with the value in text (were 14 / 500 name, muted 16 value); descriptions 14 muted; new PIN hashing card                                                                                                                              |
+| UI kit                                     | Every group a `Section`; on-navy sample label 14 (was a caption); disclosure-panel body 14                                                                                                                                                               |
+| Onboarding steps                           | Hero heading centred; second welcome sentence and the over-18 example in body text (were muted); language note 14 muted; drawing labels 14 (were 12); Back and Next full width and stacked in `BottomActions` (were side by side) with the primary first |
+| Setup (PIN)                                | New screen built to the rules (hero centred, pad centred, buttons full width)                                                                                                                                                                            |

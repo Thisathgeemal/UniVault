@@ -6,6 +6,7 @@ import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import DiagnosticsScreen from '../app/(tabs)/settings/diagnostics';
 import * as appInfo from '../src/config/app-info';
 import * as check from '../src/lib/crypto-check';
+import * as pin from '../src/security/pin';
 import { en } from '../src/i18n/locales/en';
 import { renderWithProviders } from './render';
 
@@ -99,6 +100,21 @@ describe('Diagnostics screen', () => {
     expect(screen.getByTestId('diag-api-url')).toHaveTextContent(en.diagnostics.apiProblem.missing);
     expect(screen.getByText(en.diagnostics.notConfigured)).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Run the API reachability' })).toBeDisabled();
+  });
+
+  it('measures the PIN hashing time with the default parameters (never a PIN)', async () => {
+    const user = userEvent.setup();
+    const measure = jest
+      .spyOn(pin, 'measurePinHashing')
+      .mockResolvedValue({ ms: 312, params: pin.DEFAULT_KDF_PARAMS });
+    await renderWithProviders(<DiagnosticsScreen />);
+    expect(screen.getByTestId('pin-hashing-params')).toHaveTextContent(
+      'scrypt N = 4096, r = 8, p = 1 (4 MiB)',
+    );
+    expect(screen.queryByTestId('pin-hashing-result')).toBeNull();
+    await user.press(screen.getByRole('button', { name: 'Run the PIN hashing time' }));
+    expect(await screen.findByTestId('pin-hashing-result')).toHaveTextContent('312 ms');
+    expect(measure).toHaveBeenCalledWith();
   });
 
   it('shows only "not available" in a release build', async () => {
