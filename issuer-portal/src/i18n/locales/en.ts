@@ -6,6 +6,8 @@ export const en = {
   app: {
     name: 'UniVault Issuer Portal',
     shortName: 'Issuer Portal',
+    brand: 'UniVault',
+    roleTag: 'Issuer portal',
   },
   common: {
     loading: 'Loading…',
@@ -107,7 +109,7 @@ export const en = {
         description: "Credentials signed into holders' wallets so far",
       },
       active: {
-        label: 'Active',
+        label: 'Valid',
         description: "Credentials currently valid in holders' wallets",
       },
       revoked: {
@@ -119,7 +121,7 @@ export const en = {
         description: 'Created, waiting for the holder to scan the QR code',
       },
       superseded: {
-        label: 'Superseded',
+        label: 'Replaced',
         description: 'Replaced by a newer credential',
       },
       expired: {
@@ -128,7 +130,7 @@ export const en = {
       },
       expiringSoon: {
         label: 'Expiring in {{days}} days',
-        description: 'Active credentials that expire soon',
+        description: 'Valid credentials that expire soon',
       },
       holders: {
         label: 'Holders',
@@ -177,9 +179,9 @@ export const en = {
     registerAction: 'Register holder',
     statuses: {
       pending: 'Awaiting wallet',
-      valid: 'Active',
+      valid: 'Valid',
       revoked: 'Revoked',
-      superseded: 'Superseded',
+      superseded: 'Replaced',
       expired: 'Expired',
     },
     list: {
@@ -584,7 +586,7 @@ export const en = {
     description: 'Every credential your organisation has created, with its status and actions.',
     issueAction: 'Issue credential',
     statuses: {
-      valid: 'Active',
+      valid: 'Valid',
       pending: 'Awaiting wallet',
       revoked: 'Revoked',
       superseded: 'Replaced',
@@ -610,7 +612,7 @@ export const en = {
       tabsLabel: 'Filter by status',
       tabs: {
         all: 'All',
-        valid: 'Active',
+        valid: 'Valid',
         pending: 'Awaiting wallet',
         expired: 'Expired',
         revoked: 'Revoked',
@@ -637,7 +639,7 @@ export const en = {
           title: 'No credentials yet',
           description: 'Credentials you issue to holders appear here.',
         },
-        valid: { title: 'No active credentials', description: 'Nothing is active right now.' },
+        valid: { title: 'No valid credentials', description: 'Nothing is valid right now.' },
         pending: {
           title: 'Nothing is awaiting a wallet',
           description: 'Every credential has been accepted, revoked or replaced.',

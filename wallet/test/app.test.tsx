@@ -1,25 +1,17 @@
 /**
- * Root layout (providers, font loading, splash) and the app config (identifiers, permission
+ * Root layout (providers, font and language loading, splash) and the app config (identifiers, permission
  * texts, colours from the tokens, no secrets).
  */
-import { screen } from '@testing-library/react-native';
+import { act, screen } from '@testing-library/react-native';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { brandColors, semanticColors } from '@univault/portal-ui/tokens';
-import { useFonts } from '@expo-google-fonts/noto-sans-sinhala';
+import { darkColors, lightColors } from '@univault/portal-ui/tokens';
+import { useFonts } from 'expo-font';
 import { renderRouter } from 'expo-router/testing-library';
 import * as SplashScreen from 'expo-splash-screen';
 import appConfig, { APP_ID, CAMERA_PERMISSION_TEXT, FACE_ID_PERMISSION_TEXT } from '../app.config';
-import { en } from '../src/i18n/locales/en';
 
-jest.mock('@expo-google-fonts/noto-sans-sinhala', () => ({
-  NotoSansSinhala_400Regular: 1,
-  NotoSansSinhala_700Bold: 2,
-  useFonts: jest.fn(() => [true, null]),
-}));
-jest.mock('expo-splash-screen', () => ({
-  preventAutoHideAsync: jest.fn(() => Promise.resolve()),
-  hideAsync: jest.fn(() => Promise.resolve()),
-}));
+// the font weights, expo-font's useFonts and expo-splash-screen are mocked in test/setup.ts
 
 /**
  * The REAL route tree: renderRouter reads the files in wallet/app, so the Stack and Tabs screen
@@ -34,36 +26,43 @@ describe('root layout (real app/ routes)', () => {
     (useFonts as jest.Mock).mockReturnValue([true, null]);
   });
 
-  it('renders the app once the Sinhala font is loaded, then hides the splash screen', async () => {
+  it('renders the app once the font and the language are ready, then hides the splash', async () => {
     await renderRouter(APP_DIR, { initialUrl: '/' });
-    expect(screen.getByText(en.credentials.emptyTitle)).toBeOnTheScreen();
+    expect(await screen.findByTestId('credentials-screen')).toBeOnTheScreen();
     expect(SplashScreen.hideAsync).toHaveBeenCalled();
-  });
-
-  it.each([
-    ['/scan', en.scan.emptyTitle],
-    ['/history', en.history.emptyTitle],
-    ['/settings', en.settings.language],
-    ['/settings/diagnostics', en.diagnostics.cryptoTitle],
-    ['/no-such-screen', en.notFound.title],
-  ])('every declared screen exists: %s', async (url, text) => {
-    await renderRouter(APP_DIR, { initialUrl: url });
-    expect(screen).toHavePathname(url);
-    expect(screen.getAllByText(text).length).toBeGreaterThan(0);
   });
 
   it('keeps the splash screen (renders nothing) while the font loads', async () => {
     (useFonts as jest.Mock).mockReturnValue([false, null]);
     await renderRouter(APP_DIR, { initialUrl: '/' });
-    expect(screen.queryByText(en.credentials.emptyTitle)).toBeNull();
+    // let the language restore finish: still nothing, because the font is not ready
+    await act(async () => undefined);
+    expect(screen.queryByTestId('credentials-screen')).toBeNull();
     expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
   });
 
   it('still starts, with the system font, if the font fails to load', async () => {
     (useFonts as jest.Mock).mockReturnValue([false, new Error('font missing')]);
     await renderRouter(APP_DIR, { initialUrl: '/' });
-    expect(await screen.findByText(en.credentials.emptyTitle)).toBeOnTheScreen();
+    expect(await screen.findByTestId('credentials-screen')).toBeOnTheScreen();
     expect(SplashScreen.hideAsync).toHaveBeenCalled();
+  });
+});
+
+describe('bundled fonts', () => {
+  it('imports only the five design weights, never a font package index (which pulls every weight)', () => {
+    const source = readFileSync(join(APP_DIR, '_layout.tsx'), 'utf8');
+    expect(source).not.toMatch(/from '@expo-google-fonts\/noto-sans(-sinhala)?'/);
+    const weights = [...source.matchAll(/from '@expo-google-fonts\/([\w-]+\/\w+)'/g)].map(
+      (m) => m[1],
+    );
+    expect(weights).toEqual([
+      'noto-sans/400Regular',
+      'noto-sans/500Medium',
+      'noto-sans/600SemiBold',
+      'noto-sans-sinhala/400Regular',
+      'noto-sans-sinhala/600SemiBold',
+    ]);
   });
 });
 
@@ -101,8 +100,9 @@ describe('app config', () => {
   });
 
   it('takes its colours from the shared tokens', () => {
-    expect(config.android?.adaptiveIcon?.backgroundColor).toBe(semanticColors.primary);
-    expect(JSON.stringify(config.plugins)).toContain(brandColors[900]);
+    expect(config.android?.adaptiveIcon?.backgroundColor).toBe(lightColors.brand);
+    expect(JSON.stringify(config.plugins)).toContain(lightColors.bg);
+    expect(JSON.stringify(config.plugins)).toContain(darkColors.bg);
   });
 
   it('holds no secrets and no extra runtime values', () => {

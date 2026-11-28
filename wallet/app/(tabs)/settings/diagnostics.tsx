@@ -6,17 +6,28 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
-import { AppText, Button, Card, Screen, StatusBadge } from '../../src/components';
-import { diagnosticsEnabled, getAppInfo } from '../../src/config/app-info';
-import { getApiConfig } from '../../src/config/env';
-import { runCryptoCoreCheck, type CryptoCheckResult } from '../../src/lib/crypto-check';
-import { checkHealth, getApiClient, type HealthResult } from '../../src/services/api-client';
+import { AppText, Badge, Button, Card, Screen } from '../../../src/components';
+import { diagnosticsEnabled, getAppInfo } from '../../../src/config/app-info';
+import { getApiConfig } from '../../../src/config/env';
+import { runCryptoCoreCheck, type CryptoCheckResult } from '../../../src/lib/crypto-check';
+import { checkHealth, getApiClient, type HealthResult } from '../../../src/services/api-client';
 
-function Row({ label, value, testID }: { label: string; value: string; testID?: string }) {
+function Row({
+  label,
+  value,
+  mono = false,
+  testID,
+}: {
+  label: string;
+  value: string;
+  /** Addresses and ids in mono (the only screen in the wallet that uses it). */
+  mono?: boolean;
+  testID?: string;
+}) {
   return (
     <View style={styles.row}>
       <AppText variant="label">{label}</AppText>
-      <AppText tone="muted" testID={testID} selectable>
+      <AppText variant={mono ? 'mono' : 'body'} tone="muted" testID={testID} selectable>
         {value}
       </AppText>
     </View>
@@ -26,11 +37,13 @@ function Row({ label, value, testID }: { label: string; value: string; testID?: 
 function ResultBadge({ pass, testID }: { pass: boolean | null; testID: string }) {
   const { t } = useTranslation();
   if (pass === null)
-    return <StatusBadge label={t('diagnostics.notRun')} tone="neutral" testID={testID} />;
+    return <Badge label={t('diagnostics.notRun')} tone="neutral" testID={testID} />;
   return (
-    <StatusBadge
+    <Badge
       label={pass ? t('diagnostics.pass') : t('diagnostics.fail')}
-      tone={pass ? 'success' : 'danger'}
+      // a check result, like a verification: passed = valid colours, failed = revoked colours
+      tone={pass ? 'valid' : 'revoked'}
+      icon={pass ? 'checkmark-circle' : 'close-circle'}
       testID={testID}
     />
   );
@@ -88,10 +101,11 @@ export default function DiagnosticsScreen() {
         <Row
           label={t('diagnostics.apiBaseUrl')}
           value={api.apiBaseUrl ?? t(`diagnostics.apiProblem.${api.problem ?? 'missing'}`)}
+          mono={api.apiBaseUrl !== null}
           testID="diag-api-url"
         />
         {api.isLoopback ? (
-          <AppText tone="destructive" testID="diag-loopback">
+          <AppText tone="error" testID="diag-loopback">
             {t('diagnostics.loopbackWarning')}
           </AppText>
         ) : null}
@@ -112,16 +126,14 @@ export default function DiagnosticsScreen() {
               {t('diagnostics.duration', { ms: crypto.durationMs })}
             </AppText>
             {crypto.failure ? (
-              <AppText tone="destructive">
-                {t('diagnostics.reason', { reason: crypto.failure })}
-              </AppText>
+              <AppText tone="error">{t('diagnostics.reason', { reason: crypto.failure })}</AppText>
             ) : null}
           </>
         ) : null}
         <Button
           label={cryptoBusy ? t('common.running') : t('diagnostics.run')}
           accessibilityLabel={t('diagnostics.runLabel', { name: t('diagnostics.cryptoTitle') })}
-          busy={cryptoBusy}
+          loading={cryptoBusy}
           onPress={() => void runCrypto()}
           testID="run-crypto-check"
         />
@@ -145,13 +157,13 @@ export default function DiagnosticsScreen() {
             </AppText>
           </>
         ) : null}
-        {api.apiBaseUrl ? null : (
-          <AppText tone="destructive">{t('diagnostics.notConfigured')}</AppText>
-        )}
+        {api.apiBaseUrl ? null : <AppText tone="error">{t('diagnostics.notConfigured')}</AppText>}
+        {/* one primary action per screen: the crypto check is primary, this one secondary */}
         <Button
+          variant="secondary"
           label={healthBusy ? t('common.running') : t('diagnostics.run')}
           accessibilityLabel={t('diagnostics.runLabel', { name: t('diagnostics.apiTitle') })}
-          busy={healthBusy}
+          loading={healthBusy}
           disabled={!api.apiBaseUrl}
           onPress={() => void runHealth()}
           testID="run-api-check"

@@ -5,10 +5,15 @@ presents them, selectively disclosed, to a verifier. React Native + **Expo SDK 5
 Native 0.88.1, React 19.3.0, Expo Router 58), TypeScript **6.0.3** (the version Expo SDK 58
 requires; the rest of the repository stays on 5.9.3, see CLAUDE.md and Decision 022).
 
-**Status (27 Nov 2026):** project initialised: navigation, theme, English/Sinhala, shared crypto
-code, Diagnostics. The four tabs are placeholders; credential redemption, storage and
-presentation follow in the next Sprint 2 tasks. Design doc:
-[docs/frontend/mobile-wallet.md](../docs/frontend/mobile-wallet.md).
+**Status (27 Nov 2026):** application shell: four tabs with a stack each (Credentials, Scan,
+History, Settings), header back and Android back handling, the shared component set, credential
+status badges in the issuer portal's words, the "Navy and azure" design system
+([docs/design/design-system.md](../docs/design/design-system.md): light/dark from the shared
+tokens, Noto Sans + Noto Sans Sinhala, WCAG AA contrast tested in both themes), the saved
+language preference, About, and the dev-only Diagnostics and UI kit.
+Credentials and History show **synthetic sample data in development builds only**; credential
+redemption, the vault, the camera and presentation follow in the next Sprint 2 tasks. Design
+doc: [docs/frontend/mobile-wallet.md](../docs/frontend/mobile-wallet.md).
 
 ## Prerequisites
 
@@ -21,7 +26,7 @@ presentation follow in the next Sprint 2 tasks. Design doc:
 | ngrok account  | Only for tunnel mode (`npm run start:tunnel`), see Troubleshooting                                                     |
 
 No Android Studio or Xcode is needed for Expo Go. A development build (later, see
-[docs/frontend/mobile-wallet.md](../docs/frontend/mobile-wallet.md) §6) will need them.
+[docs/frontend/mobile-wallet.md](../docs/frontend/mobile-wallet.md) §12) will need them.
 
 ## Setup
 
@@ -90,7 +95,7 @@ bundle; never put a secret in one.
 | `npm run typecheck`           | `tsc --noEmit` (TypeScript 6.0.3)                                              |
 | `npm run lint`                | Root ESLint config on `wallet/`, 0 warnings allowed                            |
 | `npm test`                    | Jest (jest-expo) + React Native Testing Library                                |
-| `npm run test:coverage`       | Same with coverage; fails below 98 / 93 / 96 / 99 (stmts/branches/funcs/lines) |
+| `npm run test:coverage`       | Same with coverage; fails below 99 / 95 / 98 / 99 (stmts/branches/funcs/lines) |
 | `npm run doctor`              | `npx expo-doctor`: SDK version alignment, config and dependency checks         |
 | `npm run fixture:diagnostics` | Regenerates the synthetic SD-JWT used by Diagnostics (throwaway keys)          |
 | `npm run art:placeholder`     | Regenerates the placeholder icon and splash PNGs from the design tokens        |
@@ -105,29 +110,55 @@ wallet/
   app.config.ts            name, slug, version, scheme, identifiers, permission texts, splash
   metro.config.js          linked crypto-core, tokens mapping, guards (see the file header)
   jest.config.js           jest-expo + .mjs transform + tokens mapping, coverage thresholds
-  app/                     Expo Router routes
-    _layout.tsx            root: i18n, safe areas, Sinhala font, splash, ErrorBoundary, Stack
-    (tabs)/_layout.tsx     Credentials · Scan · History · Settings
-    (tabs)/index.tsx       Credentials (placeholder)
-    (tabs)/scan.tsx        Scan (placeholder)
-    (tabs)/history.tsx     History (placeholder)
-    (tabs)/settings.tsx    language, app version, link to Diagnostics (dev builds)
-    settings/diagnostics.tsx  dev-only checks
+  app/                     Expo Router routes (every path is in src/navigation/routes.ts)
+    _layout.tsx            root Stack: i18n + saved language, safe areas, font, splash, toasts, ErrorBoundary
+    index.tsx              / → /credentials
     +not-found.tsx
+    (tabs)/_layout.tsx     Credentials · Scan · History · Settings (backBehavior firstRoute)
+    (tabs)/credentials/    _layout (Stack), index (list), [id] (detail placeholder)
+    (tabs)/scan/           _layout, index (placeholder; camera later)
+    (tabs)/history/        _layout, index, [id] (placeholder)
+    (tabs)/settings/       _layout, index, language, security (placeholder), about,
+                           diagnostics (dev only), ui-kit (dev only)
   src/
-    components/            Screen, Button, Card, StatusBadge, EmptyState, ErrorBoundary, AppText
-    theme/                 theme from @univault/portal-ui/tokens; useTheme (scheme + script)
-    i18n/                  i18next setup, locales/en.ts, locales/si.ts (needs review)
-    lib/                   crypto-setup (Hermes polyfills), crypto-check (Diagnostics)
+    components/            Header, Button, Card, CredentialCard, StatusBadge, Badge, ListItem,
+                           SectionHeader, LoadingState, EmptyState, ErrorState, OfflineNotice,
+                           Toast, ConfirmDialog, Icon, Screen, AppText, ErrorBoundary
+    credentials/           status.ts: backend status → wallet state (the one mapping)
+    theme/                 the shared tokens (design names, light/dark); useTheme; contrast.ts
+    i18n/                  i18next setup, languages, locales/en.ts, locales/si.ts (needs review)
+    lib/                   crypto-setup, crypto-check, preferences (AsyncStorage), format (dates)
+    navigation/            routes.ts (route table), tabs.ts, TabStack, stack-options (Header)
     services/              api-client (EXPO_PUBLIC_API_BASE_URL, GET /health)
-    config/                env (API URL parsing), app-info (versions, __DEV__ gate)
-    navigation/            tab definitions
-    fixtures/              synthetic SD-JWT for Diagnostics (generated)
+    config/                env (API URL parsing), app-info (versions, __DEV__ gates)
+    fixtures/              synthetic SD-JWT for Diagnostics; sample-data (dev builds only)
   assets/images/           placeholder icon, adaptive icon, splash marks (generated)
   assets/fonts/            NotoSansSinhala-OFL.txt (licence of the bundled font)
   scripts/                 fixture and artwork generators (Node, development only)
   test/                    Jest tests
 ```
+
+## Storage rule
+
+`@react-native-async-storage/async-storage` holds **UI preferences only** (today: the language,
+key `univault.language`). It is unencrypted: never put a key, credential, SD-JWT, claim, token,
+PIN or anything personal in it. Those go in secure storage (`expo-secure-store`) from the
+holder-key and vault tasks. Every AsyncStorage key is listed in `src/lib/preferences.ts`.
+
+## Design system
+
+All UI follows [docs/design/design-system.md](../docs/design/design-system.md); every colour,
+font, size and radius comes from `portal-ui/src/tokens.ts` through `src/theme` (never a hex value
+in a component; tests fail otherwise). Status colours mean valid, expired, revoked and pending
+only, each status shown as icon + word. One primary (azure) button per screen. The light/dark
+theme follows the phone; there is no switch in the app.
+
+## Developer screens
+
+**Settings → Developer** (development builds only): **Diagnostics** (versions, crypto-core and
+API checks) and **UI kit** (every component, variant and status in the current language and
+colour scheme; switch the phone to dark mode to see the dark theme). Neither is reachable in a
+release build.
 
 ## Identifiers
 

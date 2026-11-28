@@ -6,7 +6,7 @@ import { isRouteErrorResponse, Link, useRouteError } from 'react-router';
 function DashboardLink() {
   const { t } = useTranslation();
   return (
-    <Link to="/" className={buttonVariants({ variant: 'outline' })}>
+    <Link to="/" className={buttonVariants({ variant: 'secondary' })}>
       {t('common.backToDashboard')}
     </Link>
   );

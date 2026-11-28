@@ -131,7 +131,7 @@ describe('step 2 – details from the preview, read-only', () => {
     const view = await openWizard();
     await goTo(view, 2);
     const card = await screen.findByRole('heading', { name: 'Credential details' });
-    const scope = card.closest('div[class*="rounded-card"]') as HTMLElement;
+    const scope = card.closest('div[class*="rounded-md"]') as HTMLElement;
     expect(definition(scope, 'Designation')).toHaveTextContent('Value from the server');
     expect(within(scope).queryByText('Logistics Coordinator')).not.toBeInTheDocument();
     expect(definition(scope, 'Employment type')).toHaveTextContent('Contract'); // option label

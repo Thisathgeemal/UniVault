@@ -36,9 +36,9 @@ export function ErrorSummary({ title, errors, focusKey }: ErrorSummaryProps) {
       tabIndex={-1}
       role="alert"
       aria-labelledby={titleId}
-      className="mb-6 rounded-md border-2 border-destructive bg-destructive-muted px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="mb-6 rounded-md border-2 border-status-revoked bg-status-revoked-bg px-4 py-3 text-body text-status-revoked-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
     >
-      <h2 id={titleId} className="mb-2 font-semibold text-destructive">
+      <h2 id={titleId} className="mb-2 font-semibold text-status-revoked-text">
         {title}
       </h2>
       <ul className="list-disc space-y-1 pl-5">
@@ -47,7 +47,7 @@ export function ErrorSummary({ title, errors, focusKey }: ErrorSummaryProps) {
             {error.fieldId ? (
               <a
                 href={`#${error.fieldId}`}
-                className="font-medium text-destructive underline underline-offset-2"
+                className="font-medium text-status-revoked-text underline underline-offset-2"
                 onClick={(event) => {
                   event.preventDefault();
                   const field = document.getElementById(error.fieldId!);
@@ -58,7 +58,7 @@ export function ErrorSummary({ title, errors, focusKey }: ErrorSummaryProps) {
                 {error.message}
               </a>
             ) : (
-              <span className="text-destructive">{error.message}</span>
+              <span className="text-status-revoked-text">{error.message}</span>
             )}
           </li>
         ))}

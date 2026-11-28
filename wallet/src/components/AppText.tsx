@@ -1,28 +1,42 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
-import { typeStyle, type TypeStep } from '../theme';
+import { Platform, Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
+import type { ThemeColors, TypeStep } from '../theme';
 import { useTheme } from '../theme/use-theme';
 
-export type AppTextVariant = 'title' | 'heading' | 'body' | 'label' | 'caption';
+/** The design type scale: display, h1, h2, h3, body, bodySm, label, caption, mono. */
+export type AppTextVariant = TypeStep;
 
-const VARIANTS: Record<AppTextVariant, { step: TypeStep; bold: boolean }> = {
-  title: { step: '2xl', bold: true },
-  heading: { step: 'lg', bold: true },
-  body: { step: 'base', bold: false },
-  label: { step: 'sm', bold: true },
-  caption: { step: 'sm', bold: false },
+/** Text colours: text, text-muted, text-subtle (captions only), links, errors, on navy. */
+export type AppTextTone =
+  'default' | 'muted' | 'subtle' | 'accent' | 'error' | 'onBrand' | 'onBrandMuted';
+
+const TONE: Record<AppTextTone, keyof ThemeColors> = {
+  default: 'text',
+  muted: 'textMuted',
+  subtle: 'textSubtle',
+  accent: 'accentText',
+  error: 'statusRevoked', // errors use the revoked colours (design system)
+  onBrand: 'onBrand',
+  onBrandMuted: 'onBrandMuted',
 };
+
+/**
+ * mono: ids and JWT snippets on the Diagnostics screen only. The system monospace font
+ * (JetBrains Mono is self-hosted for the portals; bundling it for one developer screen was not
+ * worth the app size).
+ */
+const SYSTEM_MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
 
 export interface AppTextProps extends Omit<TextProps, 'style'> {
   variant?: AppTextVariant;
-  tone?: 'default' | 'muted' | 'primary' | 'destructive';
+  tone?: AppTextTone;
   style?: StyleProp<TextStyle>;
   children?: ReactNode;
 }
 
 /**
- * Themed text. Sizes come from the shared type scale; the Sinhala font and taller line height
- * apply automatically while the UI is in Sinhala. Text keeps scaling with the OS text size
+ * Themed text in the design type scale (generous line heights: 26 for 16 body), Noto Sans or
+ * Noto Sans Sinhala by weight and UI language. Text keeps scaling with the OS text size
  * (dynamic type); maxFontSizeMultiplier only stops extreme sizes from breaking layouts.
  */
 export function AppText({
@@ -33,24 +47,15 @@ export function AppText({
   ...rest
 }: AppTextProps) {
   const theme = useTheme();
-  const { step, bold } = VARIANTS[variant];
-  const color =
-    tone === 'muted'
-      ? theme.colors.mutedForeground
-      : tone === 'primary'
-        ? theme.colors.primary
-        : tone === 'destructive'
-          ? theme.colors.destructive
-          : theme.colors.foreground;
-  const fontFamily = theme.fontFamily(bold ? 'bold' : 'regular');
+  const type = theme.type(variant);
   return (
     <Text
       maxFontSizeMultiplier={2}
       {...rest}
       style={[
-        typeStyle(step, theme.script),
-        { color },
-        fontFamily ? { fontFamily } : bold ? styles.bold : null,
+        { fontSize: type.fontSize, lineHeight: type.lineHeight },
+        { fontFamily: variant === 'mono' ? SYSTEM_MONO : type.fontFamily },
+        { color: theme.colors[TONE[tone]] },
         style,
       ]}
     >
@@ -58,7 +63,3 @@ export function AppText({
     </Text>
   );
 }
-
-const styles = StyleSheet.create({
-  bold: { fontWeight: '700' },
-});

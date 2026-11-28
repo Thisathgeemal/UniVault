@@ -341,7 +341,7 @@ describe('actions', () => {
     const big = within(dialog).getByRole('img', { name: QR_ALT });
     expect(Number(big.getAttribute('width'))).toBeGreaterThanOrEqual(560);
     expect(decodeQr(big)).toBe(offer.qrContent);
-    expect(within(dialog).getByRole('timer')).toHaveClass('text-5xl');
+    expect(within(dialog).getByRole('timer')).toHaveClass('text-display');
     // Only the visible countdown (the full-screen one) announces
     const liveOf = (timerElement: Element) =>
       timerElement.parentElement!.querySelector('[aria-live]');
@@ -483,7 +483,7 @@ describe('entry points and other credentials', () => {
     expect(
       await screen.findByText('Only a credential awaiting the wallet can be offered'),
     ).toBeInTheDocument();
-    expect(screen.getByText(/^This credential is Active:/)).toBeInTheDocument();
+    expect(screen.getByText(/^This credential is Valid:/)).toBeInTheDocument();
     expect(createRequests()).toHaveLength(0);
     expect(screen.getByRole('link', { name: 'Back to credential' })).toBeInTheDocument();
   });

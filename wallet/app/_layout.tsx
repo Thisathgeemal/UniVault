@@ -1,23 +1,30 @@
 /**
  * Root layout: providers for every screen.
- * - i18n (set up once, before the first render)
- * - safe areas, OS colour scheme (status bar), the Sinhala font (bundled, loaded with expo-font)
- * - an ErrorBoundary around the navigator
- * The splash screen stays up until the font is ready (or failed: then the system font is used).
+ * - i18n: initialised synchronously at import (device language), then the SAVED language is
+ *   applied (restoreLanguage) before anything renders, so there is no flash of the wrong
+ *   language
+ * - safe areas, OS colour scheme (status bar), Noto Sans and Noto Sans Sinhala (bundled, expo-font)
+ * - toasts (ToastProvider) and an ErrorBoundary around the navigator
+ * The splash screen stays up until the fonts (or their failure: system font) AND the language are
+ * ready.
  */
-import {
-  NotoSansSinhala_400Regular,
-  NotoSansSinhala_700Bold,
-  useFonts,
-} from '@expo-google-fonts/noto-sans-sinhala';
+// One import per weight: the packages' index files require EVERY weight and italic, which would
+// put about 20 unused font files (over 10 MB) into the app bundle
+import { NotoSans_400Regular } from '@expo-google-fonts/noto-sans/400Regular';
+import { NotoSans_500Medium } from '@expo-google-fonts/noto-sans/500Medium';
+import { NotoSans_600SemiBold } from '@expo-google-fonts/noto-sans/600SemiBold';
+import { NotoSansSinhala_400Regular } from '@expo-google-fonts/noto-sans-sinhala/400Regular';
+import { NotoSansSinhala_600SemiBold } from '@expo-google-fonts/noto-sans-sinhala/600SemiBold';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ErrorBoundary } from '../src/components';
-import { setupI18n } from '../src/i18n';
+import { ErrorBoundary, ToastProvider } from '../src/components';
+import { restoreLanguage, setupI18n } from '../src/i18n';
+import { useStackScreenOptions } from '../src/navigation/stack-options';
 import { useTheme } from '../src/theme/use-theme';
 
 setupI18n();
@@ -26,31 +33,45 @@ void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 function RootNavigator() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const screenOptions = useStackScreenOptions();
   return (
     <>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: theme.colors.surface },
-          headerTintColor: theme.colors.primary,
-          headerTitleStyle: { color: theme.colors.foreground },
-          contentStyle: { backgroundColor: theme.colors.background },
-        }}
-      >
+      <Stack screenOptions={screenOptions}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="settings/diagnostics" options={{ title: t('diagnostics.title') }} />
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ title: t('notFound.title') }} />
       </Stack>
     </>
   );
 }
 
+/** True once the saved language (or the device language) is applied. */
+function useLanguageReady(): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void restoreLanguage().then(() => {
+      if (active) setReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  return ready;
+}
+
 export default function RootLayout() {
+  // The design system's families and weights (names in portal-ui/src/tokens.ts fontFamily)
   const [fontsLoaded, fontError] = useFonts({
+    NotoSans_400Regular,
+    NotoSans_500Medium,
+    NotoSans_600SemiBold,
     NotoSansSinhala_400Regular,
-    NotoSansSinhala_700Bold,
+    NotoSansSinhala_600SemiBold,
   });
-  const ready = fontsLoaded || fontError !== null;
+  const languageReady = useLanguageReady();
+  const ready = (fontsLoaded || fontError !== null) && languageReady;
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync().catch(() => undefined);
@@ -59,9 +80,11 @@ export default function RootLayout() {
   if (!ready) return null;
   return (
     <SafeAreaProvider>
-      <ErrorBoundary>
-        <RootNavigator />
-      </ErrorBoundary>
+      <ToastProvider>
+        <ErrorBoundary>
+          <RootNavigator />
+        </ErrorBoundary>
+      </ToastProvider>
     </SafeAreaProvider>
   );
 }

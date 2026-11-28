@@ -1,5 +1,6 @@
 /**
- * Jest setup: English UI, the crypto runtime set up exactly as in the app (index.ts imports
+ * Jest setup: English UI, empty AsyncStorage (official mock), font and splash mocks for the
+ * root layout, the crypto runtime set up exactly as in the app (index.ts imports
  * src/lib/crypto-setup first), the real app config for expo-constants, and a console guard.
  *
  * CONSOLE GUARD: any console.error or console.warn during a test FAILS that test (after it
@@ -11,7 +12,34 @@
  * reason; keep it empty when possible.
  */
 import '../src/lib/crypto-setup';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setupI18n, i18n } from '../src/i18n';
+
+// AsyncStorage's official in-memory Jest mock; emptied before every test (no state leaks)
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+
+// The root layout (rendered by every test of the real app/ tree) loads the Sinhala font and
+// holds the splash screen: loaded at once by default; app.test.tsx changes useFonts per test.
+jest.mock('@expo-google-fonts/noto-sans/400Regular', () => ({ NotoSans_400Regular: 1 }));
+jest.mock('@expo-google-fonts/noto-sans/500Medium', () => ({ NotoSans_500Medium: 2 }));
+jest.mock('@expo-google-fonts/noto-sans/600SemiBold', () => ({ NotoSans_600SemiBold: 3 }));
+jest.mock('@expo-google-fonts/noto-sans-sinhala/400Regular', () => ({
+  NotoSansSinhala_400Regular: 4,
+}));
+jest.mock('@expo-google-fonts/noto-sans-sinhala/600SemiBold', () => ({
+  NotoSansSinhala_600SemiBold: 5,
+}));
+// only useFonts is replaced: the icon font (@expo/vector-icons) still uses the real module
+jest.mock('expo-font', () => ({
+  ...jest.requireActual('expo-font'),
+  useFonts: jest.fn(() => [true, null]),
+}));
+jest.mock('expo-splash-screen', () => ({
+  preventAutoHideAsync: jest.fn(() => Promise.resolve()),
+  hideAsync: jest.fn(() => Promise.resolve()),
+}));
 
 // jest-expo's expo-constants mock has no app config: give it the real one (app.config.ts)
 jest.mock('expo-constants', () => {
@@ -47,6 +75,7 @@ beforeEach(async () => {
     };
   }
   if (i18n.language !== 'en') await i18n.changeLanguage('en');
+  await AsyncStorage.clear();
 });
 
 afterEach(() => {

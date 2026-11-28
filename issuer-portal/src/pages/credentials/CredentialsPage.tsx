@@ -95,8 +95,10 @@ export function CredentialsPage() {
   });
   if (!user) return null;
 
-  const issueLink = (
-    <Link to="/credentials/new" className={buttonVariants({ variant: 'default' })}>
+  // One primary per page: the header's link is the primary; the empty state repeats it as a
+  // secondary button (design system: one azure action per screen)
+  const issueLink = (variant: 'primary' | 'secondary') => (
+    <Link to="/credentials/new" className={buttonVariants({ variant })}>
       <FilePlus2 aria-hidden="true" className="h-4 w-4" />
       {t('credentials.issueAction')}
     </Link>
@@ -110,7 +112,7 @@ export function CredentialsPage() {
         <span className="inline-flex items-center gap-1">
           <Link
             to={`/credentials/${c.id}`}
-            className="font-mono text-primary underline-offset-2 hover:underline"
+            className="font-mono text-accent-text underline-offset-2 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
             {shortId(c.id)}
@@ -131,12 +133,12 @@ export function CredentialsPage() {
         <span className="flex flex-col">
           <Link
             to={`/holders/${c.holder.id}`}
-            className="font-medium text-primary underline-offset-2 hover:underline"
+            className="font-medium text-accent-text underline-offset-2 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
             {c.holder.fullName}
           </Link>
-          <span className="font-mono text-xs text-muted-foreground">{c.holder.externalRef}</span>
+          <span className="font-mono text-caption text-text-muted">{c.holder.externalRef}</span>
         </span>
       ),
     },
@@ -158,7 +160,7 @@ export function CredentialsPage() {
         c.issuedAt ? (
           <time dateTime={c.issuedAt}>{formatColomboDate(c.issuedAt, language) ?? c.issuedAt}</time>
         ) : (
-          <span className="text-muted-foreground">{t('credentials.list.notIssued')}</span>
+          <span className="text-text-muted">{t('credentials.list.notIssued')}</span>
         ),
     },
     {
@@ -173,7 +175,7 @@ export function CredentialsPage() {
               {formatColomboDate(c.expiresAt, language) ?? c.expiresAt}
             </time>
             {days !== null && days <= EXPIRING_SOON_DAYS ? (
-              <span className="text-xs font-medium text-accent-foreground">
+              <span className="text-caption font-medium text-status-expired-text">
                 {days === 0
                   ? t('credentials.list.expiringToday')
                   : t('credentials.list.expiringSoon', { days })}
@@ -225,9 +227,13 @@ export function CredentialsPage() {
         <div className="flex flex-col gap-1">
           <p className="font-medium">{t('credentials.list.loadFailed')}</p>
           <p>{error.message}</p>
-          {error.reference ? <p className="font-mono text-xs">{error.reference}</p> : null}
+          {error.reference ? <p className="font-mono text-caption">{error.reference}</p> : null}
         </div>
-        <Button variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}>
+        <Button
+          variant="secondary"
+          onClick={() => void query.refetch()}
+          disabled={query.isFetching}
+        >
           {t('common.tryAgain')}
         </Button>
       </Alert>
@@ -239,7 +245,7 @@ export function CredentialsPage() {
         description={t('credentials.list.noMatch.description')}
         icon={<SearchX className="h-10 w-10" />}
         action={
-          <Button variant="outline" onClick={() => onSearch('')}>
+          <Button variant="secondary" onClick={() => onSearch('')}>
             {t('credentials.list.clearSearch')}
           </Button>
         }
@@ -251,7 +257,7 @@ export function CredentialsPage() {
         title={t(`credentials.list.empty.${list.status}.title`)}
         description={t(`credentials.list.empty.${list.status}.description`)}
         icon={<FileBadge className="h-10 w-10" />}
-        {...(list.status === 'all' ? { action: issueLink } : {})}
+        {...(list.status === 'all' ? { action: issueLink('secondary') } : {})}
       />
     );
   } else {
@@ -301,7 +307,7 @@ export function CredentialsPage() {
       <PageHeader
         title={t('credentials.title')}
         description={t('credentials.description')}
-        actions={issueLink}
+        actions={issueLink('primary')}
       />
       <FilterTabs
         label={t('credentials.list.tabsLabel')}

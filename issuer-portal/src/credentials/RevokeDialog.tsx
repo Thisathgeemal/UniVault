@@ -99,7 +99,7 @@ export function RevokeDialog({
       busy={revoke.isPending}
       footer={
         <>
-          <Button variant="outline" onClick={onClose} disabled={revoke.isPending}>
+          <Button variant="secondary" onClick={onClose} disabled={revoke.isPending}>
             {t('credentials.revoke.cancel')}
           </Button>
           <Button
@@ -147,7 +147,7 @@ export function RevokeDialog({
             rows={3}
             onChange={(e) => setNote(e.target.value)}
             disabled={revoke.isPending}
-            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-destructive"
+            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring aria-[invalid=true]:border-status-revoked"
           />
         )}
       </FormField>
@@ -160,7 +160,7 @@ export function RevokeDialog({
       {failure ? (
         <Alert variant="destructive" role="alert">
           <p>{failure.message}</p>
-          {failure.reference ? <p className="font-mono text-xs">{failure.reference}</p> : null}
+          {failure.reference ? <p className="font-mono text-caption">{failure.reference}</p> : null}
         </Alert>
       ) : null}
     </Dialog>

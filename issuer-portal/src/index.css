@@ -12,8 +12,11 @@
     font-family: var(--font-sans);
   }
 
+  /* Design system: bg page, text colour, body type step (16 px / 26 px, generous for Sinhala) */
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--bg);
+    color: var(--text);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
   }
 }

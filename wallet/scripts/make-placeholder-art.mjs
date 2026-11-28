@@ -9,7 +9,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
-import { brandColors, semanticColors } from '../../portal-ui/src/tokens.ts';
+import { darkColors, lightColors } from '../../portal-ui/src/tokens.ts';
 
 const OUT = fileURLToPath(new URL('../assets/images/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
@@ -104,13 +104,14 @@ function draw(size, scale, colours) {
   return encodePng(size, rgba);
 }
 
-const primary = hex(semanticColors.primary);
-const onPrimary = hex(semanticColors.primaryForeground);
-const accent = hex(semanticColors.accent);
-const light = hex(brandColors[100]);
+// "Navy and azure": a navy mark with an azure keyhole; on the dark splash, the on-brand colour
+const primary = hex(lightColors.brand);
+const onPrimary = hex(lightColors.onBrand);
+const accent = hex(lightColors.accent);
+const light = hex(darkColors.onBrand);
 
 const files = {
-  // App icon (iOS and the default): opaque, full-bleed brand teal
+  // App icon (iOS and the default): opaque, full-bleed brand navy
   'icon.png': draw(1024, 1, {
     background: primary,
     ring: onPrimary,
@@ -125,7 +126,7 @@ const files = {
     disc: onPrimary,
     keyhole: primary,
   }),
-  // Splash marks: teal on the light background, light teal on the dark one
+  // Splash marks: navy on the light background, on-brand white on the dark one
   'splash-icon.png': draw(512, 1, {
     background: TRANSPARENT,
     ring: primary,
@@ -136,7 +137,7 @@ const files = {
     background: TRANSPARENT,
     ring: light,
     disc: light,
-    keyhole: hex(brandColors[900]),
+    keyhole: hex(darkColors.accent),
   }),
 };
 

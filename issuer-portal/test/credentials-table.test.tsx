@@ -73,7 +73,7 @@ describe('columns and badges', () => {
 
     // Every effective status in plain words
     const table = screen.getByRole('table', { name: 'Credentials' });
-    for (const label of ['Active', 'Awaiting wallet', 'Expired', 'Revoked', 'Replaced']) {
+    for (const label of ['Valid', 'Awaiting wallet', 'Expired', 'Revoked', 'Replaced']) {
       expect(within(table).getAllByText(label).length).toBeGreaterThan(0);
     }
     expect(within(table).queryByText('valid')).not.toBeInTheDocument();
@@ -117,7 +117,7 @@ describe('tabs, search, sort and paging – all in the URL', () => {
       'aria-pressed',
       'true',
     );
-    for (const name of ['Active 1', 'Awaiting wallet 1', 'Expired 1', 'Revoked 1', 'Replaced 1']) {
+    for (const name of ['Valid 1', 'Awaiting wallet 1', 'Expired 1', 'Revoked 1', 'Replaced 1']) {
       expect(within(tabs).getByRole('button', { name })).toBeInTheDocument();
     }
     await user.click(within(tabs).getByRole('button', { name: 'Expired 1' }));
@@ -208,7 +208,7 @@ describe('empty, loading and error states', () => {
     expect(screen.getByRole('heading', { name: 'No credentials yet' })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Issue credential' })).toHaveLength(2);
     const expectations: [RegExp, string][] = [
-      [/^Active/, 'No active credentials'],
+      [/^Valid/, 'No valid credentials'],
       [/^Awaiting wallet/, 'Nothing is awaiting a wallet'],
       [/^Expired/, 'No expired credentials'],
       [/^Revoked/, 'No revoked credentials'],

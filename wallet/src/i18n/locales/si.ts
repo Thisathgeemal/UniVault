@@ -4,8 +4,10 @@
  * prototype (NFR-02); EVERY string still needs review by a native speaker before release.
  * Same shape as en.ts (enforced by the `Messages` type and a test). Terms follow the issuer
  * portal: credential = අක්තපත්‍රය, issuer = නිකුත්කරු, holder = හිමිකරු, wallet = පසුම්බිය.
+ * The status words and credential type names are COPIED from the issuer portal's si.ts
+ * (credentials.statuses, credentialTypes); test/status.test.ts fails if they drift apart.
  * Technical names (UniVault, SD-JWT, Expo, Hermes, API, crypto-core, GET /health, HTTP,
- * EXPO_PUBLIC_API_BASE_URL, wallet/.env) stay in Latin script.
+ * EXPO_PUBLIC_API_BASE_URL, wallet/.env, SIL Open Font License) stay in Latin script.
  */
 import type { Messages } from './en';
 
@@ -16,6 +18,9 @@ export const si: Messages = {
   common: {
     tryAgain: 'නැවත උත්සාහ කරන්න',
     running: 'ක්‍රියාත්මක වෙමින්…',
+    loading: 'පූරණය වෙමින්…',
+    back: 'ආපසු',
+    cancel: 'අවලංගු කරන්න',
   },
   language: {
     en: 'English',
@@ -27,11 +32,46 @@ export const si: Messages = {
     history: 'ඉතිහාසය',
     settings: 'සැකසුම්',
   },
+  status: {
+    valid: 'වලංගුයි',
+    expired: 'කල් ඉකුත් වූ',
+    revoked: 'අවලංගු කළ',
+    replaced: 'ප්‍රතිස්ථාපනය කළ',
+    notChecked: 'තවම පරීක්ෂා කර නැත',
+    checking: 'පරීක්ෂා කරමින්…',
+  },
+  credentialTypes: {
+    EmploymentCredential: 'රැකියා අක්තපත්‍රය',
+    KYCCredential: 'KYC අක්තපත්‍රය',
+  },
+  credentialCard: {
+    expires: '{{date}} දින කල් ඉකුත් වේ',
+    expiredOn: '{{date}} දින කල් ඉකුත් විය',
+    issuedBy: 'නිකුත්කරු {{issuer}}',
+    holder: 'හිමිකරු {{name}}',
+    statusLabel: 'තත්ත්වය {{status}}',
+    openHint: 'අක්තපත්‍රයේ විස්තර විවෘත කරයි',
+  },
+  sampleData: {
+    notice: 'නියැදි දත්ත (සංවර්ධන අනුවාදයේ පමණි). සැබෑ අක්තපත්‍ර පසු අනුවාදයකින් ලැබේ.',
+  },
   credentials: {
     title: 'මගේ අක්තපත්‍ර',
+    detailTitle: 'අක්තපත්‍රය',
     emptyTitle: 'තවම අක්තපත්‍ර නැත',
     emptyMessage:
       'සේවා යෝජකයෙකුගෙන් හෝ බැංකුවකින් ඔබට ලැබෙන අක්තපත්‍ර මෙහි දිස්වේ. එකක් එක් කිරීමට, නිකුත්කරු පෙන්වන QR කේතය ස්කෑන් ටැබයෙන් ස්කෑන් කරන්න.',
+    detailPlaceholder: 'අක්තපත්‍ර පසුම්බියේ ගබඩා කළ පසු සම්පූර්ණ විස්තර සහ බෙදා ගැනීමේ විකල්ප මෙහි දිස්වේ.',
+    notFoundTitle: 'අක්තපත්‍රය හමු නොවීය',
+    notFoundMessage: 'මෙම අක්තපත්‍රය ඔබගේ පසුම්බියේ නැත.',
+    backToList: 'මගේ අක්තපත්‍ර වෙත ආපසු',
+    fields: {
+      issuer: 'නිකුත්කරු',
+      type: 'වර්ගය',
+      holder: 'හිමිකරු',
+      expires: 'කල් ඉකුත් වන දිනය',
+      status: 'තත්ත්වය',
+    },
   },
   scan: {
     title: 'QR කේතයක් ස්කෑන් කරන්න',
@@ -41,18 +81,131 @@ export const si: Messages = {
   },
   history: {
     title: 'ඉතිහාසය',
+    detailTitle: 'ක්‍රියාකාරකම',
     emptyTitle: 'තවම ක්‍රියාකාරකම් නැත',
     emptyMessage:
       'ඔබට ලැබෙන අක්තපත්‍ර සහ ඔබ ඒවා බෙදා ගන්නා අය පිළිබඳ වාර්තාවක් මෙහි දිස්වේ. එය මෙම දුරකථනයේම පවතී.',
+    kinds: {
+      received: 'අක්තපත්‍රයක් ලැබිණි',
+      shared: 'අක්තපත්‍රයක් බෙදා ගන්නා ලදී',
+    },
+    entrySubtitle: '{{party}} · {{date}}',
+    detailPlaceholder: 'බෙදා ගත් දේ සහ කා සමඟද යන්න නිවැරදිව මෙහි දිස්වේ.',
+    notFoundTitle: 'ක්‍රියාකාරකම හමු නොවීය',
+    notFoundMessage: 'මෙම සටහන ඔබගේ ඉතිහාසයේ නැත.',
+    backToList: 'ඉතිහාසය වෙත ආපසු',
+    fields: {
+      with: 'කා සමඟද',
+      when: 'කවදාද',
+      credential: 'අක්තපත්‍රය',
+    },
   },
   settings: {
     title: 'සැකසුම්',
+    sections: {
+      preferences: 'මනාපයන්',
+      app: 'යෙදුම',
+      developer: 'සංවර්ධක (සංවර්ධන අනුවාද සඳහා පමණි)',
+    },
     language: 'භාෂාව',
     languageHint: 'මුළු යෙදුමේම භාෂාව වෙනස් කරයි.',
+    languageSaved: 'භාෂාව වෙනස් කළා',
+    languageNotSaved: 'භාෂාව වෙනස් කළා, නමුත් ඊළඟ වතාව සඳහා එය සුරැකිය නොහැකි විය.',
+    security: 'ආරක්ෂාව',
+    securityHint: 'පසුම්බි අගුල සහ ඇඟිලි සලකුණු හෝ මුහුණ මගින් අගුළු හැරීම',
     about: 'යෙදුම ගැන',
+    aboutHint: 'අනුවාදය සහ බලපත්‍ර',
     appVersion: 'යෙදුමේ අනුවාදය',
     diagnostics: 'පද්ධති පරීක්ෂා',
     diagnosticsHint: 'සංවර්ධක පරීක්ෂා (සංවර්ධන අනුවාද සඳහා පමණි)',
+    uiKit: 'UI කට්ටලය',
+    uiKitHint: 'සියලු සංරචක සහ තත්ත්වයන් (සංවර්ධන අනුවාද සඳහා පමණි)',
+  },
+  security: {
+    title: 'ආරක්ෂාව',
+    placeholderTitle: 'ආරක්ෂක සැකසුම් ළඟදීම',
+    placeholderMessage:
+      'කිසිවක් පෙන්වීමට හෝ බෙදා ගැනීමට පෙර පසුම්බිය අගුළු දමන ආකාරය (උපාංග මුරකේතය, ඇඟිලි සලකුණ හෝ මුහුණ) ඔබ මෙහිදී තෝරනු ඇත. ඔබගේ යතුරු දුරකථනයේ ආරක්ෂිත ගබඩාවේ තබා ගැනේ.',
+  },
+  about: {
+    title: 'යෙදුම ගැන',
+    description:
+      'UniVault යනු පෞද්ගලිකත්වය රකින අනන්‍යතා පසුම්බියකි: ඔබගේ අක්තපත්‍ර මෙම දුරකථනයේ තබාගෙන බෙදා ගන්නා දේ ඔබම තෝරයි.',
+    appVersion: 'යෙදුමේ අනුවාදය',
+    sdkVersion: 'Expo SDK',
+    licences: 'බලපත්‍ර',
+    fontLicence:
+      'සිංහල අකුරු සඳහා Noto Sans Sinhala අකුරු මුහුණත භාවිත කරයි, © 2022 The Noto Project Authors, SIL Open Font License, Version 1.1 යටතේ.',
+  },
+  uiKit: {
+    title: 'UI කට්ටලය',
+    unavailable: 'UI කට්ටලය ලබා ගත හැක්කේ සංවර්ධන අනුවාදවල පමණි.',
+    intro: 'වත්මන් භාෂාවෙන් සහ තේමාවෙන් ({{scheme}} ප්‍රකාරය) සියලු පොදු සංරචක. සංවර්ධන අනුවාද සඳහා පමණි.',
+    schemeLight: 'ආලෝක',
+    schemeDark: 'අඳුරු',
+    sections: {
+      buttons: 'බොත්තම්',
+      statuses: 'අක්තපත්‍ර තත්ත්වයන්',
+      cards: 'අක්තපත්‍ර කාඩ්පත්',
+      badges: 'ලාංඡන',
+      list: 'ලැයිස්තු අයිතම',
+      header: 'ශීර්ෂය',
+      states: 'පූරණය, හිස් සහ දෝෂ තත්ත්වයන්',
+      feedback: 'දැනුම්දීම සහ තහවුරු කිරීම',
+      offline: 'නොබැඳි දැනුම්දීම',
+      disclosure: 'හෙළිදරව් කිරීමේ පුවරුව (පසුව)',
+    },
+    variants: {
+      primary: 'ප්‍රධාන',
+      secondary: 'ද්විතීයික',
+      destructive: 'විනාශකාරී',
+      text: 'පෙළ බොත්තම',
+      onBrand: 'නාවික පසුබිම මත',
+    },
+    disabled: '{{variant}} (අක්‍රිය)',
+    loading: '{{variant}} (පූරණය වෙමින්)',
+    tones: {
+      valid: 'වලංගු වර්ණ',
+      expired: 'කල් ඉකුත් වර්ණ',
+      revoked: 'අවලංගු කළ වර්ණ',
+      pending: 'රැඳී ඇති වර්ණ',
+      neutral: 'මධ්‍යස්ථ (තත්ත්වයක් නොවේ)',
+    },
+    onBrandSample: 'නාවික කාඩ්පතක් මත බොත්තම්',
+    offlineSample: 'පැය 2 කට පෙර',
+    disclosureVerifier: 'Sample Verifier (Demo)',
+    disclosurePurpose: 'ඔබගේ රැකියා විස්තර පරීක්ෂා කිරීමට අවශ්‍යයි.',
+    disclosureLink: 'මෙය ඉල්ලන්නේ ඇයි?',
+    listTitle: 'ලැයිස්තු අයිතමයේ මාතෘකාව',
+    listSubtitle: 'විශාල අකුරු ප්‍රමාණවලදී දෙවන පේළියකට යා හැකි උප මාතෘකාවක්',
+    listValue: 'අගය',
+    headerTitle: 'තිරයේ මාතෘකාව',
+    headerAction: 'උදාහරණ ක්‍රියාව',
+    headerAction2: 'දෙවන උදාහරණ ක්‍රියාව',
+    loadingMessage: 'උදාහරණය පූරණය වෙමින්…',
+    emptyTitle: 'මෙහි කිසිවක් නැත',
+    emptyMessage: 'හිස් තත්ත්වයක් මෙහි දිස්වන දේ සහ එය එක් කරන ආකාරය පැහැදිලි කරයි.',
+    errorMessage: 'දෝෂ තත්ත්වයක් වැරදුණු දේ පවසා නැවත උත්සාහ කිරීමට ඉඩ දෙයි.',
+    showToast: 'දැනුම්දීමක් පෙන්වන්න',
+    showThreeToasts: 'දැනුම්දීම් තුනක් පෙළගස්වන්න',
+    toastMessage: 'උදාහරණ දැනුම්දීම {{n}}',
+    confirm: 'තහවුරු කිරීමක් විවෘත කරන්න',
+    confirmDestructive: 'විනාශකාරී තහවුරු කිරීමක් විවෘත කරන්න',
+    confirmTitle: 'ඉදිරියට යනවාද?',
+    confirmMessage: 'වැදගත් ක්‍රියාවකට පෙර තහවුරු කිරීමක් විමසයි.',
+    confirmAction: 'ඉදිරියට යන්න',
+    destructiveTitle: 'මෙම අක්තපත්‍රය ඉවත් කරනවාද?',
+    destructiveMessage: 'මෙය අහෝසි කළ නොහැක. (උදාහරණයක් පමණි: කිසිවක් ඉවත් නොකෙරේ.)',
+    destructiveAction: 'ඉවත් කරන්න',
+    confirmed: 'තහවුරු කළා (උදාහරණය)',
+    cancelled: 'අවලංගු කළා (උදාහරණය)',
+    pressed: 'එබුවා (උදාහරණය)',
+  },
+  toast: {
+    dismiss: 'පණිවිඩය ඉවත් කරන්න',
+  },
+  offline: {
+    lastChecked: 'තත්ත්වය අවසන් වරට පරීක්ෂා කළේ {{time}}',
   },
   diagnostics: {
     title: 'පද්ධති පරීක්ෂා',
@@ -93,6 +246,7 @@ export const si: Messages = {
     notConfigured: 'පළමුව API මූලික ලිපිනය සකසන්න.',
   },
   errors: {
+    title: 'යම් දෝෂයක් සිදු විය',
     boundaryTitle: 'යම් දෝෂයක් සිදු විය',
     boundaryMessage: 'මෙම තිරයේ අනපේක්ෂිත ගැටලුවක් ඇති විය. ඔබගේ අක්තපත්‍රවලට කිසිදු බලපෑමක් නැත.',
   },

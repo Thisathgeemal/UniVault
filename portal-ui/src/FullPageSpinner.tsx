@@ -8,9 +8,9 @@ export function FullPageSpinner({ label }: FullPageSpinnerProps) {
     <div
       role="status"
       aria-live="polite"
-      className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background text-muted-foreground"
+      className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg text-text-muted"
     >
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8 animate-spin text-primary">
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8 animate-spin text-accent-text">
         <circle
           cx="12"
           cy="12"
@@ -28,7 +28,7 @@ export function FullPageSpinner({ label }: FullPageSpinnerProps) {
           strokeLinecap="round"
         />
       </svg>
-      <span className="text-sm">{label}</span>
+      <span className="text-body-sm">{label}</span>
     </div>
   );
 }

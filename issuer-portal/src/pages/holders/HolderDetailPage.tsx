@@ -29,7 +29,9 @@ import {
 import { ApiError } from '../../api/errors.js';
 import { fetchHolder, HOLDERS_QUERY_KEY, type HolderDetail } from '../../api/holders.js';
 import { useAuth } from '../../auth/auth-context.js';
-import { optionLabel, STATUS_TONES } from '../../holders/display.js';
+import { CredentialStatusBadge } from '../../credentials/CredentialStatusBadge.js';
+import { STATUS_PRESENTATION } from '../../credentials/status.js';
+import { optionLabel } from '../../holders/display.js';
 import { EXTERNAL_REF, FORM_UI, inputKind } from '../../holders/form-model.js';
 import { fieldLabel, tKey } from '../../holders/validation.js';
 import { shortId } from '../../lib/activity.js';
@@ -64,7 +66,7 @@ export function HolderDetailPage() {
           title={t('holders.detail.notFound.title')}
           message={t('holders.detail.notFound.message')}
           action={
-            <Link to="/holders" className={buttonVariants({ variant: 'outline' })}>
+            <Link to="/holders" className={buttonVariants({ variant: 'secondary' })}>
               {t('holders.detail.notFound.back')}
             </Link>
           }
@@ -81,9 +83,9 @@ export function HolderDetailPage() {
         <div className="flex flex-col gap-1">
           <p className="font-medium">{t('holders.detail.loadFailed')}</p>
           <p>{error.message}</p>
-          {error.reference ? <p className="font-mono text-xs">{error.reference}</p> : null}
+          {error.reference ? <p className="font-mono text-caption">{error.reference}</p> : null}
         </div>
-        <Button variant="outline" onClick={() => void holder.refetch()}>
+        <Button variant="secondary" onClick={() => void holder.refetch()}>
           {t('common.tryAgain')}
         </Button>
       </Alert>
@@ -120,15 +122,13 @@ function HolderDetailView({ holder }: { holder: HolderDetail }) {
     return text;
   };
 
-  const notProvided = (
-    <span className="text-muted-foreground">{t('holders.detail.notProvided')}</span>
-  );
+  const notProvided = <span className="text-text-muted">{t('holders.detail.notProvided')}</span>;
 
   return (
     <>
       <Link
         to="/holders"
-        className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+        className="mb-3 inline-flex items-center gap-1 text-body-sm font-medium text-accent-text hover:underline"
       >
         <ArrowLeft aria-hidden="true" className="h-4 w-4" />
         {t('holders.detail.backToList')}
@@ -139,7 +139,7 @@ function HolderDetailView({ holder }: { holder: HolderDetail }) {
         actions={
           <Link
             to={`/credentials/new?holderId=${encodeURIComponent(holder.id)}`}
-            className={buttonVariants({ variant: 'default' })}
+            className={buttonVariants({ variant: 'primary' })}
           >
             <FilePlus aria-hidden="true" className="h-4 w-4" />
             {t('holders.detail.issueCredential')}
@@ -166,7 +166,7 @@ function HolderDetailView({ holder }: { holder: HolderDetail }) {
                   <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
                     {fields.map((field) => (
                       <div key={field.path} className="flex flex-col gap-0.5">
-                        <dt className="text-sm text-muted-foreground">
+                        <dt className="text-body-sm text-text-muted">
                           {fieldLabel(t, field.path)}
                         </dt>
                         <dd className="font-medium break-words">
@@ -176,14 +176,14 @@ function HolderDetailView({ holder }: { holder: HolderDetail }) {
                     ))}
                     {group.id === 'personal' && typeof holder.claims.age_over_18 === 'boolean' ? (
                       <div className="flex flex-col gap-0.5">
-                        <dt className="text-sm text-muted-foreground">
+                        <dt className="text-body-sm text-text-muted">
                           {t('holders.detail.over18')}
                         </dt>
                         <dd className="font-medium">
                           {holder.claims.age_over_18
                             ? t('holders.detail.yes')
                             : t('holders.detail.no')}
-                          <span className="block text-xs font-normal text-muted-foreground">
+                          <span className="block text-caption font-normal text-text-muted">
                             {t('holders.detail.over18Hint')}
                           </span>
                         </dd>
@@ -204,7 +204,7 @@ function HolderDetailView({ holder }: { holder: HolderDetail }) {
             <CardContent>
               <dl className="flex flex-col gap-3">
                 <div className="flex flex-col gap-0.5">
-                  <dt className="text-sm text-muted-foreground">{t('holders.detail.createdAt')}</dt>
+                  <dt className="text-body-sm text-text-muted">{t('holders.detail.createdAt')}</dt>
                   <dd className="font-medium">
                     <time dateTime={holder.createdAt}>
                       {formatColomboDateTime(holder.createdAt, language) ?? holder.createdAt}
@@ -212,7 +212,7 @@ function HolderDetailView({ holder }: { holder: HolderDetail }) {
                   </dd>
                 </div>
                 <div className="flex flex-col gap-0.5">
-                  <dt className="text-sm text-muted-foreground">{t('holders.detail.createdBy')}</dt>
+                  <dt className="text-body-sm text-text-muted">{t('holders.detail.createdBy')}</dt>
                   <dd className="font-medium">
                     {holder.createdBy?.displayName ?? t('holders.detail.unknownStaff')}
                   </dd>
@@ -243,7 +243,7 @@ function HolderCredentials({ holderId }: { holderId: string }) {
     body = (
       <Alert variant="destructive" role="alert" className="flex flex-col items-start gap-2">
         <p>{t('holders.detail.credentials.loadFailed')}</p>
-        <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+        <Button variant="secondary" size="sm" onClick={() => void query.refetch()}>
           {t('common.tryAgain')}
         </Button>
       </Alert>
@@ -251,7 +251,7 @@ function HolderCredentials({ holderId }: { holderId: string }) {
   } else if (!query.data) {
     body = <Skeleton className="h-24" />;
   } else if (query.data.credentials.length === 0) {
-    body = <p className="text-sm text-muted-foreground">{t('holders.detail.credentials.none')}</p>;
+    body = <p className="text-body-sm text-text-muted">{t('holders.detail.credentials.none')}</p>;
   } else {
     const credentials = query.data.credentials;
     const counts = EFFECTIVE_STATUSES.map(
@@ -265,7 +265,10 @@ function HolderCredentials({ holderId }: { holderId: string }) {
         >
           {counts.map(([status, n]) => (
             <li key={status}>
-              <StatusBadge tone={STATUS_TONES[status]}>
+              <StatusBadge
+                status={STATUS_PRESENTATION[status].set}
+                icon={STATUS_PRESENTATION[status].icon}
+              >
                 {`${t(`holders.statuses.${status}`)}: ${n}`}
               </StatusBadge>
             </li>
@@ -293,11 +296,7 @@ function HolderCredentials({ holderId }: { holderId: string }) {
             {
               id: 'status',
               header: t('holders.detail.credentials.columns.status'),
-              cell: (c) => (
-                <StatusBadge tone={STATUS_TONES[c.effectiveStatus]}>
-                  {t(`holders.statuses.${c.effectiveStatus}`)}
-                </StatusBadge>
-              ),
+              cell: (c) => <CredentialStatusBadge status={c.effectiveStatus} />,
             },
             {
               id: 'issuedAt',

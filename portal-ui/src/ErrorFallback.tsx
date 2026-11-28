@@ -27,8 +27,8 @@ export function ErrorFallback({
       className="mx-auto flex max-w-lg flex-col items-center gap-3 px-6 py-16 text-center"
     >
       <h1 className="text-page-title font-semibold">{title}</h1>
-      <p className="text-muted-foreground">{message}</p>
-      {reference ? <p className="font-mono text-xs text-muted-foreground">{reference}</p> : null}
+      <p className="text-text-muted">{message}</p>
+      {reference ? <p className="font-mono text-caption text-text-muted">{reference}</p> : null}
       <div className="flex gap-2">
         {onRetry && retryLabel ? <Button onClick={onRetry}>{retryLabel}</Button> : null}
         {action}

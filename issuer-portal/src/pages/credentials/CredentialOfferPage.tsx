@@ -182,7 +182,7 @@ export function CredentialOfferPage() {
   };
 
   const backLink = (
-    <Link to={`/credentials/${credentialId}`} className={buttonVariants({ variant: 'outline' })}>
+    <Link to={`/credentials/${credentialId}`} className={buttonVariants({ variant: 'secondary' })}>
       {t('offer.actions.backToCredential')}
     </Link>
   );
@@ -195,7 +195,7 @@ export function CredentialOfferPage() {
           title={t('issuance.result.notFound.title')}
           message={t('issuance.result.notFound.message')}
           action={
-            <Link to="/credentials" className={buttonVariants({ variant: 'outline' })}>
+            <Link to="/credentials" className={buttonVariants({ variant: 'secondary' })}>
               {t('issuance.credentialsPage.title')}
             </Link>
           }
@@ -206,7 +206,7 @@ export function CredentialOfferPage() {
       <Alert variant="destructive" role="alert" className="flex flex-col items-start gap-2">
         <p className="font-medium">{t('issuance.result.loadFailed')}</p>
         <p>{apiErrorMessage(error, t).message}</p>
-        <Button variant="outline" size="sm" onClick={() => void credentialQuery.refetch()}>
+        <Button variant="secondary" size="sm" onClick={() => void credentialQuery.refetch()}>
           {t('common.tryAgain')}
         </Button>
       </Alert>
@@ -224,7 +224,7 @@ export function CredentialOfferPage() {
     );
   }
 
-  const generateButton = (variant: 'default' | 'outline' = 'default') => (
+  const generateButton = (variant: 'primary' | 'secondary' = 'primary') => (
     <Button
       variant={variant}
       onClick={() => (view === 'active' ? setConfirming('regenerate') : generate())}
@@ -289,7 +289,7 @@ export function CredentialOfferPage() {
             {offer && view === 'active' ? (
               <>
                 {expiresTime ? (
-                  <p className="text-sm">
+                  <p className="text-body-sm">
                     <time dateTime={expiresAt}>{t('offer.expiresAt', { time: expiresTime })}</time>
                   </p>
                 ) : null}
@@ -300,7 +300,7 @@ export function CredentialOfferPage() {
                   {...(!fullScreen && announcement ? { announcement } : {})}
                 />
                 {lastMinute ? (
-                  <p className="text-sm text-accent-foreground">{t('offer.lastMinute')}</p>
+                  <p className="text-body-sm text-status-expired-text">{t('offer.lastMinute')}</p>
                 ) : null}
               </>
             ) : null}
@@ -312,13 +312,13 @@ export function CredentialOfferPage() {
             ) : null}
             <div className="flex flex-wrap gap-3">
               {view === 'active' ? (
-                <Button variant="default" onClick={() => setFullScreen(true)}>
+                <Button variant="primary" onClick={() => setFullScreen(true)}>
                   <Maximize2 aria-hidden="true" className="h-4 w-4" />
                   {t('offer.actions.fullScreen')}
                 </Button>
               ) : null}
               {view !== 'redeemed' && view !== 'withdrawn' && credential.status === 'pending'
-                ? generateButton(view === 'active' ? 'outline' : 'default')
+                ? generateButton(view === 'active' ? 'secondary' : 'primary')
                 : null}
               {view === 'active' ? (
                 <Button variant="destructive" onClick={() => setConfirming('cancel')}>
@@ -390,11 +390,11 @@ function OfferFacts({ credential }: { credential: CredentialMetadata }) {
   return (
     <dl className="grid gap-3 sm:grid-cols-2">
       <div>
-        <dt className="text-sm text-muted-foreground">{t('offer.holder')}</dt>
+        <dt className="text-body-sm text-text-muted">{t('offer.holder')}</dt>
         <dd className="font-medium">{credential.holder.fullName}</dd>
       </div>
       <div>
-        <dt className="text-sm text-muted-foreground">{t('offer.credentialType')}</dt>
+        <dt className="text-body-sm text-text-muted">{t('offer.credentialType')}</dt>
         <dd className="font-medium">{t(`credentialTypes.${credential.credentialType}`)}</dd>
       </div>
     </dl>
@@ -419,8 +419,8 @@ function QrPlaceholder({
   if (session.kind === 'creating' || autoCreate) {
     return (
       <div className="flex flex-col items-center gap-3" role="status">
-        <QrIcon aria-hidden="true" className="h-10 w-10 animate-pulse text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">{t('offer.creating')}</p>
+        <QrIcon aria-hidden="true" className="h-10 w-10 animate-pulse text-text-muted" />
+        <p className="text-body-sm text-text-muted">{t('offer.creating')}</p>
       </div>
     );
   }
@@ -433,7 +433,7 @@ function QrPlaceholder({
         action={
           <Link
             to={`/credentials/${credentialId}`}
-            className="text-primary underline-offset-2 hover:underline"
+            className="text-accent-text underline-offset-2 hover:underline"
           >
             {t('offer.states.redeemed.link')}
           </Link>
@@ -459,7 +459,7 @@ function QrPlaceholder({
       />
     );
   }
-  return <QrIcon aria-hidden="true" className="h-10 w-10 text-muted-foreground" />;
+  return <QrIcon aria-hidden="true" className="h-10 w-10 text-text-muted" />;
 }
 
 function StatePanel({
@@ -478,17 +478,17 @@ function StatePanel({
       role="status"
       className={
         tone === 'warning'
-          ? 'flex max-w-72 flex-col items-center gap-2 rounded-md bg-accent p-4 text-center text-accent-foreground'
+          ? 'flex max-w-72 flex-col items-center gap-2 rounded-md bg-status-expired-bg p-4 text-center text-status-expired-text'
           : 'flex max-w-72 flex-col items-center gap-2 p-4 text-center'
       }
     >
       {tone === 'success' ? (
-        <CircleCheck aria-hidden="true" className="h-10 w-10 text-primary" />
+        <CircleCheck aria-hidden="true" className="h-10 w-10 text-status-valid" />
       ) : (
-        <QrIcon aria-hidden="true" className="h-10 w-10 text-muted-foreground" />
+        <QrIcon aria-hidden="true" className="h-10 w-10 text-text-muted" />
       )}
       <p className="font-semibold">{title}</p>
-      <p className="text-sm">{message}</p>
+      <p className="text-body-sm">{message}</p>
       {action}
     </div>
   );
@@ -516,11 +516,11 @@ function DeveloperDetails({ credentialOffer }: { credentialOffer: Record<string,
   return (
     <details className="mt-6 max-w-5xl rounded-md border border-dashed border-border p-4">
       <summary className="cursor-pointer font-medium">{t('offer.dev.summary')}</summary>
-      <p className="mt-3 rounded-md bg-accent p-3 text-sm text-accent-foreground">
+      <p className="mt-3 rounded-md bg-status-expired-bg p-3 text-body-sm text-status-expired-text">
         {t('offer.dev.warning')}
       </p>
-      <p className="mt-3 text-sm text-muted-foreground">{t('offer.dev.label')}</p>
-      <pre className="mt-1 overflow-auto rounded-md bg-muted p-3 font-mono text-xs">
+      <p className="mt-3 text-body-sm text-text-muted">{t('offer.dev.label')}</p>
+      <pre className="mt-1 overflow-auto rounded-md bg-surface-sunken p-3 font-mono text-caption">
         {JSON.stringify(credentialOffer, null, 2)}
       </pre>
     </details>

@@ -33,18 +33,18 @@ export function Stepper({ label, steps, current, statusLabels, onSelect }: Stepp
               <span
                 aria-hidden="true"
                 className={cn(
-                  'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold',
-                  state === 'complete' && 'border-primary bg-primary text-primary-foreground',
-                  state === 'current' && 'border-primary text-primary',
-                  state === 'upcoming' && 'border-border text-muted-foreground',
+                  'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-caption font-semibold',
+                  state === 'complete' && 'border-brand bg-brand text-on-brand',
+                  state === 'current' && 'border-accent text-accent-text',
+                  state === 'upcoming' && 'border-border-strong text-text-muted',
                 )}
               >
                 {index + 1}
               </span>
               <span
                 className={cn(
-                  'text-sm',
-                  state === 'current' ? 'font-semibold' : 'text-muted-foreground',
+                  'text-body-sm',
+                  state === 'current' ? 'font-semibold' : 'text-text-muted',
                 )}
               >
                 {step.label}
@@ -61,7 +61,7 @@ export function Stepper({ label, steps, current, statusLabels, onSelect }: Stepp
               {state === 'complete' && onSelect ? (
                 <button
                   type="button"
-                  className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
                   onClick={() => onSelect(index)}
                 >
                   {content}

@@ -17,7 +17,7 @@ describe('StatCard', () => {
     const link = screen.getByRole('link', { name: 'Active 1,234' });
     expect(link).toHaveAttribute('href', '/credentials?effectiveStatus=valid');
     expect(link).toHaveAccessibleDescription('Credentials currently valid');
-    expect(screen.getByText('1,234').className).toContain('text-4xl');
+    expect(screen.getByText('1,234').className).toContain('text-display');
   });
 
   it('uses the link component it is given (router adapter)', () => {
@@ -40,7 +40,7 @@ describe('StatCard', () => {
     expect(screen.getByRole('group', { name: 'Holders 25' })).toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByTestId('icon').parentElement).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByText('25').className).toContain('text-2xl');
+    expect(screen.getByText('25').className).toContain('text-h1');
   });
 
   it('shows a skeleton instead of the value while loading (named by its label only)', () => {
@@ -53,16 +53,16 @@ describe('StatCard', () => {
 
 describe('StackedBar', () => {
   const segments = [
-    { id: 'active', label: 'Active', value: 6, valueText: '6 (60%)', tone: 'brand' as const },
+    { id: 'active', label: 'Valid', value: 6, valueText: '6 (60%)', tone: 'valid' as const },
+    { id: 'revoked', label: 'Revoked', value: 3, valueText: '3 (30%)', tone: 'revoked' as const },
     {
-      id: 'revoked',
-      label: 'Revoked',
-      value: 3,
-      valueText: '3 (30%)',
-      tone: 'destructive' as const,
+      id: 'superseded',
+      label: 'Replaced',
+      value: 0,
+      valueText: '0 (0%)',
+      tone: 'pending' as const,
     },
-    { id: 'superseded', label: 'Superseded', value: 0, valueText: '0 (0%)', tone: 'info' as const },
-    { id: 'expired', label: 'Expired', value: 1, valueText: '1 (10%)', tone: 'warning' as const },
+    { id: 'expired', label: 'Expired', value: 1, valueText: '1 (10%)', tone: 'expired' as const },
   ];
 
   it('is a named figure whose legend gives every label and number in text', () => {
@@ -70,9 +70,9 @@ describe('StackedBar', () => {
     const figure = screen.getByRole('figure', { name: 'Status breakdown' });
     const items = within(figure).getAllByRole('listitem');
     expect(items.map((li) => li.textContent)).toEqual([
-      'Active6 (60%)',
+      'Valid6 (60%)',
       'Revoked3 (30%)',
-      'Superseded0 (0%)',
+      'Replaced0 (0%)',
       'Expired1 (10%)',
     ]);
     expect(screen.getByTestId('stacked-bar')).toHaveAttribute('aria-hidden', 'true');
@@ -90,7 +90,7 @@ describe('StackedBar', () => {
     // A small gap between neighbours; the last segment runs to the end
     expect(Number(rects[0]!.getAttribute('width'))).toBeCloseTo(59.4);
     expect(Number(rects[2]!.getAttribute('width'))).toBeCloseTo(10);
-    expect(rects[1]!.getAttribute('class')).toBe('fill-destructive');
+    expect(rects[1]!.getAttribute('class')).toBe('fill-status-revoked');
     expect(container.querySelector('[style]')).toBeNull();
   });
 
@@ -101,8 +101,8 @@ describe('StackedBar', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(4);
   });
 
-  it('gives each tone its own fill and swatch colour', () => {
-    const tones = (['brand', 'destructive', 'info', 'warning', 'muted'] as const).map((tone) => ({
+  it('gives each status set its own fill and swatch colour (status colours only)', () => {
+    const tones = (['valid', 'expired', 'revoked', 'pending'] as const).map((tone) => ({
       id: tone,
       label: tone,
       value: 1,
@@ -111,11 +111,16 @@ describe('StackedBar', () => {
     }));
     const { container } = render(<StackedBar label="Tones" segments={tones} />);
     const fills = [...container.querySelectorAll('rect')].map((r) => r.getAttribute('class'));
-    expect(new Set(fills).size).toBe(5);
+    expect(fills).toEqual([
+      'fill-status-valid',
+      'fill-status-expired',
+      'fill-status-revoked',
+      'fill-status-pending',
+    ]);
     const swatches = [...container.querySelectorAll('li > span[aria-hidden]')].map(
       (s) => s.className,
     );
-    expect(new Set(swatches).size).toBe(5);
+    expect(new Set(swatches).size).toBe(4);
   });
 });
 

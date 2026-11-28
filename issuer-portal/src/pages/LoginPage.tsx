@@ -75,19 +75,19 @@ export function LoginPage() {
   const pending = mutation.isPending;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-bg">
       <div className="flex justify-end p-4">
         <LanguageSwitcher />
       </div>
       <main className="flex flex-1 items-start justify-center px-4 pb-16 pt-4 sm:items-center">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <div className="mb-2 flex items-center gap-2 text-primary">
+            <div className="mb-2 flex items-center gap-2 text-accent-text">
               <ShieldCheck className="h-6 w-6" aria-hidden="true" />
               <span className="font-semibold">{t('app.name')}</span>
             </div>
             <CardTitle>
-              <span className="text-2xl">{t('login.title')}</span>
+              <span className="text-h1">{t('login.title')}</span>
             </CardTitle>
             <CardDescription>{t('login.subtitle')}</CardDescription>
           </CardHeader>
@@ -101,7 +101,7 @@ export function LoginPage() {
               <Alert role="alert" variant="destructive" className="mb-4">
                 <p>{error.message}</p>
                 {error.reference ? (
-                  <p className="mt-1 font-mono text-xs">{error.reference}</p>
+                  <p className="mt-1 font-mono text-caption">{error.reference}</p>
                 ) : null}
               </Alert>
             ) : null}
@@ -124,7 +124,7 @@ export function LoginPage() {
                   aria-describedby={fieldErrors.email ? ids.emailError : undefined}
                 />
                 {fieldErrors.email ? (
-                  <p id={ids.emailError} className="text-sm text-destructive">
+                  <p id={ids.emailError} className="text-body-sm text-status-revoked">
                     {t(`login.fieldErrors.${fieldErrors.email}`)}
                   </p>
                 ) : null}
@@ -148,7 +148,7 @@ export function LoginPage() {
                     aria-describedby={fieldErrors.password ? ids.passwordError : undefined}
                   />
                   <Button
-                    variant="ghost"
+                    variant="text"
                     size="icon"
                     className="absolute right-0 top-0"
                     aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
@@ -164,7 +164,7 @@ export function LoginPage() {
                   </Button>
                 </div>
                 {fieldErrors.password ? (
-                  <p id={ids.passwordError} className="text-sm text-destructive">
+                  <p id={ids.passwordError} className="text-body-sm text-status-revoked">
                     {t(`login.fieldErrors.${fieldErrors.password}`)}
                   </p>
                 ) : null}

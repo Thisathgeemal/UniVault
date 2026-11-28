@@ -1,12 +1,14 @@
 import { useColorScheme } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { getTheme, SINHALA_FONTS, type Theme } from './index';
+import { fontFor, getTheme, typeStyle, type Theme, type TypeStep, type Weight } from './index';
 
 export interface ThemeWithScript extends Theme {
-  /** 'sinhala' while the UI language is Sinhala (fonts and line height follow). */
+  /** 'sinhala' while the UI language is Sinhala (Noto Sans Sinhala is used). */
   script: 'latin' | 'sinhala';
-  /** The font family for a weight in the current script (undefined = system font). */
-  fontFamily: (weight: 'regular' | 'bold') => string | undefined;
+  /** The registered font family for a weight in the current script. */
+  fontFamily: (weight: Weight) => string;
+  /** Size, line height and family of a type step in the current script. */
+  type: (step: TypeStep) => { fontSize: number; lineHeight: number; fontFamily: string };
 }
 
 /** The theme for the OS colour scheme and the current UI language. */
@@ -17,6 +19,7 @@ export function useTheme(): ThemeWithScript {
   return {
     ...getTheme(scheme),
     script,
-    fontFamily: (weight) => (script === 'sinhala' ? SINHALA_FONTS[weight] : undefined),
+    fontFamily: (weight) => fontFor(weight, script),
+    type: (step) => typeStyle(step, script),
   };
 }

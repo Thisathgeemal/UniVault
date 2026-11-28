@@ -1,22 +1,20 @@
 /**
  * i18n (NFR-02): English and Sinhala through react-i18next. Every UI string goes through t().
  *
- * The start language is the phone's language when it is Sinhala, otherwise English
- * (expo-localization). The choice made in Settings is NOT saved yet: wallet storage arrives
- * with the credential vault in a later Sprint 2 task.
+ * Start language: the choice saved in Settings (AsyncStorage, src/lib/preferences.ts), else
+ * Sinhala when the phone's first preferred language is Sinhala, else English. The root layout
+ * awaits `restoreLanguage()` while the splash screen is up, so the first frame is already in
+ * the right language (no flash of English).
  */
 import { getLocales } from 'expo-localization';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { loadLanguagePreference, saveLanguagePreference } from '../lib/preferences';
+import { DEFAULT_LANGUAGE, isLanguage, SUPPORTED_LANGUAGES, type Language } from './languages';
 import { en } from './locales/en';
 import { si } from './locales/si';
 
-export const SUPPORTED_LANGUAGES = ['en', 'si'] as const;
-export type Language = (typeof SUPPORTED_LANGUAGES)[number];
-export const DEFAULT_LANGUAGE: Language = 'en';
-
-export const isLanguage = (value: unknown): value is Language =>
-  typeof value === 'string' && (SUPPORTED_LANGUAGES as readonly string[]).includes(value);
+export { DEFAULT_LANGUAGE, isLanguage, SUPPORTED_LANGUAGES, type Language };
 
 /** Sinhala if the phone's first preferred language is Sinhala, otherwise English. */
 export function deviceLanguage(): Language {
@@ -51,6 +49,24 @@ export function setupI18n(language: Language = deviceLanguage()) {
     void i18n.changeLanguage(language);
   }
   return i18n;
+}
+
+/**
+ * Applies the saved language (if any) before the first render; resolves with the language in
+ * use. Never rejects: storage problems fall back to the device language.
+ */
+export async function restoreLanguage(): Promise<Language> {
+  const saved = await loadLanguagePreference();
+  const language = saved ?? deviceLanguage();
+  setupI18n(language);
+  if (i18n.language !== language) await i18n.changeLanguage(language);
+  return language;
+}
+
+/** The Settings choice: switches the UI at once and saves it for the next start. */
+export async function chooseLanguage(language: Language): Promise<boolean> {
+  await i18n.changeLanguage(language);
+  return saveLanguagePreference(language);
 }
 
 export { i18n };

@@ -74,11 +74,13 @@ describe('QrCode', () => {
     const matrix = qrMatrix('hello');
     const side = matrix.size + 2 * QR_QUIET_ZONE;
     expect(svg).toHaveAttribute('viewBox', `0 0 ${side} ${side}`);
-    // At least the requested size, at a whole number of pixels per module (29 × 12 = 348)
+    // At least the requested size, at a whole number of pixels per module (29 Ã— 12 = 348)
     expect(svg).toHaveAttribute('width', String(side * 12));
     expect(svg).toHaveAttribute('height', String(side * 12));
     expect(svg).toHaveAttribute('shape-rendering', 'crispEdges');
-    expect(svg.querySelector('rect')).toHaveAttribute('fill', '#ffffff');
+    // token colours (no hex): text modules on a surface (white) background
+    expect(svg.querySelector('rect')).toHaveClass('fill-surface');
+    expect(svg.querySelector('path')).toHaveClass('fill-text');
     // No module is drawn inside the quiet zone
     const coordinates = [...qrPath(matrix).matchAll(/M(\d+) (\d+)/g)].flatMap((m) => [
       Number(m[1]),
@@ -128,11 +130,11 @@ describe('Countdown', () => {
   it('has a warning look on request and no live region without an announcement', () => {
     const { container, rerender } = render(<Countdown seconds={30} label="Expires in" warning />);
     expect(container.firstChild).toHaveAttribute('data-warning', 'true');
-    expect(container.firstChild).toHaveClass('bg-accent');
+    expect(container.firstChild).toHaveClass('bg-status-expired-bg');
     expect(container.querySelector('[aria-live]')).toBeNull();
     rerender(<Countdown seconds={30} label="Expires in" size="large" />);
     expect(container.firstChild).not.toHaveAttribute('data-warning');
-    expect(screen.getByRole('timer')).toHaveClass('text-5xl');
+    expect(screen.getByRole('timer')).toHaveClass('text-display');
   });
 });
 

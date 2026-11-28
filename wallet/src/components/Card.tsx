@@ -20,14 +20,14 @@ export function Card({ title, children, testID }: CardProps) {
         {
           backgroundColor: theme.colors.surface,
           borderColor: theme.colors.border,
-          borderRadius: theme.radii.card,
+          borderRadius: theme.radius.md,
           padding: theme.space(4),
           gap: theme.space(2),
         },
       ]}
     >
       {title ? (
-        <AppText variant="heading" accessibilityRole="header">
+        <AppText variant="h3" accessibilityRole="header">
           {title}
         </AppText>
       ) : null}

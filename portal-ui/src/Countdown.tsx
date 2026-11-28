@@ -41,19 +41,19 @@ export function Countdown({
       className={cn(
         'inline-flex items-baseline gap-2 rounded-md border px-3 py-2',
         warning
-          ? 'border-accent-foreground/40 bg-accent text-accent-foreground'
-          : 'border-border bg-surface text-foreground',
+          ? 'border-status-expired bg-status-expired-bg text-status-expired-text'
+          : 'border-border bg-surface text-text',
         className,
       )}
       data-warning={warning ? 'true' : undefined}
     >
-      <span className={size === 'large' ? 'text-lg' : 'text-sm'}>{label}</span>
+      <span className={size === 'large' ? 'text-h3' : 'text-body-sm'}>{label}</span>
       <span
         role="timer"
         aria-label={`${label} ${time}`}
         className={cn(
           'font-mono font-semibold tabular-nums',
-          size === 'large' ? 'text-5xl' : 'text-2xl',
+          size === 'large' ? 'text-display' : 'text-h1',
         )}
       >
         {time}

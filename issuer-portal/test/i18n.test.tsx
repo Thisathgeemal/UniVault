@@ -62,7 +62,7 @@ describe('resource files', () => {
   it('Sinhala has exactly the English keys, every value in Sinhala script (except names)', () => {
     expect(keys(si).sort()).toEqual(keys(en).sort());
     // language.en is a name; breakdown.value is only numbers and punctuation: "{{count}} ({{percent}})"
-    const latinAllowed = new Set(['language.en', 'dashboard.breakdown.value']);
+    const latinAllowed = new Set(['language.en', 'dashboard.breakdown.value', 'app.brand']);
     for (const key of keys(si)) {
       if (latinAllowed.has(key)) continue;
       expect(leaf(si, key), key).toMatch(SINHALA);

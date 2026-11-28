@@ -59,11 +59,11 @@ export function StatCard({
   const body = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <span id={labelId} className="text-sm font-medium text-muted-foreground">
+        <span id={labelId} className="text-body-sm font-medium text-text-muted">
           {label}
         </span>
         {icon ? (
-          <span aria-hidden="true" className="text-brand-600">
+          <span aria-hidden="true" className="text-brand">
             {icon}
           </span>
         ) : null}
@@ -77,15 +77,15 @@ export function StatCard({
         <span
           id={valueId}
           className={cn(
-            'font-semibold tabular-nums leading-none text-foreground',
-            size === 'lg' ? 'text-4xl' : 'text-2xl',
+            'font-semibold tabular-nums leading-none text-text',
+            size === 'lg' ? 'text-display' : 'text-h1',
           )}
         >
           {value}
         </span>
       )}
       {description ? (
-        <p id={descriptionId} className="text-sm text-muted-foreground">
+        <p id={descriptionId} className="text-body-sm text-text-muted">
           {description}
         </p>
       ) : null}
@@ -100,7 +100,7 @@ export function StatCard({
           href={href}
           className={cn(
             inner,
-            'rounded-card transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            'rounded-md transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
           )}
           aria-labelledby={labelledBy}
           aria-describedby={descriptionId}

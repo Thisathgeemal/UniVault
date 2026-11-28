@@ -12,7 +12,7 @@ import { ADMIN, API, BANK_ADMIN, errorBody, HOLDER_IDS, server } from './mock-ba
 import { renderApp } from './render-app.js';
 
 const definition = (group: string, term: string) => {
-  const card = screen.getByRole('heading', { name: group }).closest('[class*="rounded-card"]')!;
+  const card = screen.getByRole('heading', { name: group }).closest('[class*="rounded-md"]')!;
   const dt = within(card as HTMLElement).getByText(term, { selector: 'dt' });
   return dt.nextElementSibling as HTMLElement;
 };
@@ -60,12 +60,12 @@ describe('holder detail', () => {
       within(summary)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual(['Awaiting wallet: 1', 'Active: 1', 'Superseded: 1']);
+    ).toEqual(['Awaiting wallet: 1', 'Valid: 1', 'Replaced: 1']);
     const table = screen.getByRole('table', { name: 'Credentials of this holder' });
     const rows = within(table).getAllByRole('row').slice(1);
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent('Employment credential');
-    expect(rows[0]).toHaveTextContent('Active');
+    expect(rows[0]).toHaveTextContent('Valid');
     expect(rows[2]).toHaveTextContent('Not signed yet');
   });
 

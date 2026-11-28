@@ -19,7 +19,7 @@ export function Screen({ title, children, scroll = true, testID }: ScreenProps) 
   const content = (
     <View style={[styles.content, { padding: theme.space(4), gap: theme.space(4) }]}>
       {title ? (
-        <AppText variant="title" accessibilityRole="header">
+        <AppText variant="h1" accessibilityRole="header">
           {title}
         </AppText>
       ) : null}
@@ -29,7 +29,7 @@ export function Screen({ title, children, scroll = true, testID }: ScreenProps) 
   return (
     <SafeAreaView
       edges={['left', 'right']}
-      style={[styles.root, { backgroundColor: theme.colors.background }]}
+      style={[styles.root, { backgroundColor: theme.colors.bg }]}
       testID={testID}
     >
       {scroll ? <ScrollView contentContainerStyle={styles.scroll}>{content}</ScrollView> : content}

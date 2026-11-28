@@ -163,7 +163,7 @@ export function ReissueCredentialPage() {
         title={t('issuance.result.notFound.title')}
         message={t('issuance.result.notFound.message')}
         action={
-          <Link to="/credentials" className={buttonVariants({ variant: 'outline' })}>
+          <Link to="/credentials" className={buttonVariants({ variant: 'secondary' })}>
             {t('issuance.credentialsPage.title')}
           </Link>
         }
@@ -176,7 +176,7 @@ export function ReissueCredentialPage() {
   const renew = actions.reissue.kind === 'renew';
   const title = renew ? t('credentials.reissue.renewTitle') : t('credentials.reissue.title');
   const backLink = (
-    <Link to={`/credentials/${credentialId}`} className={buttonVariants({ variant: 'outline' })}>
+    <Link to={`/credentials/${credentialId}`} className={buttonVariants({ variant: 'secondary' })}>
       {t('credentials.reissue.back')}
     </Link>
   );
@@ -267,7 +267,7 @@ export function ReissueCredentialPage() {
                   rows={2}
                   onChange={(e) => setNote(e.target.value)}
                   disabled={reissue.isPending}
-                  className="w-full max-w-xl rounded-md border border-border bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-destructive"
+                  className="w-full max-w-xl rounded-md border border-border bg-surface px-3 py-2 text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring aria-[invalid=true]:border-status-revoked"
                 />
               )}
             </FormField>
@@ -297,7 +297,7 @@ export function ReissueCredentialPage() {
         </Card>
 
         {!previewReady ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-body-sm text-text-muted">
             {reason === 'other'
               ? t('credentials.revoke.noteRequired')
               : t('credentials.reissue.choosePrompt')}
@@ -320,14 +320,14 @@ export function ReissueCredentialPage() {
               {preview.changedFields.length === 0 ? (
                 <Alert role="status">{t('credentials.reissue.noChanges')}</Alert>
               ) : (
-                <p role="status" className="text-sm font-medium">
+                <p role="status" className="text-body-sm font-medium">
                   {t('credentials.reissue.changedCount', { count: preview.changedFields.length })}
                 </p>
               )}
-              <div className="overflow-x-auto rounded-card border border-border">
-                <table className="w-full text-left text-sm">
+              <div className="overflow-x-auto rounded-md border border-border">
+                <table className="w-full text-left text-body-sm">
                   <caption className="sr-only">{t('credentials.reissue.compareCaption')}</caption>
-                  <thead className="border-b border-border bg-muted/60 text-muted-foreground">
+                  <thead className="border-b border-border bg-surface-sunken text-text-muted">
                     <tr>
                       <th scope="col" className="px-4 py-2 font-medium">
                         {t('credentials.reissue.field')}
@@ -348,13 +348,15 @@ export function ReissueCredentialPage() {
                           key={name}
                           data-changed={changed ? 'true' : undefined}
                           className={
-                            changed ? 'bg-accent text-accent-foreground' : 'border-t border-border'
+                            changed
+                              ? 'bg-status-expired-bg text-status-expired-text'
+                              : 'border-t border-border'
                           }
                         >
                           <th scope="row" className="px-4 py-2 font-medium">
                             {claimLabel(t, name)}
                             {changed ? (
-                              <span className="ml-2 rounded-full border border-current px-2 text-xs">
+                              <span className="ml-2 rounded-full border border-current px-2 text-caption">
                                 {t('credentials.reissue.changed')}
                               </span>
                             ) : null}
@@ -382,7 +384,7 @@ export function ReissueCredentialPage() {
                   </tbody>
                 </table>
               </div>
-              <p aria-live="polite" className="text-sm">
+              <p aria-live="polite" className="text-body-sm">
                 {preview.current.expiresAt === preview.replacement.expiresAt
                   ? t('credentials.reissue.expirySame', {
                       date: formatColomboDate(preview.replacement.expiresAt, language),
@@ -392,7 +394,7 @@ export function ReissueCredentialPage() {
                       to: formatColomboDate(preview.replacement.expiresAt, language),
                     })}
               </p>
-              {capText(t, preview) ? <p className="text-sm">{capText(t, preview)}</p> : null}
+              {capText(t, preview) ? <p className="text-body-sm">{capText(t, preview)}</p> : null}
               <label className="flex items-start gap-2">
                 <input
                   type="checkbox"
@@ -405,7 +407,10 @@ export function ReissueCredentialPage() {
                 <span>{t('issuance.confirm.checkbox')}</span>
               </label>
               {triedSubmit && !confirmed ? (
-                <p id="reissue-confirm-error" className="text-sm font-medium text-destructive">
+                <p
+                  id="reissue-confirm-error"
+                  className="text-body-sm font-medium text-status-revoked"
+                >
                   {t('issuance.confirm.required')}
                 </p>
               ) : null}
@@ -416,7 +421,9 @@ export function ReissueCredentialPage() {
         {failure ? (
           <Alert variant="destructive" role="alert">
             <p>{failure.message}</p>
-            {failure.reference ? <p className="font-mono text-xs">{failure.reference}</p> : null}
+            {failure.reference ? (
+              <p className="font-mono text-caption">{failure.reference}</p>
+            ) : null}
           </Alert>
         ) : null}
 

@@ -40,12 +40,12 @@ describe('dashboard – counts and cards', () => {
     ).toBeInTheDocument();
     const expected: [string, string][] = [
       ['Issued 12,345', "Credentials signed into holders' wallets so far"],
-      ['Active 11,000', "Credentials currently valid in holders' wallets"],
+      ['Valid 11,000', "Credentials currently valid in holders' wallets"],
       ['Revoked 845', 'Credentials withdrawn after they were issued'],
       ['Awaiting wallet 3', 'Created, waiting for the holder to scan the QR code'],
-      ['Superseded 300', 'Replaced by a newer credential'],
+      ['Replaced 300', 'Replaced by a newer credential'],
       ['Expired 200', 'Past their expiry date'],
-      ['Expiring in 30 days 4', 'Active credentials that expire soon'],
+      ['Expiring in 30 days 4', 'Valid credentials that expire soon'],
       ['Holders 25', 'Holder records in your organisation'],
     ];
     for (const [name, description] of expected) {
@@ -65,10 +65,10 @@ describe('dashboard – counts and cards', () => {
     const { user, location } = await openDashboard();
     const hrefs: [string, string][] = [
       ['Issued 12,345', '/credentials'],
-      ['Active 11,000', '/credentials?effectiveStatus=valid'],
+      ['Valid 11,000', '/credentials?effectiveStatus=valid'],
       ['Revoked 845', '/credentials?effectiveStatus=revoked'],
       ['Awaiting wallet 3', '/credentials?effectiveStatus=pending'],
-      ['Superseded 300', '/credentials?effectiveStatus=superseded'],
+      ['Replaced 300', '/credentials?effectiveStatus=superseded'],
       ['Expired 200', '/credentials?effectiveStatus=expired'],
       ['Expiring in 30 days 4', '/credentials?effectiveStatus=valid&sort=expires'],
       ['Holders 25', '/holders'],
@@ -91,7 +91,7 @@ describe('dashboard – counts and cards', () => {
 
   it('is shown to officers too, with the officer token', async () => {
     renderApp('/', { signedInAs: OFFICER });
-    expect(await screen.findByRole('link', { name: 'Active 11,000' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Valid 11,000' })).toBeInTheDocument();
     expect(summaryRequests()[0]?.authorization).toMatch(/^Bearer /);
   });
 });
@@ -104,7 +104,7 @@ describe('dashboard – status breakdown', () => {
       within(figure)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual(['Active11,000 (89%)', 'Revoked845 (7%)', 'Superseded300 (2%)', 'Expired200 (2%)']);
+    ).toEqual(['Valid11,000 (89%)', 'Revoked845 (7%)', 'Replaced300 (2%)', 'Expired200 (2%)']);
     expect(figure.querySelectorAll('rect')).toHaveLength(4);
   });
 
@@ -289,7 +289,7 @@ describe('dashboard – states', () => {
       await screen.findByRole('heading', { level: 2, name: 'No credentials issued yet' }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Start by adding a holder record/)).toBeInTheDocument();
-    for (const name of ['Issued 0', 'Active 0', 'Revoked 0', 'Holders 0']) {
+    for (const name of ['Issued 0', 'Valid 0', 'Revoked 0', 'Holders 0']) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
     expect(screen.queryByRole('figure')).not.toBeInTheDocument();

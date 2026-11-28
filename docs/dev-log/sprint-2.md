@@ -77,11 +77,113 @@ store, issuer portal) is logged in [sprint-1.md](sprint-1.md).
 - **Blockers:** None.
 - **Evidence:** `wallet/test/app.test.tsx`, `wallet/test/setup.ts`; three clean `npm test` runs.
 
+### Fri 27 Nov (wallet navigation and application shell)
+
+- **Done:** Extended the initialised wallet (nothing rebuilt). **Navigation:** a Stack per tab
+  (`credentials/` index + `[id]`, `scan/`, `history/` index + `[id]`, `settings/` index,
+  language, security placeholder, about, diagnostics and the new ui-kit, both dev only); `/`
+  redirects to `/credentials`; one typed route table `src/navigation/routes.ts` checked against
+  `app/` (Expo Router typed routes left off: generated into git-ignored `.expo/types`); shared
+  Header with back on every stack; `anchor: 'index'` so deep links keep the list; Android back:
+  stack → Credentials tab → leave the app only from the Credentials root (`backBehavior:
+'firstRoute'`, BackHandler simulated in tests); unknown routes and ids → not found.
+  **Components:** Header, Button (primary / secondary / destructive / ghost, loading, disabled,
+  icon), CredentialCard, StatusBadge (credential state), Badge (generic tone), ListItem,
+  SectionHeader, LoadingState, ErrorState, Toast (FIFO, max 3), ConfirmDialog, Icon; EmptyState
+  and Card kept. **Status:** `walletStatusFromBackend()` (valid → active, revoked, superseded →
+  replaced, expired; anything else → notChecked) plus wallet-only notChecked / checking, each
+  with its own icon and label; words copied from the issuer portal's `credentials.statuses` and
+  `credentialTypes` (en + si) with a parity test. **Theme:** `darkSemanticColors` added to
+  `portal-ui/src/tokens.ts` (not emitted to `theme.css`); `theme.css` and the issuer portal's
+  built CSS byte-identical (SHA-256 before/after: `index-CS6Xois6.css` `4FCD3220…`,
+  `vendor-BWIVbSOu.css` `29219633…`, `theme.css` `3A91F8AE…`); WCAG AA contrast test for 28
+  colour pairs in light and dark (lowest 5.35:1 light, 7.18:1 dark). **Preferences:** AsyncStorage 2.2.0
+  (`npx expo install`), language only (`univault.language`), applied under the splash screen
+  before the first frame; storage rule documented. **Settings:** Language (radio group,
+  saved, toast), About (version, Expo SDK, Noto Sans Sinhala OFL notice), Security placeholder,
+  Developer section (dev only). **UI kit** (dev only; inline `__DEV__` gate, so its code is not in
+  the release bundle). Synthetic sample credentials / history in dev builds only. Wallet tests
+  68 → **223** (14 files), coverage 99.19 / 95.41 / 98.74 / 100, thresholds raised to
+  99 / 95 / 98 / 99. portal-ui 80, issuer-portal 396 tests still pass. expo-doctor 20/20;
+  `npx expo export --platform android`: 1,367 modules, no bundler warnings.
+- **Next:** Screenshots ([s2-wallet-shell-guide.md](evidence/s2-wallet-shell-guide.md)) on a
+  phone in Expo Go, light and dark, English and Sinhala, largest text size; native-speaker
+  review of the new Sinhala strings; holder key (ES256) in secure storage; OpenID4VCI
+  redemption; camera on the Scan tab.
+- **Blockers:** None.
+- **Evidence:** `wallet/test/` (223 tests), the CSS hashes above,
+  [s2-wallet-shell-guide.md](evidence/s2-wallet-shell-guide.md) (screenshots to be taken).
+
+### Fri 27 Nov (review answers; design system blocked on contrast)
+
+- **Done:** Answers to the wallet-shell review. **Decision 023** recorded (wallet storage tiers:
+  secure store for keys and the vault key, encrypted vault for credentials, AsyncStorage only
+  for non-secret preferences; FR-WAL-03, NFR-08; Draft – review). **Decision 022** consequences
+  now record the typed-route choice (one route table checked by `wallet/test/routes.test.tsx`,
+  Expo Router typed routes off), accepted in review. **Issuer portal wording:** `superseded` is
+  "Replaced" / "ප්‍රතිස්ථාපනය කළ" everywhere: holder page (`holders.statuses`) and dashboard
+  card (`dashboard.cards.superseded.label`) changed, tests and the dashboard e2e expectation
+  updated, backlog note removed. Sample data in the release bundle stays on the backlog.
+- **Design system ("Navy and azure"):** NOT applied. The two source files
+  (`docs/design/source/univault-tokens.css`, `univault-theme.ts`) agree on every value (31
+  colours per theme, spacing, radii, sans stack). But light-theme pairs the design system uses
+  fail WCAG AA: `text-subtle` on `bg` 4.43:1 and on `surface-sunken` 4.23:1 (placeholders in
+  input fills); `focus-ring` on `brand` 2.98:1 and on `brand-hover` 2.23:1 (keyboard focus on
+  the sidebar, including the active item); `accent-text` on `brand-soft` 4.35:1 and
+  `text-subtle` on `brand-soft` 4.01:1 (links and timestamps in a selected table row). The brief
+  says to stop rather than change a colour, so nothing in Part B was changed. Dark theme: every
+  pair passes.
+- **Next:** Decision on the failing light pairs; then Part B (tokens, portals, wallet, tests).
+- **Blockers:** Contrast failures in the source palette (above).
+- **Evidence:** contrast figures computed from `univault-theme.ts` (WCAG 2.2 formula, the
+  same one as `wallet/src/theme/contrast.ts`).
+
+### Fri 27 Nov (design system "Navy and azure" applied)
+
+- **Done:** The three agreed contrast fixes, then the design system in every app (Decision 024,
+  [design-system.md](../design/design-system.md)). **Tokens:** every value in
+  `portal-ui/src/tokens.ts` under the design-system names (light + dark, usage tokens
+  `focus-ring-on-brand` = on-brand and `accent-text-on-soft` = accent-hover, `text-subtle`
+  #5B6B80 in light, status sets, component token sets for the offline notice and the disclosure
+  panel, type scale and per-weight font names from `univault-theme.ts`, JetBrains Mono from
+  `univault-tokens.css`); `theme.css` regenerated as `:root` variables (`--brand`) + Tailwind
+  utilities with the same names (`bg-brand`, `text-text-muted`); `docs/design/source/` deleted;
+  old token names removed everywhere; a test fails on any hex colour outside tokens.ts (QrCode's
+  black/white became `fill-text` / `fill-surface`). **Status:** four sets, an icon and a word per
+  status in portal and wallet (Valid / circle-check, Expired / clock, Revoked / ban, Awaiting
+  wallet / hourglass, Replaced / pending colours + swap, wallet Not checked yet / expired colours
+  - offline, Checking… / pending colours + refresh); "Valid" (වලංගුයි) replaces "Active"; label
+    parity test still passes. **Portals:** navy top bar with the role tag as an `AppShell` prop
+    ("Issuer portal" + certificate), navy 240 px sidebar (active: brand-hover fill, on-brand label,
+    3 px on-brand bar), pages on bg / surface / surface-sunken table heads, Button kinds primary /
+    secondary / text / destructive / onBrand (min 40 px, radius-md), design type steps, Noto Sans +
+    Noto Sans Sinhala + JetBrains Mono self-hosted (@fontsource 5.3.0); one primary per page:
+    **Credentials** and **Holders** empty states demoted their repeated primary link to secondary.
+    **Wallet:** same names in light and dark, brand header on the Credentials home (light status
+    bar while focused), navy credential cards (radius-lg, badge in its own pill), surface tab bar
+    with the active tab in accent, Button kinds (44 pt), `OfflineNotice`, disclosure panel tokens in
+    the UI kit, Noto Sans + Noto Sans Sinhala imported per weight (5 font files; Issue 10), mono =
+    system monospace on Diagnostics only; Diagnostics' second "Run check" demoted to secondary.
+    **Contrast:** 74 pairs (light) and 73 (dark) checked, all pass; lowest text 4.58:1 light
+    (text-subtle on brand-soft) and 4.90:1 dark (text-subtle on surface), lowest border/icon/focus
+    3.08:1 light and 3.24:1 dark (border-strong); dark text-subtle on brand-soft is 4.04:1, so the
+    wallet uses text-muted on brand-soft (Issue 9). Also Decision 023's secure-store wording
+    replaced with the cited Expo statement. Tests: portal-ui 80 → **97**, issuer-portal 396 →
+    **424** (+ 10 e2e), wallet 223 → **343**; coverage portal-ui 100 / 98.73 / 100 / 100,
+    issuer-portal 97.56 / 92.2 / 98.02 / 98.57, wallet 99.06 / 95.61 / 98.28 / 99.79. expo-doctor
+    20/20; Metro Android bundle 1,366 modules, no warnings.
+- **Next:** Supervisor review of Decisions 023 and 024 and of the dark text-subtle restriction;
+  native-speaker review of the new Sinhala strings (role tag, "Not checked yet", UI kit labels);
+  screenshots from the final list; holder key and redemption.
+- **Blockers:** None.
+- **Evidence:** `portal-ui/test/tokens.test.ts`, `issuer-portal/test/design-system.test.tsx`,
+  `wallet/test/contrast.test.ts`, `wallet/test/design-system.test.tsx`; e2e 10 passed.
+
 ## Backlog
 
-- **Persist the language choice** once wallet storage exists (the credential vault task); until
-  then the Settings choice lasts until the app restarts and the start language follows the
-  phone.
+- **Sample data in the release bundle:** `src/fixtures/sample-data.ts` (synthetic, never shown
+  in a release build) is still bundled because the list screens import it; remove it when the
+  vault provides real credentials.
 - **npm audit: 24 moderate findings in the wallet** (27 Nov 2026; 0 high, 0 critical), all in
   the Expo toolchain: three advisories, in `glob` and `minimatch` (through Jest and
   `@expo/fingerprint`, the Expo CLI's build fingerprinting) and `uuid` 3.4.0 (through
@@ -93,18 +195,25 @@ store, issuer portal) is logged in [sprint-1.md](sprint-1.md).
   reaches the app bundle or a high/critical level at once.
 - **EAS development build** (`expo-dev-client`) when push notifications or OS-level
   `openid-credential-offer://` links are scheduled (Decision 022).
-- **Native-speaker review** of `wallet/src/i18n/locales/si.ts`.
+- **Native-speaker review** of `wallet/src/i18n/locales/si.ts` (27 Nov: about 110 new strings
+  for the shell, UI kit included).
 - **Final app icon and splash** (the current ones are generated placeholders).
 
 ## Testing evidence
 
 Record the tests that show the sprint goal is met, with links to output in `evidence/`.
 
-| Test / check                         | Type (unit / integration / manual) | Result         | Evidence                                                    |
-| ------------------------------------ | ---------------------------------- | -------------- | ----------------------------------------------------------- |
-| Wallet unit and component tests      | unit / component (Jest + RNTL)     | 68 passed      | `wallet/test/`                                              |
-| Expo SDK alignment and config checks | tooling (expo-doctor)              | 20/20 passed   | `npm run doctor`                                            |
-| crypto-core on the phone (Hermes)    | manual (Expo Go, Diagnostics)      | to be recorded | [s2-wallet-init-guide.md](evidence/s2-wallet-init-guide.md) |
+| Test / check                         | Type (unit / integration / manual)           | Result         | Evidence                                                                          |
+| ------------------------------------ | -------------------------------------------- | -------------- | --------------------------------------------------------------------------------- |
+| Wallet unit and component tests      | unit / component (Jest + RNTL)               | 223 passed     | `wallet/test/`                                                                    |
+| Wallet status words = issuer portal  | unit (parity test, en + si)                  | passed         | `wallet/test/status.test.tsx`                                                     |
+| WCAG AA contrast, light and dark     | unit (74 / 73 design + component pairs)      | passed         | `wallet/test/contrast.test.ts`                                                    |
+| One primary action per page / screen | component (portal and wallet)                | passed         | `issuer-portal/test/design-system.test.tsx`, `wallet/test/design-system.test.tsx` |
+| No hex colour outside tokens.ts      | unit (scans every app's source)              | passed         | `portal-ui/test/tokens.test.ts`                                                   |
+| theme.css generated from tokens.ts   | unit (replaces the byte-identical CSS check) | passed         | `portal-ui/test/tokens.test.ts`                                                   |
+| Wallet shell on the phone            | manual (Expo Go)                             | to be recorded | [s2-wallet-shell-guide.md](evidence/s2-wallet-shell-guide.md)                     |
+| Expo SDK alignment and config checks | tooling (expo-doctor)                        | 20/20 passed   | `npm run doctor`                                                                  |
+| crypto-core on the phone (Hermes)    | manual (Expo Go, Diagnostics)                | to be recorded | [s2-wallet-init-guide.md](evidence/s2-wallet-init-guide.md)                       |
 
 ## Sprint review (Sun 29 Nov)
 
@@ -216,3 +325,70 @@ Record the tests that show the sprint goal is met, with links to output in `evid
   added to the wallet README.
 - **Lesson:** A test route map must mirror `app/`; better, render the real directory. Fail on
   console output so warnings cannot pile up unseen.
+
+### Issue 6: `unstable_settings.initialRouteName` is deprecated in Expo Router 58 (27 Nov 2026)
+
+- **Task:** Wallet navigation (a Stack per tab)
+- **Symptom:** Every test rendering the app failed on the console guard: "`unstable_settings.
+initialRouteName` is deprecated. Use `unstable_settings.anchor` instead."
+- **Cause:** The older Expo Router documentation (and most examples) still use
+  `initialRouteName`; SDK 58 renamed it.
+- **Resolution:** `export const unstable_settings = { anchor: 'index' }` in each tab's
+  `_layout.tsx`; a deep-link test proves Back still lands on the list.
+- **Lesson:** The console guard turned a silent deprecation into a failing test on the first run.
+
+### Issue 7: Tests passed against a dead AsyncStorage mock (27 Nov 2026)
+
+- **Task:** Language preference
+- **Symptom:** The "simulated restart" test read `null` for a language saved a line earlier,
+  while the other preference tests passed.
+- **Cause:** The official mock's `getItem` / `setItem` are `jest.fn`s holding the in-memory
+  store. `jest.spyOn` on them returns the same `jest.fn`, and `restoreAllMocks` in `afterEach`
+  then **removed their implementation**: every later test in the file ran against a store that
+  saved nothing (some still passed for the wrong reason).
+- **Resolution:** No `spyOn` / restore on the mock; one-shot `mockRejectedValueOnce` /
+  `mockImplementationOnce` and `.mock.calls` (with `clearMocks`). Rule added to CLAUDE.md.
+- **Lesson:** Spying on something that is already a mock and then restoring it does not restore
+  the mock; check a later test still sees real behaviour.
+
+### Issue 8: The dev-only UI kit was in the release bundle (27 Nov 2026)
+
+- **Task:** UI kit hidden in production
+- **Symptom:** The Jest tests (gate mocked to false) passed, but `npx expo export --platform
+android` (a release bundle) still contained the kit's test IDs.
+- **Cause:** The screen returned early on `uiKitEnabled()`, a function call returning
+  `__DEV__`; Metro's minifier cannot fold a call across modules, so the code after it stayed.
+  (Expo Router bundles every route file, so the screen module itself is always present.)
+- **Resolution:** Gate with an inline `!__DEV__ || !uiKitEnabled()`: folded to `true` in a
+  release build, the kit below is dropped (test IDs absent after re-export); a test keeps the
+  inline gate. The synthetic sample data is still bundled (backlog).
+- **Lesson:** "Hidden" (not reachable) and "stripped" (not in the bundle) are different
+  claims; check the exported bundle, not only the tests.
+
+### Issue 9: One source pairing fails AA in dark: text-subtle on brand-soft (27 Nov 2026)
+
+- **Task:** Design system, contrast test for both themes
+- **Symptom:** After the three agreed light-theme fixes, the extended contrast test failed one
+  dark pair: `text-subtle` (#7D8DA6) on `brand-soft` (#1A2E4D) is 4.04:1 (needs 4.5:1).
+- **Cause:** The stop check before Part B tested the brand-soft pairs in light only; in dark the
+  pair was not measured. In light it is a portal pairing (timestamps in a selected table row) and
+  passes after the fix (4.58:1).
+- **Resolution:** No colour changed (the brief: dark text-subtle stays). Usage rule instead: in
+  the wallet, text on a brand-soft panel is `text-muted` (5.77:1; the disclosure panel token set
+  already uses it); the pair is marked light-only in `DESIGN_PAIRS` and a test pins both ratios.
+  Recorded in design-system.md (Accessibility). Needs supervisor confirmation.
+- **Lesson:** Check every pairing in every theme it can appear in before declaring a palette
+  clean.
+
+### Issue 10: The Expo font packages bundled every weight (27 Nov 2026)
+
+- **Task:** Wallet fonts (Noto Sans)
+- **Symptom:** `npx expo export` listed all 18 Noto Sans files (weights and italics, about 11 MB)
+  and all 9 Noto Sans Sinhala files, although the app loads five.
+- **Cause:** Importing from a package index (`@expo-google-fonts/noto-sans`) evaluates every
+  `require('./…ttf')` in it, and Metro bundles each asset it sees. The Sinhala package had done
+  the same since the wallet was initialised.
+- **Resolution:** One import per weight (`@expo-google-fonts/noto-sans/400Regular` …) and
+  `useFonts` from `expo-font`; the export now lists exactly the five design weights plus the icon
+  font. `test/app.test.tsx` fails if a package index is imported again.
+- **Lesson:** Read the asset list of a release bundle after adding a font or image package.

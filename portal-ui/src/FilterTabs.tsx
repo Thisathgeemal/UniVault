@@ -34,10 +34,10 @@ export function FilterTabs({ label, tabs, selected, onSelect, className }: Filte
             aria-pressed={active}
             onClick={() => onSelect(tab.id)}
             className={cn(
-              'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'inline-flex min-h-10 items-center gap-2 rounded-pill border px-3 py-1.5 text-label focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
               active
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-surface text-foreground hover:bg-muted',
+                ? 'border-brand bg-brand-soft text-text'
+                : 'border-border-strong bg-surface text-text hover:bg-surface-sunken',
             )}
           >
             {tab.label}
@@ -46,8 +46,8 @@ export function FilterTabs({ label, tabs, selected, onSelect, className }: Filte
             {tab.count !== undefined ? (
               <span
                 className={cn(
-                  'rounded-full px-2 text-xs',
-                  active ? 'bg-white/20' : 'bg-muted text-muted-foreground',
+                  'rounded-pill px-2 text-caption',
+                  active ? 'bg-surface text-text' : 'bg-surface-sunken text-text-muted',
                 )}
               >
                 {tab.count}

@@ -71,10 +71,10 @@ export function FullscreenOverlay({
       className="fixed inset-0 z-50 flex flex-col bg-surface p-6"
     >
       <div className="flex items-center justify-between gap-4">
-        <h2 id={titleId} className="text-xl font-semibold">
+        <h2 id={titleId} className="text-h2">
           {title}
         </h2>
-        <Button ref={closeRef} variant="outline" onClick={onClose}>
+        <Button ref={closeRef} variant="secondary" onClick={onClose}>
           {closeLabel}
         </Button>
       </div>

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Screen } from '../../src/components';
+import { EmptyState, Screen } from '../../../src/components';
 
-/** Scan tab: QR scanning of credential offers and verification requests (later tasks). */
+/** Scan tab: QR scanning of credential offers and verification requests (camera: later task). */
 export default function ScanScreen() {
   const { t } = useTranslation();
   return (

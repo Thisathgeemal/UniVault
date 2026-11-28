@@ -60,7 +60,7 @@ export function IssuanceProblemAlert({
         <>
           <p className="font-medium">{t('issuance.errors.failed')}</p>
           <p>{message.message}</p>
-          {message.reference ? <p className="font-mono text-xs">{message.reference}</p> : null}
+          {message.reference ? <p className="font-mono text-caption">{message.reference}</p> : null}
         </>
       );
     }
@@ -70,7 +70,7 @@ export function IssuanceProblemAlert({
     <Alert variant="destructive" role="alert" className="mb-6 flex flex-col items-start gap-1">
       {body}
       {retry && onRetry ? (
-        <Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
+        <Button variant="secondary" size="sm" className="mt-2" onClick={onRetry}>
           {t('common.tryAgain')}
         </Button>
       ) : null}

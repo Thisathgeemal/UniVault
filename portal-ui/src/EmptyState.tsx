@@ -11,15 +11,15 @@ export interface EmptyStateProps {
 
 export function EmptyState({ title, description, icon, action, badge }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-card border border-dashed border-border bg-surface px-6 py-12 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border-strong bg-surface px-6 py-12 text-center">
       {icon ? (
-        <div className="text-brand-600" aria-hidden="true">
+        <div className="text-brand" aria-hidden="true">
           {icon}
         </div>
       ) : null}
-      {badge ? <Badge variant="accent">{badge}</Badge> : null}
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {description ? <p className="max-w-md text-sm text-muted-foreground">{description}</p> : null}
+      {badge ? <Badge>{badge}</Badge> : null}
+      <h2 className="text-h2">{title}</h2>
+      {description ? <p className="max-w-md text-body-sm text-text-muted">{description}</p> : null}
       {action}
     </div>
   );

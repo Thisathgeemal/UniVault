@@ -61,10 +61,10 @@ test('staff sign-in, role-based menu, dashboard numbers and sign-out', async ({ 
   const format = (n: number) => new Intl.NumberFormat('en-LK').format(n);
   const cards: [string, string][] = [
     ['Issued', 'issued'],
-    ['Active', 'active'],
+    ['Valid', 'active'],
     ['Revoked', 'revoked'],
     ['Awaiting wallet', 'awaitingWallet'],
-    ['Superseded', 'superseded'],
+    ['Replaced', 'superseded'],
     ['Expired', 'expired'],
     [`Expiring in ${summary.expiringSoonDays} days`, 'expiringSoon'],
     ['Holders', 'holders'],

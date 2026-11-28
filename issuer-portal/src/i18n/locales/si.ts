@@ -11,6 +11,8 @@ export const si: Messages = {
   app: {
     name: 'UniVault නිකුත්කරු ද්වාරය',
     shortName: 'නිකුත්කරු ද්වාරය',
+    brand: 'UniVault',
+    roleTag: 'නිකුත්කරු ද්වාරය',
   },
   common: {
     loading: 'පූරණය වෙමින්…',
@@ -110,7 +112,7 @@ export const si: Messages = {
         description: 'මෙතෙක් හිමිකරුවන්ගේ පසුම්බිවලට අත්සන් කර ලබා දුන් අක්තපත්‍ර',
       },
       active: {
-        label: 'සක්‍රිය',
+        label: 'වලංගුයි',
         description: 'දැනට හිමිකරුවන්ගේ පසුම්බිවල වලංගු අක්තපත්‍ර',
       },
       revoked: {
@@ -122,7 +124,7 @@ export const si: Messages = {
         description: 'සාදා ඇත, හිමිකරු QR කේතය ස්කෑන් කරන තෙක් රැඳී සිටී',
       },
       superseded: {
-        label: 'ප්‍රතිස්ථාපිත',
+        label: 'ප්‍රතිස්ථාපනය කළ',
         description: 'නව අක්තපත්‍රයකින් ප්‍රතිස්ථාපනය කළ',
       },
       expired: {
@@ -131,7 +133,7 @@ export const si: Messages = {
       },
       expiringSoon: {
         label: 'දින {{days}}ක් තුළ කල් ඉකුත් වන',
-        description: 'ළඟදීම කල් ඉකුත් වන සක්‍රිය අක්තපත්‍ර',
+        description: 'ළඟදීම කල් ඉකුත් වන වලංගු අක්තපත්‍ර',
       },
       holders: {
         label: 'හිමිකරුවන්',
@@ -180,9 +182,9 @@ export const si: Messages = {
     registerAction: 'හිමිකරුවෙකු ලියාපදිංචි කරන්න',
     statuses: {
       pending: 'පසුම්බිය සඳහා රැඳී ඇති',
-      valid: 'සක්‍රිය',
+      valid: 'වලංගුයි',
       revoked: 'අවලංගු කළ',
-      superseded: 'ප්‍රතිස්ථාපිත',
+      superseded: 'ප්‍රතිස්ථාපනය කළ',
       expired: 'කල් ඉකුත් වූ',
     },
     list: {
@@ -583,7 +585,7 @@ export const si: Messages = {
     description: 'ඔබගේ ආයතනය සෑදූ සියලු අක්තපත්‍ර, ඒවායේ තත්ත්වය සහ ක්‍රියා සමඟ.',
     issueAction: 'අක්තපත්‍රය නිකුත් කරන්න',
     statuses: {
-      valid: 'සක්‍රිය',
+      valid: 'වලංගුයි',
       pending: 'පසුම්බිය සඳහා රැඳී ඇති',
       revoked: 'අවලංගු කළ',
       superseded: 'ප්‍රතිස්ථාපනය කළ',
@@ -609,7 +611,7 @@ export const si: Messages = {
       tabsLabel: 'තත්ත්වය අනුව පෙරන්න',
       tabs: {
         all: 'සියල්ල',
-        valid: 'සක්‍රිය',
+        valid: 'වලංගුයි',
         pending: 'පසුම්බිය සඳහා රැඳී ඇති',
         expired: 'කල් ඉකුත් වූ',
         revoked: 'අවලංගු කළ',
@@ -636,7 +638,7 @@ export const si: Messages = {
           title: 'තවම අක්තපත්‍ර නැත',
           description: 'ඔබ හිමිකරුවන්ට නිකුත් කරන අක්තපත්‍ර මෙහි දිස් වේ.',
         },
-        valid: { title: 'සක්‍රිය අක්තපත්‍ර නැත', description: 'මේ මොහොතේ කිසිවක් සක්‍රිය නැත.' },
+        valid: { title: 'වලංගු අක්තපත්‍ර නැත', description: 'මේ මොහොතේ කිසිවක් වලංගු නැත.' },
         pending: {
           title: 'පසුම්බිය සඳහා රැඳී ඇති අක්තපත්‍ර නැත',
           description: 'සියලු අක්තපත්‍ර පිළිගෙන, අවලංගු කර හෝ ප්‍රතිස්ථාපනය කර ඇත.',

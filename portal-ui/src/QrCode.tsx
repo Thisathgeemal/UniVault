@@ -70,8 +70,10 @@ export function QrCode({ value, label, size = 288, className }: QrCodeProps) {
       className={cn('block h-auto max-w-full', className)}
       data-qr-modules={side}
     >
-      <rect width={side} height={side} fill="#ffffff" />
-      <path d={path} fill="#000000" />
+      {/* Token colours, not hex: text (near-black navy) modules on a surface (white) quiet zone,
+          17.9:1, ample for scanners */}
+      <rect width={side} height={side} className="fill-surface" />
+      <path d={path} className="fill-text" />
     </svg>
   );
 }

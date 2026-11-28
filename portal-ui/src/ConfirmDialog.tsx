@@ -67,26 +67,26 @@ export function ConfirmDialog({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-text/40 p-4">
       <div
         ref={dialogRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={messageId}
-        className="w-full max-w-md rounded-card border border-border bg-surface p-6 shadow-lg"
+        className="w-full max-w-md rounded-md border border-border bg-surface p-6 shadow-lg"
       >
-        <h2 id={titleId} className="text-lg font-semibold">
+        <h2 id={titleId} className="text-h2">
           {title}
         </h2>
-        <p id={messageId} className="mt-2 text-sm text-muted-foreground">
+        <p id={messageId} className="mt-2 text-body text-text-muted">
           {message}
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <Button ref={cancelRef} variant="outline" onClick={onCancel}>
+          <Button ref={cancelRef} variant="secondary" onClick={onCancel}>
             {cancelLabel}
           </Button>
-          <Button variant={tone === 'destructive' ? 'destructive' : 'default'} onClick={onConfirm}>
+          <Button variant={tone === 'destructive' ? 'destructive' : 'primary'} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>

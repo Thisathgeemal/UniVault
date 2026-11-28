@@ -4,6 +4,7 @@
  * The sidebar is built from APP_ROUTES, the same list the route guards use.
  */
 import { AppShell, ErrorFallback, FullPageSpinner } from '@univault/portal-ui';
+import { Certificate } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../auth/auth-context.js';
@@ -38,14 +39,16 @@ export function ProtectedLayout() {
   return (
     <AppShell
       header={{
-        appName: t('app.shortName'),
+        appName: t('app.brand'),
+        // the role tag is the only visual difference from the verifier portal (Decision 024)
+        roleTag: { label: t('app.roleTag'), icon: Certificate },
         orgName: user.issuer.name,
         userName: user.displayName,
         roleLabel: t(`roles.${user.role}`),
         logoutLabel: t('header.signOut'),
         onLogout: () => void auth.signOut(),
         logoutPending: auth.signingOut,
-        languageSwitcher: <LanguageSwitcher />,
+        languageSwitcher: <LanguageSwitcher onBrand />,
       }}
       sidebar={{
         items: APP_ROUTES.map((route) => ({

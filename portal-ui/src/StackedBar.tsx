@@ -1,10 +1,15 @@
 import { cn } from './cn.js';
+import type { StatusSet } from './tokens.js';
 
-export type StackedBarTone = 'brand' | 'destructive' | 'info' | 'warning' | 'muted';
+/**
+ * The bar shows credentials BY STATUS, so each segment takes its status colour set (the only
+ * use of status colours here: a segment is a status, never a decorative series).
+ */
+export type StackedBarTone = StatusSet;
 
 export interface StackedBarSegment {
   id: string;
-  /** e.g. "Active" (already translated) */
+  /** e.g. "Valid" (already translated) */
   label: string;
   value: number;
   /** What the legend shows next to the label, e.g. "8 (73%)" (already formatted). */
@@ -21,18 +26,16 @@ export interface StackedBarProps {
 
 // Literal class names, so Tailwind finds them when it scans this package
 const FILL: Record<StackedBarTone, string> = {
-  brand: 'fill-brand-500',
-  destructive: 'fill-destructive',
-  info: 'fill-info',
-  warning: 'fill-accent-foreground',
-  muted: 'fill-muted-foreground',
+  valid: 'fill-status-valid',
+  expired: 'fill-status-expired',
+  revoked: 'fill-status-revoked',
+  pending: 'fill-status-pending',
 };
 const SWATCH: Record<StackedBarTone, string> = {
-  brand: 'bg-brand-500',
-  destructive: 'bg-destructive',
-  info: 'bg-info',
-  warning: 'bg-accent-foreground',
-  muted: 'bg-muted-foreground',
+  valid: 'bg-status-valid',
+  expired: 'bg-status-expired',
+  revoked: 'bg-status-revoked',
+  pending: 'bg-status-pending',
 };
 /** Gap between neighbouring segments, in percent of the width. */
 const GAP = 0.6;
@@ -60,7 +63,7 @@ export function StackedBar({ label, segments, className }: StackedBarProps) {
         focusable="false"
         viewBox="0 0 100 1"
         preserveAspectRatio="none"
-        className="h-4 w-full overflow-hidden rounded-full bg-muted"
+        className="h-4 w-full overflow-hidden rounded-full bg-surface-sunken"
         data-testid="stacked-bar"
       >
         {total > 0
@@ -77,15 +80,15 @@ export function StackedBar({ label, segments, className }: StackedBarProps) {
             ))
           : null}
       </svg>
-      <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+      <ul className="flex flex-wrap gap-x-6 gap-y-2 text-body-sm">
         {segments.map((segment) => (
           <li key={segment.id} className="flex items-center gap-2" data-segment={segment.id}>
             <span
               aria-hidden="true"
               className={cn('inline-block h-3 w-3 rounded-sm', SWATCH[segment.tone])}
             />
-            <span className="text-muted-foreground">{segment.label}</span>
-            <span className="font-semibold tabular-nums text-foreground">{segment.valueText}</span>
+            <span className="text-text-muted">{segment.label}</span>
+            <span className="font-semibold tabular-nums text-text">{segment.valueText}</span>
           </li>
         ))}
       </ul>

@@ -66,7 +66,7 @@ describe('CredentialCardPreview', () => {
     const card = screen.getByRole('article', { name: 'KYC credential' });
     expect(within(card).getByText('Demo Bank', { selector: 'p' })).toBeInTheDocument();
     const always = within(card).getByRole('region', { name: 'Always shown' });
-    expect(always.className).toContain('bg-muted');
+    expect(always.className).toContain('bg-surface-sunken');
     expect(within(always).getByText('Verifiers see these')).toBeInTheDocument();
     const holder = within(card).getByRole('region', { name: 'Holder chooses' });
     expect(within(holder).getByText('SD')).toBeInTheDocument();

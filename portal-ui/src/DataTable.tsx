@@ -1,7 +1,6 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from './icons.js';
 import type { ReactNode } from 'react';
 import { cn } from './cn.js';
-import { Button } from './ui/button.js';
 import { Skeleton } from './ui/skeleton.js';
 
 export type SortDirection = 'asc' | 'desc';
@@ -61,10 +60,10 @@ export function DataTable<T>({
   });
 
   return (
-    <div className="overflow-x-auto rounded-card border border-border bg-surface">
-      <table className="w-full text-left text-sm" aria-busy={loading}>
+    <div className="overflow-x-auto rounded-md border border-border bg-surface">
+      <table className="w-full text-left text-body-sm" aria-busy={loading}>
         <caption className="sr-only">{caption}</caption>
-        <thead className="border-b border-border bg-muted/60 text-muted-foreground">
+        <thead className="border-b border-border bg-surface-sunken text-text-muted">
           <tr>
             {columns.map((column) => {
               const active = sort?.column === column.id ? sort.direction : undefined;
@@ -77,15 +76,14 @@ export function DataTable<T>({
                   className={cn('px-4 py-3 font-medium', column.className)}
                 >
                   {column.sortable && onSortChange ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="-ml-3"
+                    <button
+                      type="button"
+                      className="-ml-1 inline-flex min-h-10 items-center gap-1 rounded-sm px-1 text-label text-text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
                       onClick={() => onSortChange(nextSort(column.id))}
                     >
                       {column.header}
                       <Icon className="h-3.5 w-3.5" />
-                    </Button>
+                    </button>
                   ) : (
                     column.header
                   )}
@@ -109,7 +107,7 @@ export function DataTable<T>({
                 <tr
                   key={getRowId(row)}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  className={cn(onRowClick && 'cursor-pointer hover:bg-muted/60')}
+                  className={cn(onRowClick && 'cursor-pointer hover:bg-surface-sunken')}
                 >
                   {columns.map((column) => (
                     <td key={column.id} className={cn('px-4 py-3', column.className)}>

@@ -10,7 +10,7 @@
  *   the system's own wording; the app explains each permission on screen before asking
  *   (from Sprint 2, when the camera and biometric unlock are used).
  */
-import { brandColors, semanticColors } from '../portal-ui/src/tokens.ts';
+import { darkColors, lightColors } from '../portal-ui/src/tokens.ts';
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 /** Reverse-DNS application id for Android and iOS (`lk` = Sri Lanka). */
@@ -43,7 +43,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: APP_ID,
     adaptiveIcon: {
       foregroundImage: './assets/images/adaptive-icon.png',
-      backgroundColor: semanticColors.primary,
+      backgroundColor: lightColors.brand,
     },
     permissions: ['android.permission.CAMERA', 'android.permission.USE_BIOMETRIC'],
   },
@@ -57,10 +57,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         image: './assets/images/splash-icon.png',
         imageWidth: 160,
         resizeMode: 'contain',
-        backgroundColor: semanticColors.background,
+        backgroundColor: lightColors.bg,
         dark: {
           image: './assets/images/splash-icon-dark.png',
-          backgroundColor: brandColors[900],
+          backgroundColor: darkColors.bg,
         },
       },
     ],

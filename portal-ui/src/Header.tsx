@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 
@@ -11,15 +11,27 @@ export interface HeaderMenuButton {
   label: string;
 }
 
+/**
+ * The portal's role tag next to the UniVault name: the ONLY visual difference between the
+ * issuer portal ("Issuer portal", certificate icon) and the verifier portal ("Verifier portal",
+ * shield-check icon). Both passed in: this package holds no text and no icon library.
+ */
+export interface RoleTag {
+  label: string;
+  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' }>;
+}
+
 export interface HeaderProps {
+  /** "UniVault" */
   appName: string;
+  roleTag: RoleTag;
   orgName: string;
   userName: string;
   roleLabel: string;
   logoutLabel: string;
   onLogout: () => void;
   logoutPending?: boolean;
-  /** e.g. the portal's language switcher */
+  /** e.g. the portal's language switcher (must be styled for the navy bar) */
   languageSwitcher?: ReactNode;
   /** Mobile menu toggle (AppShell passes it) */
   menuButton?: HeaderMenuButton;
@@ -41,8 +53,14 @@ function MenuIcon() {
   );
 }
 
+/**
+ * The navy top bar: UniVault name + role tag (role-tag-bg pill, on-brand text, radius-pill),
+ * organisation, user with their role, language switcher and logout (on-brand buttons). Focus
+ * rings inside it use focus-ring-on-brand (azure on navy is below 3:1).
+ */
 export function Header({
   appName,
+  roleTag,
   orgName,
   userName,
   roleLabel,
@@ -52,12 +70,13 @@ export function Header({
   languageSwitcher,
   menuButton,
 }: HeaderProps) {
+  const TagIcon = roleTag.icon;
   return (
-    <header className="sticky top-0 z-40 flex h-header items-center gap-3 border-b border-border bg-surface px-4">
+    <header className="sticky top-0 z-40 flex h-header items-center gap-3 bg-brand px-4 text-on-brand">
       {menuButton ? (
         <Button
           id={menuButton.id}
-          variant="ghost"
+          variant="onBrand"
           size="icon"
           className="md:hidden"
           aria-expanded={menuButton.expanded}
@@ -68,23 +87,31 @@ export function Header({
           <MenuIcon />
         </Button>
       ) : null}
-      <div className="flex min-w-0 flex-col">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {appName}
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="text-h3 text-on-brand">{appName}</span>
+        <span
+          data-testid="role-tag"
+          className="inline-flex items-center gap-1.5 rounded-pill bg-role-tag-bg px-3 py-1 text-caption font-semibold text-on-brand"
+        >
+          <TagIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {roleTag.label}
         </span>
-        <span className="truncate font-semibold" data-testid="header-org">
+        <span
+          className="hidden truncate text-body-sm text-on-brand-muted sm:inline"
+          data-testid="header-org"
+        >
           {orgName}
         </span>
       </div>
       <div className="ml-auto flex items-center gap-3">
         {languageSwitcher}
         <div className="hidden flex-col items-end sm:flex">
-          <span className="text-sm font-medium" data-testid="header-user">
+          <span className="text-label text-on-brand" data-testid="header-user">
             {userName}
           </span>
-          <Badge variant="accent">{roleLabel}</Badge>
+          <Badge variant="onBrand">{roleLabel}</Badge>
         </div>
-        <Button variant="outline" size="sm" onClick={onLogout} disabled={logoutPending}>
+        <Button variant="onBrand" size="sm" onClick={onLogout} disabled={logoutPending}>
           {logoutLabel}
         </Button>
       </div>

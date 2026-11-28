@@ -29,6 +29,8 @@ export interface SidebarProps<R extends string = string> {
   /** Accessible name of the navigation landmark (e.g. "Main navigation"). */
   label: string;
   linkComponent?: ComponentType<SidebarLinkProps>;
+  /** Optional section heading above the items (on-brand-muted), already translated. */
+  sectionLabel?: string;
   /** Called after a link is chosen (AppShell closes the mobile menu with it). */
   onNavigate?: () => void;
   id?: string;
@@ -63,12 +65,18 @@ export function Sidebar<R extends string = string>({
   activePath,
   label,
   linkComponent: Link = PlainLink,
+  sectionLabel,
   onNavigate,
   id,
   className,
 }: SidebarProps<R>) {
   return (
     <nav aria-label={label} id={id} className={cn('flex flex-col gap-1 p-3', className)}>
+      {sectionLabel ? (
+        <p className="px-3 pb-1 pt-2 text-caption font-semibold uppercase tracking-wide text-on-brand-muted">
+          {sectionLabel}
+        </p>
+      ) : null}
       <ul className="flex flex-col gap-1">
         {visibleSidebarItems(items, currentRole).map((item) => {
           const active = isSidebarItemActive(item.href, activePath);
@@ -80,10 +88,12 @@ export function Sidebar<R extends string = string>({
                 {...(active ? { 'aria-current': 'page' as const } : {})}
                 {...(onNavigate ? { onClick: onNavigate } : {})}
                 className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-muted',
+                  'flex min-h-10 items-center gap-3 rounded-md border-l-[3px] px-3 py-2 text-label transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring-on-brand',
+                  // active: brand-hover fill, on-brand label, 3px on-brand bar on the left
+                  // edge (not azure: azure on navy is below 3:1)
                   active
-                    ? 'bg-sidebar-active text-white'
-                    : 'text-sidebar-foreground hover:bg-white/10',
+                    ? 'border-on-brand bg-brand-hover text-on-brand'
+                    : 'border-transparent text-on-brand hover:bg-brand-hover',
                 )}
               >
                 {Icon ? <Icon className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}

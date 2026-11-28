@@ -20,7 +20,7 @@ export function Tooltip({ content, children }: TooltipProps) {
       <span
         role="tooltip"
         id={id}
-        className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 w-max max-w-xs -translate-x-1/2 rounded-md bg-foreground px-2.5 py-1.5 text-xs text-background opacity-0 shadow transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+        className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 w-max max-w-xs -translate-x-1/2 rounded-md bg-text px-2.5 py-1.5 text-caption text-bg opacity-0 shadow transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
       >
         {content}
       </span>

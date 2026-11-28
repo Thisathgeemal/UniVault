@@ -16,7 +16,8 @@ export interface AppShellProps<R extends string = string> {
 }
 
 /**
- * Page frame: header on top, sidebar on the left (a toggled drawer below the md breakpoint)
+ * Page frame ("Navy and azure"): the navy top bar with the role tag, the navy sidebar (240 px)
+ * on the left and the content on bg. Header on top, sidebar on the left (a toggled drawer below the md breakpoint)
  * and the main content. Keyboard: a skip link to the content; the menu button is a real
  * <button> (Enter/Space) with aria-expanded and aria-controls; Escape closes the open menu and
  * returns focus to the button; choosing a link closes it.
@@ -42,10 +43,10 @@ export function AppShell<R extends string = string>({
   }, [menuOpen]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-bg text-body text-text">
       <a
         href={`#${MAIN_CONTENT_ID}`}
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:shadow"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:shadow focus:outline-none focus:ring-2 focus:ring-focus-ring"
       >
         {labels.skipToContent}
       </a>
@@ -64,7 +65,7 @@ export function AppShell<R extends string = string>({
           <div
             aria-hidden="true"
             data-testid="app-menu-backdrop"
-            className="fixed inset-0 top-header z-20 bg-black/40 md:hidden"
+            className="fixed inset-0 top-header z-20 bg-text/40 md:hidden"
             onClick={closeMenu}
           />
         ) : null}
@@ -72,7 +73,7 @@ export function AppShell<R extends string = string>({
           id={APP_SIDEBAR_ID}
           data-state={menuOpen ? 'open' : 'closed'}
           className={cn(
-            'w-sidebar shrink-0 bg-sidebar',
+            'w-sidebar shrink-0 bg-brand',
             'fixed bottom-0 left-0 top-header z-30 overflow-y-auto md:sticky md:block md:h-[calc(100vh-var(--spacing-header))]',
             menuOpen ? 'block' : 'hidden',
           )}

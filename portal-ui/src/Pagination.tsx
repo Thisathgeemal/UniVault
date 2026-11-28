@@ -40,15 +40,15 @@ export function Pagination({
   return (
     <nav
       aria-label={labels.navigation}
-      className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm"
+      className="mt-4 flex flex-wrap items-center justify-between gap-3 text-body-sm"
     >
-      <p aria-live="polite" className="text-muted-foreground">
+      <p aria-live="polite" className="text-text-muted">
         {labels.summary}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         {pageSizeOptions && onPageSizeChange ? (
           <span className="flex items-center gap-2">
-            <label htmlFor={sizeId} className="text-muted-foreground">
+            <label htmlFor={sizeId} className="text-text-muted">
               {labels.pageSize}
             </label>
             <Select
@@ -66,7 +66,7 @@ export function Pagination({
           </span>
         ) : null}
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
@@ -74,7 +74,7 @@ export function Pagination({
           {labels.previous}
         </Button>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           disabled={page >= lastPage}
           onClick={() => onPageChange(page + 1)}

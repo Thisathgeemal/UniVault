@@ -1,48 +1,26 @@
-import { StyleSheet, View } from 'react-native';
-import { useTheme } from '../theme/use-theme';
-import { AppText } from './AppText';
-
-export type BadgeTone = 'success' | 'danger' | 'info' | 'neutral';
+import { useTranslation } from 'react-i18next';
+import { STATUS_PRESENTATION, type WalletStatus } from '../credentials/status';
+import { Badge } from './Badge';
 
 export interface StatusBadgeProps {
-  /** Already translated, e.g. t('diagnostics.pass'). Colour is never the only signal. */
-  label: string;
-  tone: BadgeTone;
+  status: WalletStatus;
   testID?: string;
 }
 
-/** A small status pill. The text carries the meaning; the colour only reinforces it. */
-export function StatusBadge({ label, tone, testID }: StatusBadgeProps) {
-  const { colors, radii, space } = useTheme();
-  const palette = {
-    success: { bg: colors.successMuted, fg: colors.success },
-    danger: { bg: colors.destructiveMuted, fg: colors.destructive },
-    info: { bg: colors.infoMuted, fg: colors.info },
-    neutral: { bg: colors.muted, fg: colors.mutedForeground },
-  }[tone];
+/**
+ * A credential's status: icon + translated word (the same words as the issuer portal's badge; a
+ * test compares them) in its status colour set's pill. Map backend values with
+ * walletStatusFromBackend().
+ */
+export function StatusBadge({ status, testID }: StatusBadgeProps) {
+  const { t } = useTranslation();
+  const { set, icon } = STATUS_PRESENTATION[status];
   return (
-    <View
-      testID={testID}
-      accessible
-      accessibilityRole="text"
-      accessibilityLabel={label}
-      style={[
-        styles.badge,
-        {
-          backgroundColor: palette.bg,
-          borderRadius: radii.full,
-          paddingHorizontal: space(3),
-          paddingVertical: space(1),
-        },
-      ]}
-    >
-      <AppText variant="label" style={{ color: palette.fg }}>
-        {label}
-      </AppText>
-    </View>
+    <Badge
+      label={t(`status.${status}`)}
+      tone={set}
+      icon={icon}
+      testID={testID ?? `status-${status}`}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  badge: { alignSelf: 'flex-start' },
-});

@@ -106,28 +106,39 @@ portal-ui/        @univault/portal-ui: shared, app-agnostic layout (AppShell, Si
                   FullscreenOverlay, Dialog, ActionMenu, FilterTabs, CopyButton,
                   shadcn-style primitives). Built with tsc to dist; the verifier portal
                   will use it in Sprint 3
-  src/tokens.ts     THE design tokens (plain data, no imports): theme.css is GENERATED from it by
-                    `npm run build` (src/theme-css.ts + scripts/generate-theme-css.mjs; a test
-                    checks they match); exported as @univault/portal-ui/tokens for the wallet
+  src/tokens.ts     THE design tokens, "Navy and azure" (plain data, no imports): light + dark
+                    colours with the design-system names, usage tokens, status sets, component
+                    token sets, type scale, fonts, spacing, radius. theme.css is GENERATED from it
+                    by `npm run build` (src/theme-css.ts: `:root` vars like --brand + Tailwind
+                    utilities like bg-brand; a test checks they match); exported as
+                    @univault/portal-ui/tokens for the wallet. The ONLY file with hex colours
 verifier-portal/  React (Vite) – Sprint 3
 wallet/           React Native, Expo SDK 58 + Expo Router (Decision 022; docs/frontend/mobile-wallet.md)
   index.ts          entry: src/lib/crypto-setup FIRST (Hermes polyfills), then expo-router/entry
   app.config.ts     name, version, scheme univault, lk.univault.wallet, permission texts, splash
   metro.config.js   crypto-core symlink (watchFolders, nodeModulesPaths), tokens → portal-ui/src/tokens.ts, guards
   jest.config.js    jest-expo + .mjs transform + tokens mapping + thresholds
-  app/              routes: _layout (providers), (tabs)/ Credentials · Scan · History · Settings,
-                    settings/diagnostics (dev only), +not-found
-  src/components/   Screen, Button, Card, StatusBadge, EmptyState, ErrorBoundary, AppText
-  src/theme/        theme from @univault/portal-ui/tokens (rem → pt, light/dark), useTheme()
+  app/              routes: _layout (providers, saved language), index (→ /credentials), +not-found,
+                    (tabs)/ with a Stack per tab: credentials/ (index, [id]), scan/, history/
+                    (index, [id]), settings/ (index, language, security, about, diagnostics and
+                    ui-kit: dev only)
+  src/components/   Header, Button, Card, CredentialCard, StatusBadge, Badge, ListItem, SectionHeader,
+                    LoadingState, EmptyState, ErrorState, OfflineNotice, Toast, ConfirmDialog, Icon,
+                    Screen, AppText, ErrorBoundary
+  src/credentials/  status.ts: walletStatusFromBackend() = THE backend → wallet status mapping
+  src/navigation/   routes.ts = THE route table (ROUTES, ROUTE_FILES), tabs.ts, TabStack, stack-options
+  src/theme/        theme = the tokens (light/dark, design names), useTheme(), contrast.ts (DESIGN_PAIRS)
   src/i18n/         i18next + expo-localization; locales/en.ts, si.ts (needs native-speaker review)
-  src/lib/          crypto-setup.ts, crypto-check.ts (Diagnostics); storage later
+  src/lib/          crypto-setup.ts, crypto-check.ts (Diagnostics), preferences.ts (AsyncStorage), format.ts
+  src/fixtures/     sample-data.ts: synthetic credentials/history, dev builds only
   src/services/     api-client.ts (EXPO_PUBLIC_API_BASE_URL, GET /health)
   src/config/       env.ts (API URL rules), app-info.ts (versions, __DEV__ gate)
-  src/fixtures/     synthetic SD-JWT for Diagnostics (npm run fixture:diagnostics; no keys)
+  src/fixtures/     also the synthetic SD-JWT for Diagnostics (npm run fixture:diagnostics; no keys)
   assets/           placeholder icon/splash (npm run art:placeholder), fonts/NotoSansSinhala-OFL.txt
   test/             Jest + React Native Testing Library
 ai-service/                        Python Flask + scikit-learn – Sprint 4
 docs/
+  design/           design-system.md: THE design rules ("Navy and azure"; values in portal-ui/src/tokens.ts)
   schemas/          credential JSON Schemas (single source of truth) + credential-schemas.md
   api/, security/, database/, testing/   design docs per feature
   dev-log/          sprint logs, decisions.md, evidence/ screenshots
@@ -161,14 +172,17 @@ cleanly.)
   @vitejs/plugin-react 6.3.0, react-router 8.5.2, @tanstack/react-query 5.108.4,
   tailwindcss / @tailwindcss/vite 4.3.5, i18next 27.2.7, react-i18next 18.0.3,
   zod 4.6.7, lucide-react 1.79.0, msw 3.0.7, @playwright/test 1.65.1, jsdom 31.0.1,
-  @testing-library/react 16.3.3, qrcode 1.5.4 (portal-ui; @types/qrcode 1.5.6), jsqr 1.4.0
+  @testing-library/react 16.3.3, qrcode 1.5.4 (portal-ui; @types/qrcode 1.5.6), jsqr 1.4.0,
+  @fontsource/noto-sans 5.3.0, @fontsource/noto-sans-sinhala 5.3.0, @fontsource/jetbrains-mono 5.3.0
   and pngjs 7.0.0 (test decoding only). Root lint: eslint-plugin-react-hooks 7.1.1,
   eslint-plugin-jsx-a11y 6.10.2, eslint-plugin-react-refresh 0.5.8, eslint-plugin-react 7.37.5,
   eslint-plugin-react-native 5.0.0, eslint-plugin-expo 1.2.1 (wallet).
 - Wallet (Decision 022): expo 58.1.0, react-native 0.88.1, react / react-dom 19.3.0, expo-router
   58.0.33 and the other Expo packages at the versions `npx expo install` chose for SDK 58
   (exact), typescript 6.0.3, i18next 27.2.7, react-i18next 18.0.3,
-  @expo-google-fonts/noto-sans-sinhala 0.4.2, @expo/vector-icons 15.1.1, jest 30.5.2, jest-expo
+  @expo-google-fonts/noto-sans 0.4.2 and noto-sans-sinhala 0.4.2 (imported per weight: 5 font files),
+  @expo/vector-icons 15.1.1,
+  @react-native-async-storage/async-storage 2.2.0, jest 30.5.2, jest-expo
   58.0.16, @testing-library/react-native 14.1.0, test-renderer 1.3.1, @expo/ngrok 4.1.3. Add
   Expo-managed packages ONLY with `npx expo install <pkg>`, then pin the installed version
   exactly; `npm run doctor` must stay 20/20.
@@ -204,12 +218,12 @@ migrations by hand.
 ```
 cd crypto-core && npm test                  # crypto-core tests (158) + coverage: npm run test:coverage
 cd claims-validation && npm test | test:coverage | build | typecheck   # shared claim validation (23 tests)
-cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (80 tests); build regenerates theme.css
+cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (97 tests); build regenerates theme.css
 cd wallet && npm start                      # Metro :8081 (LAN), scan with Expo Go; start:tunnel = ngrok
-cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 68 tests; doctor = expo-doctor (20/20)
+cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 343 tests; doctor = expo-doctor (20/20)
 cd wallet && npm run android | ios | fixture:diagnostics | art:placeholder
 cd issuer-portal && npm run dev             # http://localhost:5173 (backend: npm run dev in backend/)
-cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 396 tests; build also checks the bundle
+cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 424 tests; build also checks the bundle
 cd issuer-portal && npm run test:e2e        # Playwright (10 tests), Chromium; own backend on :4100 + portal on :5180
                                             # (first time: npx playwright install chromium)
 cd backend && npm test                      # backend tests (571; rebuilds crypto-core and claims-validation first)
@@ -321,6 +335,40 @@ of `D:/...`. See Sprint 1, Issue 6.
     portal-ui to regenerate `theme.css` for the portals. Keep tokens.ts import-free and plain
     (Expo's config loader and Node type stripping load it directly). A portal's Tailwind `@source` of portal-ui/src must
     exclude `tokens.ts` and `theme-css.ts` (`@source not`), or words in them become utilities.
+    The wallet uses the token sets directly (`theme.colors.brand`, `theme.colors.textMuted`; dark
+    values for the same names); theme.css emits the light set only (portals are light-only). The
+    portal CSS changes whenever a token does: `portal-ui/test/tokens.test.ts` checks theme.css
+    equals what tokens.ts generates (this replaced the old "byte-identical CSS" check).
+  - **Routes:** every path comes from `src/navigation/routes.ts` (`ROUTES.*`); never write a path
+    string in a screen. A new route file goes into `ROUTE_FILES` (`test/routes.test.tsx` compares
+    it with `app/`). Expo Router typed routes stay off (generated into git-ignored `.expo/types`).
+    Each tab folder has a Stack (`TabStack`, `unstable_settings.anchor = 'index'`; not
+    `initialRouteName`, deprecated); all stacks draw the shared `Header` via
+    `useStackScreenOptions()`. Tabs use `backBehavior: 'firstRoute'` (Android back: stack → first
+    tab → leave app only from the Credentials root).
+  - **Components:** build screens from `src/components` (catalogue in mobile-wallet.md §5); icons
+    only through `Icon` (decorative unless `label`); a credential's status only through
+    `StatusBadge` + `walletStatusFromBackend()` (`src/credentials/status.ts`, the ONE mapping, each
+    state → one of the four status sets with its own icon). Fonts: `AppText` variants are the
+    design type scale (display … caption, mono = system monospace, Diagnostics only).
+    The shared status words and credential type names are COPIED from the issuer portal's
+    `credentials.statuses` / `credentialTypes` (en and si); `test/status.test.tsx` fails if they
+    differ. Never colour-only meaning: icon + text for every state.
+  - **Contrast:** every pairing the design system uses is in `DESIGN_PAIRS` and every component
+    pair in `colorPairs()` (`src/theme/contrast.ts`); both must pass WCAG AA (4.5:1 text, 3:1
+    borders, focus ring, icons, large text) in light AND dark (`test/contrast.test.ts`). Use
+    `toneColors()` / `buttonColors()`, not ad-hoc pairs. In the wallet, text on `brand-soft` is
+    `text-muted` (dark `text-subtle` on brand-soft is 4.04:1).
+  - **Storage rule (Decision 023):** AsyncStorage = UI preferences ONLY (today `univault.language`; every key in
+    `PREFERENCE_KEYS`, `src/lib/preferences.ts`, test-enforced). Keys, credentials, SD-JWTs,
+    claims, tokens, PINs and anything personal go in secure storage (`expo-secure-store`) from
+    the holder-key / vault tasks, never AsyncStorage. The saved language is applied before the
+    first frame (root layout waits for `restoreLanguage()` under the splash screen).
+  - **Dev-only screens and data:** Diagnostics (`diagnosticsEnabled()`), UI kit (`uiKitEnabled()`)
+    and the synthetic sample credentials/history (`sampleDataEnabled()`) are `__DEV__` only. Gate a
+    dev-only screen with an INLINE `!__DEV__ || !gate()` so Metro drops its code from release
+    bundles (a function call alone is not folded); the sample-data module is still bundled (never
+    shown) until the vault replaces it.
   - **Imports are extensionless** in the wallet (Metro/bundler resolution), unlike the NodeNext
     packages' `.js` rule.
   - **All UI strings and accessibility labels through `t()`**; keys in both `en.ts` and `si.ts`
@@ -367,6 +415,41 @@ of `D:/...`. See Sprint 1, Issue 6.
 - **Transactions (PGlite):** inside `db.transaction(async (tx) => …)`, every
   query must use `tx`, never `db`. PGlite has one connection, so a `db` query
   inside a transaction waits forever (Sprint 1, Issue 5).
+
+## Design system
+
+All UI follows docs/design/design-system.md. Colours, fonts, spacing and radius come only from
+portal-ui/src/tokens.ts (CSS variables in the portals, the theme object in the wallet). Never write
+a hex value in a component. Status colours mean valid, expired, revoked and pending only. One
+primary (azure) action per screen. The verifier portal uses the same AppShell with the 'Verifier
+portal' role tag.
+
+Details (Decision 024):
+
+- **Names:** the design-system token names everywhere: CSS `var(--surface-sunken)`, Tailwind
+  `bg-surface-sunken` / `text-text-muted` / `ring-focus-ring`, wallet `colors.surfaceSunken`. Usage
+  tokens instead of ad-hoc picks: `focus-ring-on-brand` (focus inside navy areas) and
+  `accent-text-on-soft` (links on brand-soft). `portal-ui/test/tokens.test.ts` fails on a hex
+  colour in any app's source outside tokens.ts (and theme.css is generated).
+- **Status:** map every status to a status set (valid, expired, revoked, pending) with its own
+  icon and word: issuer portal `src/credentials/status.ts` (`STATUS_PRESENTATION`), wallet
+  `src/credentials/status.ts`. Valid → valid / circle-check; expired → expired / clock; revoked →
+  revoked / ban; pending (Awaiting wallet) → pending / hourglass; superseded (Replaced) → pending /
+  swap; wallet "Not checked yet" → expired / offline; "Checking…" → pending / refresh. Errors,
+  failed verifications and anomalies use the revoked colours. "Valid" (වලංගුයි), never "Active".
+  A status icon never sits directly on navy: always in its badge pill.
+- **Portals:** light only; portal-ui `AppShell` = navy top bar (UniVault + role tag:
+  `header.roleTag = { label, icon }`) and navy 240 px sidebar (active item: brand-hover fill,
+  on-brand label, 3 px on-brand left bar); pages on `bg`, cards and tables on `surface`, table
+  headers `surface-sunken`; `Button` kinds `primary` | `secondary` | `text` | `destructive` |
+  `onBrand` (min 40 px, radius-md; Revoke = destructive + confirmation); badges radius-sm, tags
+  radius-pill; type steps `text-display` … `text-caption` (forms 16 px, dense tables
+  `text-body-sm`); fonts self-hosted via @fontsource. `issuer-portal/test/design-system.test.tsx`
+  checks at most one primary per page.
+- **Wallet:** light + dark from the same names; bg screens, surface tab bar (border top, active
+  tab accent), brand header on the Credentials home only, CredentialCard brand + radius-lg;
+  `Button` kinds as above (min 44 pt); `OfflineNotice` (expired colours); the disclosure panel
+  token set (`componentTokens.disclosurePanel`, brand-soft) is shown in the UI kit for later.
 
 ## Credential lifecycle (important)
 
@@ -575,6 +658,14 @@ documented, unavoidable third-party noise only and is empty). Fix the cause, nev
   calls".
 - A test that expects an error (ErrorBoundary) mocks `console.error` itself. `clearMocks` is on
   (fresh call counts per test).
+- `test/setup.ts` installs the official AsyncStorage mock (cleared before each test) and mocks the
+  Sinhala font and splash screen for the root layout. **Never `jest.spyOn` + restore the
+  AsyncStorage mock's functions:** they are `jest.fn`s and restoring removes their in-memory
+  store (later tests then pass against a dead store). Use `(AsyncStorage.getItem as
+jest.Mock).mockRejectedValueOnce(…)` / `mockImplementationOnce`.
+- RNTL leaves elements hidden from screen readers out of queries: a decorative element is found
+  only with `{ includeHiddenElements: true }` (that absence is itself the accessibility check).
+- With several tab stacks mounted, query the stack header's back button by `stack-header-back`.
 - With parallel workers and piped output Jest hides per-file console output, so the guard (not
   the log) is what keeps the suite silent; `npx jest --runInBand` shows the messages.
 - Run Jest **and Metro / `expo export`** from PowerShell or cmd: under Git Bash, Metro cannot
@@ -689,21 +780,23 @@ secrets or personal data may appear in responses or logs.
   | 020 | Portrait embedded, size-limited (40 KB), selectively disclosable          | Draft – review |
   | 021 | Offer code only in portal memory; QR never re-shown; tx_code deferred     | Draft – review |
   | 022 | Expo Router + Expo Go for S2; development build for push / OS offer links | Draft – review |
+  | 023 | Wallet storage tiers: secure store, encrypted vault, AsyncStorage prefs   | Draft – review |
+  | 024 | One shared "Navy and azure" palette, portals told apart by a role tag     | Draft – review |
 
 - **Evidence screenshots:** `docs/dev-log/evidence/s<sprint>-<YYYY-MM-DD>-<feature>-<what>.png`.
 - **Commits:** include the Jira key, e.g. `SCRUM-XX: <summary>`.
 
 ## Done so far (Sprint 1, and Sprint 2 from 27 Nov)
 
-Test totals (27 Nov 2026, wallet initialised): **crypto-core 158 tests** (6 files; 97.63%
+Test totals (27 Nov 2026, design system applied): **crypto-core 158 tests** (6 files; 97.63%
 statements, 93.89% branches, 100% functions, 99.14% lines), **backend
 571 tests** (23 files in two Vitest projects; 90.74% statements, 88.08% branches, 94.52% functions,
-91.13% lines; thresholds 90 / 86 / 93 / 90), **issuer-portal 396 tests** (17
-files; 97.56% statements, 92.11% branches, 98.01% functions, 98.56% lines;
-thresholds 96 / 91 / 97 / 98) plus **10 Playwright e2e tests**, **portal-ui 80
-tests** (8 files; 100% statements, 98.7% branches, 100% functions, 100% lines;
-thresholds 99 / 94 / 99 / 99), **wallet 68 tests** (8 files, Jest + RNTL; 98.61% statements,
-93.71% branches, 96.96% functions, 100% lines; thresholds 98 / 93 / 96 / 99) and
+91.13% lines; thresholds 90 / 86 / 93 / 90), **issuer-portal 424 tests** (18
+files; 97.56% statements, 92.2% branches, 98.02% functions, 98.57% lines;
+thresholds 96 / 91 / 97 / 98) plus **10 Playwright e2e tests**, **portal-ui 97
+tests** (8 files; 100% statements, 98.73% branches, 100% functions, 100% lines;
+thresholds 99 / 94 / 99 / 99), **wallet 343 tests** (15 files, Jest + RNTL; 99.06% statements,
+95.61% branches, 98.28% functions, 99.79% lines; thresholds 99 / 95 / 98 / 99) and
 **claims-validation 23 tests** (1 file; 98.63%
 statements, 90.47% branches, 100% functions, 98.57% lines; thresholds 98 / 89 / 100 / 98),
 all passing.
@@ -820,5 +913,30 @@ replaces }`.
   `lk.univault.wallet`, scheme `univault`, placeholder icon/splash from the tokens, root ESLint
   for the wallet. portal-ui: `src/tokens.ts` single source, `theme.css` generated (issuer portal
   CSS byte-identical). Backend unchanged (already binds all interfaces).
+- **Wallet navigation and application shell** (27 Nov, Sprint 2, `docs/frontend/mobile-wallet.md`
+  §3, §5–§10): a Stack per tab (credentials list/detail, scan, history list/detail, settings with
+  language, security placeholder, about, diagnostics and UI kit), one typed route table checked
+  against `app/`, shared Header with back, Android back to the first tab then out, not-found;
+  components Header, Button (4 variants, loading/disabled), CredentialCard, StatusBadge,
+  Badge, ListItem, SectionHeader, LoadingState, ErrorState, Toast (queue), ConfirmDialog, Icon;
+  status mapping valid/revoked/superseded/expired → active/revoked/replaced/expired plus
+  notChecked/checking, words copied from the issuer portal with a parity test; light/dark mode
+  (`darkSemanticColors` added to portal-ui tokens, not emitted; theme.css and issuer portal CSS
+  byte-identical) with a WCAG AA contrast test (28 pairs × 2 modes); language saved in
+  AsyncStorage and applied before the first frame; About with the OFL notice; dev-only UI kit
+  stripped from release bundles; synthetic sample data in dev builds. (Its teal palette and
+  `darkSemanticColors` were replaced the same day by the design system, next item.)
+- **Design system "Navy and azure"** (27 Nov, `docs/design/design-system.md`, Decision 024):
+  every token in `portal-ui/src/tokens.ts` with the design names (light + dark, usage tokens
+  `focus-ring-on-brand` and `accent-text-on-soft`, `text-subtle` #5B6B80: three contrast fixes),
+  theme.css as CSS variables + same-name Tailwind utilities, design source files deleted, no hex
+  outside tokens.ts (test); four status sets with an icon and word per status ("Valid" replaces
+  "Active"; Replaced and Checking pending, Not checked yet expired); portals: navy top bar with
+  the role tag prop, navy sidebar with the on-brand active bar, design Button kinds, type scale,
+  self-hosted Noto Sans / Noto Sans Sinhala / JetBrains Mono, one primary per page (empty-state
+  duplicates demoted); wallet: light/dark from the same names, brand home header, navy credential
+  cards, OfflineNotice, disclosure panel tokens in the UI kit, Noto Sans per weight (5 font
+  files); contrast test over every design pairing in both themes. Also Decision 023 (storage
+  tiers) and the portal's "Replaced" wording everywhere.
 - **Planned routes (return `501` until built):** wallet redemption
   (`/credential-offers/token`, `/credential`), verifications.

@@ -48,13 +48,13 @@ export function FormField({
       <Label htmlFor={id}>
         {label}
         {required ? (
-          <span aria-hidden="true" className="ml-0.5 text-destructive">
+          <span aria-hidden="true" className="ml-0.5 text-status-revoked">
             *
           </span>
         ) : null}
       </Label>
       {hint ? (
-        <p id={fieldHintId(id)} className="text-sm text-muted-foreground">
+        <p id={fieldHintId(id)} className="text-body-sm text-text-muted">
           {hint}
         </p>
       ) : null}
@@ -65,7 +65,7 @@ export function FormField({
         'aria-required': required ? true : undefined,
       })}
       {error ? (
-        <p id={fieldErrorId(id)} className="text-sm font-medium text-destructive">
+        <p id={fieldErrorId(id)} className="text-body-sm font-medium text-status-revoked">
           {error}
         </p>
       ) : null}

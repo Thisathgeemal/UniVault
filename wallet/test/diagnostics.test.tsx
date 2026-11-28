@@ -3,7 +3,7 @@
  * crypto-core check on the bundled fixture, and API reachability via GET /health.
  */
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
-import DiagnosticsScreen from '../app/settings/diagnostics';
+import DiagnosticsScreen from '../app/(tabs)/settings/diagnostics';
 import * as appInfo from '../src/config/app-info';
 import * as check from '../src/lib/crypto-check';
 import { en } from '../src/i18n/locales/en';
@@ -28,7 +28,9 @@ describe('Diagnostics screen', () => {
     expect(screen.getByTestId('diag-hermes')).toHaveTextContent(en.diagnostics.off); // Jest = Node
     expect(screen.getByTestId('diag-api-url')).toHaveTextContent('http://192.168.1.20:4000/api/v1');
     expect(screen.queryByTestId('diag-loopback')).toBeNull();
-    expect(screen.getByTestId('crypto-result')).toHaveTextContent(en.diagnostics.notRun);
+    expect(screen.getByTestId('crypto-result').props.accessibilityLabel).toBe(
+      en.diagnostics.notRun,
+    );
   });
 
   it('runs the crypto-core check: 5 of 5 disclosures, pass', async () => {
@@ -36,7 +38,9 @@ describe('Diagnostics screen', () => {
     await renderWithProviders(<DiagnosticsScreen />);
     await user.press(screen.getByRole('button', { name: 'Run the crypto-core check' }));
     await waitFor(() =>
-      expect(screen.getByTestId('crypto-result')).toHaveTextContent(en.diagnostics.pass),
+      expect(screen.getByTestId('crypto-result').props.accessibilityLabel).toBe(
+        en.diagnostics.pass,
+      ),
     );
     expect(screen.getByTestId('crypto-disclosures')).toHaveTextContent(
       '5 of 5 disclosures decoded',
@@ -55,7 +59,7 @@ describe('Diagnostics screen', () => {
     await renderWithProviders(<DiagnosticsScreen />);
     await user.press(screen.getByRole('button', { name: 'Run the crypto-core check' }));
     expect(await screen.findByText('Reason: DISCLOSURE_NOT_IN_SD')).toBeOnTheScreen();
-    expect(screen.getByTestId('crypto-result')).toHaveTextContent(en.diagnostics.fail);
+    expect(screen.getByTestId('crypto-result').props.accessibilityLabel).toBe(en.diagnostics.fail);
   });
 
   it('calls GET /health on the configured URL and shows the server status', async () => {
@@ -66,7 +70,7 @@ describe('Diagnostics screen', () => {
     await renderWithProviders(<DiagnosticsScreen />);
     await user.press(screen.getByRole('button', { name: 'Run the API reachability' }));
     await waitFor(() =>
-      expect(screen.getByTestId('api-result')).toHaveTextContent(en.diagnostics.pass),
+      expect(screen.getByTestId('api-result').props.accessibilityLabel).toBe(en.diagnostics.pass),
     );
     expect(fetchMock).toHaveBeenCalledWith(
       'http://192.168.1.20:4000/api/v1/health',

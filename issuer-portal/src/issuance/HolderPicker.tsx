@@ -44,19 +44,19 @@ export function HolderPicker() {
       ) : !query.data ? (
         <Skeleton className="h-24" />
       ) : query.data.holders.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('issuance.picker.none', { query: q })}</p>
+        <p className="text-body-sm text-text-muted">{t('issuance.picker.none', { query: q })}</p>
       ) : (
-        <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+        <ul className="divide-y divide-border rounded-md border border-border bg-surface">
           {query.data.holders.map((h) => (
             <li key={h.id}>
               <Link
                 to={`/credentials/new?holderId=${encodeURIComponent(h.id)}`}
                 aria-label={t('issuance.picker.choose', { name: h.fullName })}
-                className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
               >
                 <span className="flex flex-col">
                   <span className="font-medium">{h.fullName}</span>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-body-sm text-text-muted">
                     <span className="font-mono">{h.externalRef}</span>
                     {h.idNumberLast4 ? (
                       <span aria-hidden="true" className="ml-2 font-mono">
@@ -65,7 +65,7 @@ export function HolderPicker() {
                     ) : null}
                   </span>
                 </span>
-                <ChevronRight aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight aria-hidden="true" className="h-4 w-4 text-text-muted" />
               </Link>
             </li>
           ))}

@@ -35,6 +35,7 @@ function shell(role: Role = 'admin', activePath = '/people', onLogout = vi.fn())
     <AppShell
       header={{
         appName: 'App',
+        roleTag: { label: 'Example portal', icon: Icon },
         orgName: 'Org One',
         userName: 'Ada Admin',
         roleLabel: 'Administrator',
@@ -60,6 +61,29 @@ describe('Sidebar', () => {
     );
     expect(within(nav).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
     expect(within(nav).getByRole('link', { name: 'Keys' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('styles the active item brand-hover with an on-brand label and 3px on-brand bar (not azure)', () => {
+    render(
+      <Sidebar
+        items={ITEMS}
+        currentRole="admin"
+        activePath="/people"
+        label="Nav"
+        sectionLabel="Section"
+      />,
+    );
+    const active = screen.getByRole('link', { name: 'People' });
+    for (const cls of ['bg-brand-hover', 'text-on-brand', 'border-l-[3px]', 'border-on-brand']) {
+      expect(active.className).toContain(cls);
+    }
+    expect(active.className).not.toMatch(/\bbg-accent\b|text-accent/);
+    const other = screen.getByRole('link', { name: 'Home' });
+    expect(other.className).toContain('border-transparent');
+    expect(other.className).toContain('hover:bg-brand-hover');
+    // focus inside navy uses the on-brand ring (azure on navy is below 3:1)
+    expect(active.className).toContain('focus-visible:ring-focus-ring-on-brand');
+    expect(screen.getByText('Section').className).toContain('text-on-brand-muted');
   });
 
   it('filters items by role: an officer does not see admin items', () => {

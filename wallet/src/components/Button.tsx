@@ -1,60 +1,78 @@
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import { MIN_TOUCH_TARGET } from '../theme';
+import { buttonColors, MIN_TOUCH_TARGET, type ButtonVariant } from '../theme';
 import { useTheme } from '../theme/use-theme';
 import { AppText } from './AppText';
+import { Icon, type IconName } from './Icon';
+
+export type { ButtonVariant };
 
 export interface ButtonProps {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary';
+  /**
+   * primary (azure: the ONE main action on a screen), secondary (every other action), text
+   * (low weight, e.g. "View details"), destructive (revoke, delete), onBrand (on a navy header or
+   * credential card).
+   */
+  variant?: ButtonVariant;
   disabled?: boolean;
-  /** Shows a spinner and blocks presses (e.g. while a check runs). */
-  busy?: boolean;
+  /** Shows a spinner, announces "busy" and blocks presses (e.g. while a check runs). */
+  loading?: boolean;
+  /** Decorative icon before the label (the label carries the meaning). */
+  icon?: IconName;
   /** Spoken instead of the label when the label alone is ambiguous. */
   accessibilityLabel?: string;
   accessibilityHint?: string;
-  testID?: string;
+  testID?: string | undefined;
 }
 
-/** Accessible button: role "button", disabled/busy state announced, at least 44 pt tall. */
+/**
+ * Accessible button in the design system's kinds: role "button", disabled/busy state announced,
+ * at least 44 × 44 pt, radius-md, label type step.
+ */
 export function Button({
   label,
   onPress,
   variant = 'primary',
   disabled = false,
-  busy = false,
+  loading = false,
+  icon,
   accessibilityLabel,
   accessibilityHint,
   testID,
 }: ButtonProps) {
   const theme = useTheme();
-  const inactive = disabled || busy;
-  const primary = variant === 'primary';
-  const foreground = primary ? theme.colors.primaryForeground : theme.colors.primary;
+  const inactive = disabled || loading;
+  const colors = buttonColors(theme.colors, variant);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       {...(accessibilityHint ? { accessibilityHint } : {})}
-      accessibilityState={{ disabled: inactive, busy }}
+      accessibilityState={{ disabled: inactive, busy: loading }}
       disabled={inactive}
       onPress={onPress}
       testID={testID}
       style={({ pressed }) => [
         styles.base,
         {
-          borderRadius: theme.radii.lg,
+          borderRadius: theme.radius.md,
           paddingHorizontal: theme.space(4),
           paddingVertical: theme.space(2),
-          backgroundColor: primary ? theme.colors.primary : theme.colors.surface,
-          borderColor: theme.colors.primary,
+          backgroundColor: colors.bg,
+          borderColor: colors.border,
+          // disabled controls are exempt from WCAG contrast; the state is also announced
           opacity: inactive ? 0.55 : pressed ? 0.8 : 1,
         },
       ]}
     >
-      <View style={styles.row}>
-        {busy ? <ActivityIndicator color={foreground} /> : null}
-        <AppText variant="label" style={{ color: foreground }}>
+      <View style={[styles.row, { gap: theme.space(2) }]}>
+        {loading ? (
+          <ActivityIndicator color={colors.fg} testID={testID ? `${testID}-spinner` : undefined} />
+        ) : icon ? (
+          <Icon name={icon} size={20} color={colors.fg} />
+        ) : null}
+        <AppText variant="label" style={[styles.label, { color: colors.fg }]}>
           {label}
         </AppText>
       </View>
@@ -70,5 +88,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  label: { flexShrink: 1, textAlign: 'center' },
 });

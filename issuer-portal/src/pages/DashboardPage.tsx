@@ -50,6 +50,7 @@ import {
   formatPercent,
   formatRelativeTime,
 } from '../lib/format.js';
+import { STATUS_PRESENTATION } from '../credentials/status.js';
 
 /** Counts are live: refetched after 30 s and whenever the window regains focus. */
 export const DASHBOARD_STALE_TIME_MS = 30_000;
@@ -124,9 +125,9 @@ export function DashboardPage() {
       <div className="flex flex-col gap-1">
         <p className="font-medium">{t('dashboard.loadFailed')}</p>
         <p>{error.message}</p>
-        {error.reference ? <p className="font-mono text-xs">{error.reference}</p> : null}
+        {error.reference ? <p className="font-mono text-caption">{error.reference}</p> : null}
       </div>
-      <Button variant="outline" onClick={retry} disabled={query.isFetching}>
+      <Button variant="secondary" onClick={retry} disabled={query.isFetching}>
         {t('common.tryAgain')}
       </Button>
     </Alert>
@@ -139,7 +140,7 @@ export function DashboardPage() {
         title={summary?.issuer.name ?? user.issuer.name}
         {...(lastUpdated ? { description: t('dashboard.lastUpdated', { time: lastUpdated }) } : {})}
         actions={
-          <Button variant="outline" onClick={retry} disabled={query.isFetching}>
+          <Button variant="secondary" onClick={retry} disabled={query.isFetching}>
             <RefreshCw aria-hidden="true" className={cn('h-4 w-4', refreshing && 'animate-spin')} />
             {refreshing ? t('dashboard.refreshing') : t('dashboard.refresh')}
           </Button>
@@ -190,10 +191,10 @@ function DashboardDetails({ summary }: { summary: DashboardSummary }) {
 
   const segments: StackedBarSegment[] = (
     [
-      ['active', 'brand'],
-      ['revoked', 'destructive'],
-      ['superseded', 'info'],
-      ['expired', 'warning'],
+      ['active', STATUS_PRESENTATION.valid.set],
+      ['revoked', STATUS_PRESENTATION.revoked.set],
+      ['superseded', STATUS_PRESENTATION.superseded.set],
+      ['expired', STATUS_PRESENTATION.expired.set],
     ] as const
   ).map(([key, tone]) => ({
     id: key,
@@ -223,7 +224,7 @@ function DashboardDetails({ summary }: { summary: DashboardSummary }) {
                   className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0"
                 >
                   <p className="font-medium">{activityAction(event, t)}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-body-sm text-text-muted">
                     {credentialTypeLabel(event.credentialType, t)}
                     {' · '}
                     <span title={event.credentialId}>
@@ -232,7 +233,7 @@ function DashboardDetails({ summary }: { summary: DashboardSummary }) {
                     {' · '}
                     {event.staffName ?? t('dashboard.activity.byWallet')}
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-body-sm text-text-muted">
                     <time dateTime={event.at}>
                       {relative ? `${relative} · ${absolute}` : absolute}
                     </time>
@@ -249,7 +250,7 @@ function DashboardDetails({ summary }: { summary: DashboardSummary }) {
           <CardTitle>{t('dashboard.activity.title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">{t('dashboard.activity.empty')}</p>
+          <p className="text-body-sm text-text-muted">{t('dashboard.activity.empty')}</p>
         </CardContent>
       </Card>
     );
@@ -262,7 +263,7 @@ function DashboardDetails({ summary }: { summary: DashboardSummary }) {
           description={t('dashboard.empty.description')}
           icon={<Inbox className="h-10 w-10" />}
           action={
-            <Link to="/holders" className={buttonVariants({ variant: 'default' })}>
+            <Link to="/holders" className={buttonVariants({ variant: 'primary' })}>
               {t('dashboard.empty.action')}
             </Link>
           }
@@ -283,7 +284,7 @@ function DashboardDetails({ summary }: { summary: DashboardSummary }) {
           {counts.issued > 0 ? (
             <StackedBar label={t('dashboard.breakdown.title')} segments={segments} />
           ) : (
-            <p className="text-sm text-muted-foreground">{t('dashboard.breakdown.noneIssued')}</p>
+            <p className="text-body-sm text-text-muted">{t('dashboard.breakdown.noneIssued')}</p>
           )}
         </CardContent>
       </Card>

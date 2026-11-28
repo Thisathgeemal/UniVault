@@ -535,7 +535,7 @@ describe('credential page', () => {
     );
     // Timeline: plain words, staff name, reason, Colombo time
     const timeline = (await screen.findByRole('heading', { name: 'Status history' })).closest(
-      'div.rounded-card, section, div',
+      'div.rounded-md, section, div',
     )!.parentElement!;
     const items = await within(timeline).findAllByRole('listitem');
     expect(items.map((li) => li.querySelector('span')!.textContent)).toEqual([
@@ -589,7 +589,7 @@ describe('credential page', () => {
   it('an expired credential shows the stored status and offers Renew', async () => {
     const id = addPendingCredential(AMAL, 'expired');
     const { user, location } = renderApp(`/credentials/${id}`, { signedInAs: OFFICER });
-    expect(await screen.findByText(/Stored status: Active/)).toBeInTheDocument();
+    expect(await screen.findByText(/Stored status: Valid/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Renew' }));
     expect(location()).toBe(`/credentials/${id}/reissue`);
   });

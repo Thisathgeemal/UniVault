@@ -24,3 +24,13 @@ export function getAppInfo(): AppInfo {
  * Metro removes the code behind it there.
  */
 export const diagnosticsEnabled = (): boolean => __DEV__;
+
+/** The UI Kit screen (every component and state) exists in development builds only. */
+export const uiKitEnabled = (): boolean => __DEV__;
+
+/**
+ * Synthetic sample credentials and history entries (src/fixtures/sample-data.ts) are shown in
+ * development builds only, until the vault holds real ones. A release build never shows
+ * invented credentials.
+ */
+export const sampleDataEnabled = (): boolean => __DEV__;

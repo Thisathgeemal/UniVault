@@ -60,7 +60,7 @@ export function ActionMenu({ label, trigger, items, className }: ActionMenuProps
     <div ref={rootRef} className={cn('relative inline-block text-left', className)}>
       <Button
         ref={buttonRef}
-        variant="outline"
+        variant="secondary"
         size="sm"
         aria-label={label}
         aria-expanded={open}
@@ -87,12 +87,12 @@ export function ActionMenu({ label, trigger, items, className }: ActionMenuProps
                   aria-disabled={item.disabled ? true : undefined}
                   aria-describedby={item.disabled && item.disabledReason ? reasonId : undefined}
                   className={cn(
-                    'flex w-full flex-col items-start rounded px-3 py-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    'flex w-full flex-col items-start rounded px-3 py-2 text-left text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
                     item.disabled
-                      ? 'cursor-not-allowed text-muted-foreground'
+                      ? 'cursor-not-allowed text-text-muted'
                       : item.tone === 'destructive'
-                        ? 'text-destructive hover:bg-destructive-muted'
-                        : 'hover:bg-muted',
+                        ? 'text-status-revoked hover:bg-status-revoked-bg'
+                        : 'hover:bg-surface-sunken',
                   )}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -103,7 +103,7 @@ export function ActionMenu({ label, trigger, items, className }: ActionMenuProps
                 >
                   <span className="font-medium">{item.label}</span>
                   {item.disabled && item.disabledReason ? (
-                    <span id={reasonId} className="text-xs">
+                    <span id={reasonId} className="text-caption">
                       {item.disabledReason}
                     </span>
                   ) : null}

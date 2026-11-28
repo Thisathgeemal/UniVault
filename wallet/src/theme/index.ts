@@ -1,131 +1,127 @@
 /**
- * Wallet theme, built ONLY from the shared design tokens (@univault/portal-ui/tokens). No colour,
- * size or radius value is written here: change a token in portal-ui/src/tokens.ts and both the
- * portals and the wallet follow.
+ * Wallet theme ("Navy and azure", docs/design/design-system.md), built ONLY from the shared
+ * design tokens (@univault/portal-ui/tokens). No colour, size or radius value is written here:
+ * change a token in portal-ui/src/tokens.ts and the portals and the wallet follow.
  *
- * - Lengths: tokens are in rem; React Native uses density-independent points (remToPx, 16/rem).
- * - Dark mode (userInterfaceStyle "automatic"): mapped onto the brand's dark tokens (the
- *   portal sidebar palette), which already meet WCAG AA against their foregrounds.
- * - Dynamic type: font sizes here are the base sizes; React Native's Text scales them with the
- *   user's OS text size (allowFontScaling stays on), so layouts use minHeight, never height.
+ * - Colours: the token sets themselves, same names as the design system (camelCase): light
+ *   and dark follow the phone (userInterfaceStyle "automatic"). Every pair in contrast.ts meets
+ *   WCAG AA in both modes (test/contrast.test.ts).
+ * - Lengths are points (the tokens are px); text keeps scaling with the OS text size, so
+ *   layouts use minHeight, never height.
+ * - Type: the design scale (26 for 16 body) with Noto Sans / Noto Sans Sinhala per weight.
  */
 import {
-  brandColors,
-  radii as radiusTokens,
-  remToPx,
-  semanticColors,
-  sinhalaLineHeight,
-  spacingUnit,
-  typeScale as typeTokens,
+  darkColors,
+  fontFamily,
+  lightColors,
+  minButtonHeight,
+  radius as radiusTokens,
+  statusTokens,
+  typeScale,
+  type StatusSet,
+  type ThemeColors,
+  type TypeStep,
 } from '@univault/portal-ui/tokens';
 
-export interface ThemeColors {
-  background: string;
-  surface: string;
-  foreground: string;
-  muted: string;
-  mutedForeground: string;
-  border: string;
-  primary: string;
-  primaryForeground: string;
-  accent: string;
-  accentForeground: string;
-  destructive: string;
-  destructiveForeground: string;
-  destructiveMuted: string;
-  info: string;
-  infoMuted: string;
-  success: string;
-  successMuted: string;
-  ring: string;
+export { darkColors, lightColors, type StatusSet, type ThemeColors, type TypeStep };
+
+/** Spacing on the 4 pt base: space(4) = 16 (the design's space-1 … space-8). */
+export const space = (steps: number): number => 4 * steps;
+
+export const radius = radiusTokens;
+
+/** Standard screen padding (points): space-4. */
+export const SCREEN_PADDING = space(4);
+
+/** Minimum touch target and button height in the wallet (design system: 44). */
+export const MIN_TOUCH_TARGET = minButtonHeight.wallet;
+
+/** Badge tones: the four status sets, plus neutral for labels that are not a status. */
+export type Tone = StatusSet | 'neutral';
+export const TONES: readonly Tone[] = ['valid', 'expired', 'revoked', 'pending', 'neutral'];
+
+/** Text/icon colour and background of a tone (status sets: their badge colours). */
+export function toneColors(colors: ThemeColors, tone: Tone): { fg: string; bg: string } {
+  if (tone === 'neutral') return { fg: colors.textMuted, bg: colors.surfaceSunken };
+  const names = statusTokens[tone];
+  return { fg: colors[names.text], bg: colors[names.bg] };
 }
 
-export const lightColors: ThemeColors = {
-  background: semanticColors.background,
-  surface: semanticColors.surface,
-  foreground: semanticColors.foreground,
-  muted: semanticColors.muted,
-  mutedForeground: semanticColors.mutedForeground,
-  border: semanticColors.border,
-  primary: semanticColors.primary,
-  primaryForeground: semanticColors.primaryForeground,
-  accent: semanticColors.accent,
-  accentForeground: semanticColors.accentForeground,
-  destructive: semanticColors.destructive,
-  destructiveForeground: semanticColors.destructiveForeground,
-  destructiveMuted: semanticColors.destructiveMuted,
-  info: semanticColors.info,
-  infoMuted: semanticColors.infoMuted,
-  success: brandColors[700],
-  successMuted: brandColors[50],
-  ring: semanticColors.ring,
-};
+export type ButtonVariant = 'primary' | 'secondary' | 'text' | 'destructive' | 'onBrand';
+export const BUTTON_VARIANTS: readonly ButtonVariant[] = [
+  'primary',
+  'secondary',
+  'text',
+  'destructive',
+  'onBrand',
+];
 
-export const darkColors: ThemeColors = {
-  background: semanticColors.sidebar,
-  surface: brandColors[700],
-  foreground: semanticColors.sidebarForeground,
-  muted: brandColors[600],
-  mutedForeground: semanticColors.sidebarMuted,
-  border: brandColors[600],
-  primary: brandColors[100],
-  primaryForeground: brandColors[900],
-  accent: semanticColors.accent,
-  accentForeground: semanticColors.accentForeground,
-  destructive: semanticColors.destructiveMuted,
-  destructiveForeground: semanticColors.destructive,
-  destructiveMuted: semanticColors.destructiveMuted,
-  info: semanticColors.infoMuted,
-  infoMuted: semanticColors.info,
-  success: brandColors[100],
-  successMuted: brandColors[900],
-  ring: brandColors[100],
-};
+/**
+ * Button colours per kind (design system, Buttons). `bg` is what the label sits on: a text
+ * button is transparent on bg or surface (`on: 'screen'`); an on-brand button is the
+ * translucent role-tag-bg on brand (`on: 'brand'`, composited for the contrast test).
+ */
+export function buttonColors(
+  colors: ThemeColors,
+  variant: ButtonVariant,
+): { fg: string; bg: string; border: string; on?: 'screen' | 'brand' } {
+  switch (variant) {
+    case 'primary':
+      return { fg: colors.onAccent, bg: colors.accent, border: colors.accent };
+    case 'secondary':
+      return { fg: colors.text, bg: colors.surface, border: colors.borderStrong };
+    case 'text':
+      return { fg: colors.accentText, bg: 'transparent', border: 'transparent', on: 'screen' };
+    case 'destructive':
+      return { fg: colors.onStatusRevoked, bg: colors.statusRevoked, border: colors.statusRevoked };
+    case 'onBrand':
+      return { fg: colors.onBrand, bg: colors.roleTagBg, border: 'transparent', on: 'brand' };
+  }
+}
 
-/** Spacing in points: space(4) = 4 × 0.25 rem = 16 pt (Tailwind's p-4). */
-export const space = (steps: number): number => remToPx(spacingUnit * steps);
+/** Font weights the wallet uses (the design scale uses 400, 500 and 600). */
+export type Weight = '400' | '500' | '600';
 
-export const radii = {
-  sm: remToPx(radiusTokens.sm),
-  md: remToPx(radiusTokens.md),
-  lg: remToPx(radiusTokens.lg),
-  card: remToPx(radiusTokens.card),
-  full: radiusTokens.full,
-} as const;
+/**
+ * Registered font family for a weight and script (expo-font, app/_layout.tsx). Noto Sans has
+ * 400 / 500 / 600; Noto Sans Sinhala is loaded at 400 and 600 (the design's per-weight names),
+ * so a 500 label uses Sinhala 600.
+ */
+export function fontFor(weight: Weight, script: 'latin' | 'sinhala'): string {
+  if (script === 'sinhala')
+    return weight === '400' ? fontFamily.sinhala : fontFamily.sinhalaSemiBold;
+  if (weight === '500') return fontFamily.sansMedium;
+  if (weight === '600') return fontFamily.sansSemiBold;
+  return fontFamily.sans;
+}
 
-export type TypeStep = keyof typeof typeTokens;
+/** Every font the root layout must load (the names above). */
+export const FONT_NAMES = [
+  fontFamily.sans,
+  fontFamily.sansMedium,
+  fontFamily.sansSemiBold,
+  fontFamily.sinhala,
+  fontFamily.sinhalaSemiBold,
+] as const;
 
-/** Font size and line height (points) for a type step. Sinhala gets the taller line height. */
+/** Font size, line height and family of a type step. Same sizes in both scripts. */
 export function typeStyle(
   step: TypeStep,
   script: 'latin' | 'sinhala' = 'latin',
-): { fontSize: number; lineHeight: number } {
-  const token = typeTokens[step];
-  const fontSize = remToPx(token.size);
-  const lineHeight =
-    script === 'sinhala'
-      ? Math.round(Math.max(remToPx(token.lineHeight), fontSize * sinhalaLineHeight))
-      : remToPx(token.lineHeight);
-  return { fontSize, lineHeight };
+): { fontSize: number; lineHeight: number; fontFamily: string } {
+  const token = typeScale[step];
+  return {
+    fontSize: token.fontSize,
+    lineHeight: token.lineHeight,
+    fontFamily: fontFor(token.fontWeight, script),
+  };
 }
-
-/** Minimum touch target (Apple HIG 44 pt; Android's 48 dp is met by padding where needed). */
-export const MIN_TOUCH_TARGET = 44;
-
-/**
- * Font family names registered by the root layout (expo-font). Latin text uses the system font
- * (undefined); Sinhala uses the bundled Noto Sans Sinhala, one family per weight.
- */
-export const SINHALA_FONTS = {
-  regular: 'NotoSansSinhala_400Regular',
-  bold: 'NotoSansSinhala_700Bold',
-} as const;
 
 export interface Theme {
   scheme: 'light' | 'dark';
   colors: ThemeColors;
   space: typeof space;
-  radii: typeof radii;
+  radius: typeof radius;
 }
 
 export function getTheme(scheme: 'light' | 'dark' | null | undefined): Theme {
@@ -134,6 +130,6 @@ export function getTheme(scheme: 'light' | 'dark' | null | undefined): Theme {
     scheme: resolved,
     colors: resolved === 'dark' ? darkColors : lightColors,
     space,
-    radii,
+    radius,
   };
 }

@@ -27,7 +27,7 @@ export function CopyButton({ value, label, copiedLabel, className }: CopyButtonP
         aria-label={copied ? copiedLabel : label}
         title={label}
         className={cn(
-          'inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'inline-flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-sunken hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
           className,
         )}
         onClick={(event) => {

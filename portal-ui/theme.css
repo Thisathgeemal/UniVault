@@ -1,8 +1,9 @@
 /*
- * UniVault portal design tokens (Tailwind CSS v4 theme variables).
+ * UniVault design tokens for the portals ("Navy and azure", light theme).
  *
  * GENERATED from src/tokens.ts by `npm run build` (scripts/generate-theme-css.mjs): do not edit
  * this file by hand; change the tokens and rebuild. test/tokens.test.ts checks the two match.
+ * Rules: docs/design/design-system.md.
  *
  * Import AFTER Tailwind in the portal's stylesheet, and let Tailwind scan this package:
  *
@@ -12,63 +13,131 @@
  *   @source not '../../portal-ui/src/tokens.ts';
  *   @source not '../../portal-ui/src/theme-css.ts';
  *
- * Every token becomes a CSS variable (e.g. --color-primary) and a utility (bg-primary,
- * text-muted-foreground, w-sidebar, h-header). Components in this package use the semantic
- * names only, so a portal can re-brand by overriding the variables.
+ * Every colour is a CSS variable with its design-system name (var(--brand)) and a Tailwind
+ * utility with the same name (bg-brand, text-text-muted, border-border-strong,
+ * ring-focus-ring). Never write a colour value in a component.
  *
- * Fonts: no font is downloaded from a CDN (the portals' Content-Security-Policy allows
- * font-src 'self' only). Latin text uses the system UI font; Sinhala glyphs fall through to
- * "Noto Sans Sinhala" (self-hosted by the portal, e.g. @fontsource/noto-sans-sinhala) and then
- * to the Sinhala fonts that ship with Windows (Nirmala UI, Iskoola Pota) and Android/macOS.
+ * Fonts: Noto Sans, Noto Sans Sinhala and JetBrains Mono are self-hosted by the portal
+ * (@fontsource packages): the Content-Security-Policy allows font-src 'self' only, no CDN.
  */
-@theme {
-  /* Brand: deep teal (trust) with an amber accent */
-  --color-brand-50: #effaf8;
-  --color-brand-100: #d6f1ec;
-  --color-brand-500: #14857a;
-  --color-brand-600: #0f6e65;
-  --color-brand-700: #0d5952;
-  --color-brand-900: #0a3a36;
-
-  /* Semantic colours (WCAG AA contrast against their foregrounds) */
-  --color-background: #f7f8fa;
-  --color-foreground: #111827;
-  --color-surface: #ffffff;
-  --color-muted: #eef0f3;
-  --color-muted-foreground: #4b5563;
-  --color-border: #d9dde3;
-  --color-ring: #14857a;
-  --color-primary: #0f6e65;
-  --color-primary-foreground: #ffffff;
-  --color-accent: #fdf3e1;
-  --color-accent-foreground: #7a4b05;
-  --color-destructive: #b42318;
-  --color-destructive-foreground: #ffffff;
-  --color-destructive-muted: #fdecea;
-  --color-info: #1d4f91;
-  --color-info-muted: #e8f0fb;
-  --color-sidebar: #0a3a36;
-  --color-sidebar-foreground: #e6f4f1;
-  --color-sidebar-muted: #9cc9c1;
-  --color-sidebar-active: #14857a;
-
-  /* Typography */
-  --font-sans:
-    system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans Sinhala', 'Nirmala UI',
-    'Iskoola Pota', 'Sinhala Sangam MN', sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
-  --text-page-title: 1.5rem;
-  --text-page-title--line-height: 2rem;
-
-  /* Layout spacing */
-  --spacing-sidebar: 16rem;
-  --spacing-header: 4rem;
-  --spacing-page: 1.5rem;
-
-  --radius-card: 0.75rem;
+:root {
+  /* Colours (design-system names) */
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface-sunken: #eef2f7;
+  --border: #e2e8f0;
+  --border-strong: #7c8ba1;
+  --brand: #0b2545;
+  --brand-hover: #133a66;
+  --brand-soft: #e6ecf5;
+  --on-brand: #ffffff;
+  --on-brand-muted: #b9c7dc;
+  --role-tag-bg: rgba(255, 255, 255, 0.12);
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --on-accent: #ffffff;
+  --accent-text: #2563eb;
+  --focus-ring: #2563eb;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #5b6b80;
+  --status-valid: #15803d;
+  --status-valid-bg: #dcfce7;
+  --status-valid-text: #14532d;
+  --status-expired: #b45309;
+  --status-expired-bg: #fef3c7;
+  --status-expired-text: #78350f;
+  --status-revoked: #b91c1c;
+  --status-revoked-bg: #fee2e2;
+  --status-revoked-text: #7f1d1d;
+  --on-status-revoked: #ffffff;
+  --status-pending: #475569;
+  --status-pending-bg: #e2e8f0;
+  --status-pending-text: #1e293b;
+  --focus-ring-on-brand: #ffffff;
+  --accent-text-on-soft: #1d4ed8;
 }
 
-/* Sinhala script needs more line height than Latin to keep vowel signs readable */
-:lang(si) {
-  line-height: 1.7;
+@theme inline {
+  /* Tailwind utilities with the same names: bg-brand, text-text-muted … */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-on-brand: var(--on-brand);
+  --color-on-brand-muted: var(--on-brand-muted);
+  --color-role-tag-bg: var(--role-tag-bg);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-text: var(--accent-text);
+  --color-focus-ring: var(--focus-ring);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-status-valid: var(--status-valid);
+  --color-status-valid-bg: var(--status-valid-bg);
+  --color-status-valid-text: var(--status-valid-text);
+  --color-status-expired: var(--status-expired);
+  --color-status-expired-bg: var(--status-expired-bg);
+  --color-status-expired-text: var(--status-expired-text);
+  --color-status-revoked: var(--status-revoked);
+  --color-status-revoked-bg: var(--status-revoked-bg);
+  --color-status-revoked-text: var(--status-revoked-text);
+  --color-on-status-revoked: var(--on-status-revoked);
+  --color-status-pending: var(--status-pending);
+  --color-status-pending-bg: var(--status-pending-bg);
+  --color-status-pending-text: var(--status-pending-text);
+  --color-focus-ring-on-brand: var(--focus-ring-on-brand);
+  --color-accent-text-on-soft: var(--accent-text-on-soft);
+}
+
+@theme {
+  /* Fonts */
+  --font-sans: 'Noto Sans', 'Noto Sans Sinhala', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Type scale: text-display, text-h1 … text-caption, text-mono */
+  --text-display: 2rem;
+  --text-display--line-height: 2.5rem;
+  --text-display--font-weight: 600;
+  --text-h1: 1.5rem;
+  --text-h1--line-height: 2rem;
+  --text-h1--font-weight: 600;
+  --text-h2: 1.25rem;
+  --text-h2--line-height: 1.75rem;
+  --text-h2--font-weight: 600;
+  --text-h3: 1rem;
+  --text-h3--line-height: 1.5rem;
+  --text-h3--font-weight: 600;
+  --text-body: 1rem;
+  --text-body--line-height: 1.625rem;
+  --text-body--font-weight: 400;
+  --text-body-sm: 0.875rem;
+  --text-body-sm--line-height: 1.375rem;
+  --text-body-sm--font-weight: 400;
+  --text-label: 0.875rem;
+  --text-label--line-height: 1.25rem;
+  --text-label--font-weight: 500;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.125rem;
+  --text-caption--font-weight: 400;
+  --text-mono: 0.8125rem;
+  --text-mono--line-height: 1.25rem;
+  --text-mono--font-weight: 400;
+
+  /* Radius: rounded-sm (inputs, badges), -md (buttons, cards), -lg, -pill (tags) */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-pill: 999px;
+
+  /* Layout: w-sidebar, h-header, p-page */
+  --spacing-sidebar: 15rem;
+  --spacing-header: 4rem;
+  --spacing-page: 1.5rem;
 }

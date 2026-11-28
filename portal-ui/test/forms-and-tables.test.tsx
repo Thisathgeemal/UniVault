@@ -15,6 +15,7 @@ import {
   Pagination,
   SearchInput,
   Select,
+  STATUS_SET_CLASSES,
   StatusBadge,
   ToastProvider,
   Tooltip,
@@ -291,9 +292,27 @@ describe('ErrorSummary', () => {
 });
 
 describe('StatusBadge', () => {
-  it.each(['success', 'warning', 'danger', 'info', 'neutral'] as const)('tone %s', (tone) => {
-    render(<StatusBadge tone={tone}>Active</StatusBadge>);
-    expect(screen.getByText('Active')).toHaveAttribute('data-tone', tone);
+  function StatusIcon(props: { className?: string }) {
+    return <svg data-testid="status-icon" {...props} />;
+  }
+  it.each([
+    ['valid', 'bg-status-valid-bg', 'text-status-valid-text'],
+    ['expired', 'bg-status-expired-bg', 'text-status-expired-text'],
+    ['revoked', 'bg-status-revoked-bg', 'text-status-revoked-text'],
+    ['pending', 'bg-status-pending-bg', 'text-status-pending-text'],
+  ] as const)('%s set: its badge colours, icon and word together', (status, bg, text) => {
+    render(
+      <StatusBadge status={status} icon={StatusIcon}>
+        Word
+      </StatusBadge>,
+    );
+    const badge = screen.getByText('Word');
+    expect(badge).toHaveAttribute('data-status', status);
+    expect(badge.className).toContain(bg);
+    expect(badge.className).toContain(text);
+    expect(badge.className).toContain('rounded-sm');
+    expect(within(badge).getByTestId('status-icon')).toHaveAttribute('aria-hidden', 'true');
+    expect(STATUS_SET_CLASSES[status]).toBe(`${bg} ${text}`);
   });
 });
 
@@ -410,7 +429,7 @@ describe('ConfirmDialog', () => {
         onCancel={() => undefined}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Yes' }).className).toContain('bg-primary');
+    expect(screen.getByRole('button', { name: 'Yes' }).className).toContain('bg-accent');
     // Tab from the middle of nothing special: focus stays inside the dialog
     fireEvent.keyDown(document, { key: 'Tab' });
     expect(screen.getByRole('button', { name: 'No' })).toHaveFocus();

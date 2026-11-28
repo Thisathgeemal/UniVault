@@ -76,7 +76,7 @@ export function Dialog({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-text/40 p-4">
       <div
         ref={dialogRef}
         role="dialog"
@@ -84,16 +84,16 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         className={cn(
-          'flex max-h-full w-full max-w-lg flex-col gap-4 overflow-auto rounded-card border border-border bg-surface p-6 shadow-lg',
+          'flex max-h-full w-full max-w-lg flex-col gap-4 overflow-auto rounded-md border border-border bg-surface p-6 shadow-lg',
           className,
         )}
       >
         <div>
-          <h2 id={titleId} className="text-lg font-semibold">
+          <h2 id={titleId} className="text-h2">
             {title}
           </h2>
           {description ? (
-            <p id={descriptionId} className="mt-1 text-sm text-muted-foreground">
+            <p id={descriptionId} className="mt-1 text-body-sm text-text-muted">
               {description}
             </p>
           ) : null}

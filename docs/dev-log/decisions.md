@@ -12,30 +12,32 @@ confirmation) and `Draft – review` (written by the developer, not yet reviewed
 
 ## Decision index
 
-| #                                                                                                                                                       | Decision                                                                                                                             | Date            | Sprint                   | Status         | Related requirements                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------- | ------------------------ | -------------- | ------------------------------------------------------------- |
-| [001](#decision-001-typescript-for-all-javascript-components)                                                                                           | TypeScript for all JavaScript components                                                                                             | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
-| [002](#decision-002-root-level-eslint-9-and-prettier-ruff-for-ai-service)                                                                               | Root-level ESLint 9 and Prettier; Ruff for ai-service                                                                                | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
-| [003](#decision-003-sd-jwt-vc-flat-claim-layout-instead-of-json-ld)                                                                                     | SD-JWT VC flat claim layout (W3C VC model); subject claims selectively disclosable                                                   | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-02, FR-VER-01, FR-VER-03, FR-BAK-01, NFR-01 |
-| [004](#decision-004-data-minimisation-in-credential-schemas)                                                                                            | Data minimisation in the credential schemas                                                                                          | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-VER-03, NFR-08                                  |
-| [005](#decision-005-derived-age_over_18-claim-and-under-18-handling)                                                                                    | Derived `age_over_18` claim and under-18 handling                                                                                    | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-03, FR-VER-03, NFR-08                       |
-| [006](#decision-006-sd-jwt-library-selection-sd-jwtcore)                                                                                                | SD-JWT library: `@sd-jwt/core` pinned to 0.25.0                                                                                      | Thu 19 Nov 2026 | S1                       | Accepted       | FR-ISS-02, FR-VER-02, FR-WAL-06, NFR-01                       |
-| [007](#decision-007-es256-for-holder-key-binding)                                                                                                       | ES256 for holder key binding; issuer signatures stay RS256                                                                           | Thu 19 Nov 2026 | S1                       | Proposed       | NFR-01, FR-WAL-06, FR-VER-02                                  |
-| [008](#decision-008-postgresql-with-embedded-pglite-for-development-and-hand-written-migrations)                                                        | PostgreSQL, with embedded PGlite for development and hand-written migrations                                                         | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08 |
-| [009](#decision-009-issuer-staff-authentication-jwt-database-re-check-and-lockout)                                                                      | Issuer staff authentication (JWT, database re-check and lockout)                                                                     | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
-| [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)                                                                    | Credential signing deferred to wallet redemption (holder binding)                                                                    | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
-| [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                                                                        | OpenID4VCI pre-authorised code offer format                                                                                          | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
-| [012](#decision-012-reissue-supersedes-immediately-status-changes-recorded-as-append-only-events)                                                       | Reissue supersedes immediately; status changes recorded as append-only events                                                        | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-03, FR-BAK-01, NFR-06, NFR-08                          |
-| [013](#decision-013-per-credential-status-endpoint-ietf-token-status-list-as-future-work)                                                               | Per-credential status endpoint; IETF Token Status List as future work                                                                | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06, NFR-08    |
-| [014](#decision-014-encrypted-key-file-or-encrypted-env-bundle-decrypted-once-in-a-central-key-store-kmshsm-as-future-work)                             | Encrypted key file or encrypted env bundle, decrypted once in a central key store; KMS/HSM as future work                            | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-01, FR-ISS-02, NFR-08                                     |
-| [015](#decision-015-frontend-stack-react--vite--ts-react-router-tanstack-query-tailwind--shadcnui-react-i18next-shared-portal-ui-package)               | Frontend stack: React + Vite + TS, React Router, TanStack Query, Tailwind + shadcn/ui, react-i18next, shared portal-ui package       | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
-| [016](#decision-016-staff-token-in-memory--sessionstorage-never-localstorage-httponly-cookie-as-future-work)                                            | Staff token in memory + sessionStorage, never localStorage; httpOnly cookie as future work                                           | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
-| [017](#decision-017-dashboard-demo-data-via-the-real-services-marked-by-an-inactive-staff-account-reset-lifts-the-append-only-guard-in-one-transaction) | Dashboard demo data via the real services, marked by an inactive staff account; reset lifts the append-only guard in one transaction | Wed 25 Nov 2026 | S2                       | Draft – review | FR-ISS-01, FR-ISS-03, NFR-08                                  |
-| [018](#decision-018-one-shared-claims-validation-package-the-portal-precompiles-the-schemas-at-build-time)                                              | One shared claims-validation package; the portal precompiles the schemas at build time                                               | Thu 26 Nov 2026 | S2                       | Draft – review | FR-ISS-01, NFR-02, NFR-05, NFR-08                             |
-| [019](#decision-019-issuance-form-is-read-only-and-previewed-server-side)                                                                               | Issuance form is read-only and previewed server-side; schema limited by issuer type                                                  | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-01, FR-ISS-02, FR-WAL-06                               |
-| [020](#decision-020-portrait-embedded-in-the-credential-size-limited-and-selectively-disclosable)                                                       | Portrait embedded in the credential, size-limited (40 KB) and selectively disclosable                                                | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-03, NFR-06, NFR-08, FR-WAL-06                             |
-| [021](#decision-021-pre-authorised-code-kept-only-in-portal-memory-qr-never-re-shown)                                                                   | Pre-authorised code kept only in portal memory; QR never re-shown; tx_code deferred                                                  | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
-| [022](#decision-022-expo-router--expo-go-for-sprint-2-development-build-when-push-notifications-or-os-level-offer-links-are-needed)                     | Expo Router + Expo Go for Sprint 2; development build when push notifications or OS-level offer links are needed                     | Fri 27 Nov 2026 | S2                       | Draft – review | NFR-05, NFR-06                                                |
+| #                                                                                                                                                                   | Decision                                                                                                                                          | Date            | Sprint                   | Status         | Related requirements                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------------------------ | -------------- | ------------------------------------------------------------- |
+| [001](#decision-001-typescript-for-all-javascript-components)                                                                                                       | TypeScript for all JavaScript components                                                                                                          | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
+| [002](#decision-002-root-level-eslint-9-and-prettier-ruff-for-ai-service)                                                                                           | Root-level ESLint 9 and Prettier; Ruff for ai-service                                                                                             | Mon 16 Nov 2026 | S1                       | Accepted       | None (development tooling)                                    |
+| [003](#decision-003-sd-jwt-vc-flat-claim-layout-instead-of-json-ld)                                                                                                 | SD-JWT VC flat claim layout (W3C VC model); subject claims selectively disclosable                                                                | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-02, FR-VER-01, FR-VER-03, FR-BAK-01, NFR-01 |
+| [004](#decision-004-data-minimisation-in-credential-schemas)                                                                                                        | Data minimisation in the credential schemas                                                                                                       | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-VER-03, NFR-08                                  |
+| [005](#decision-005-derived-age_over_18-claim-and-under-18-handling)                                                                                                | Derived `age_over_18` claim and under-18 handling                                                                                                 | Tue 17 Nov 2026 | S1                       | Accepted       | FR-ISS-01, FR-ISS-03, FR-VER-03, NFR-08                       |
+| [006](#decision-006-sd-jwt-library-selection-sd-jwtcore)                                                                                                            | SD-JWT library: `@sd-jwt/core` pinned to 0.25.0                                                                                                   | Thu 19 Nov 2026 | S1                       | Accepted       | FR-ISS-02, FR-VER-02, FR-WAL-06, NFR-01                       |
+| [007](#decision-007-es256-for-holder-key-binding)                                                                                                                   | ES256 for holder key binding; issuer signatures stay RS256                                                                                        | Thu 19 Nov 2026 | S1                       | Proposed       | NFR-01, FR-WAL-06, FR-VER-02                                  |
+| [008](#decision-008-postgresql-with-embedded-pglite-for-development-and-hand-written-migrations)                                                                    | PostgreSQL, with embedded PGlite for development and hand-written migrations                                                                      | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, FR-ISS-03, FR-WAL-05, FR-BAK-01, NFR-08 |
+| [009](#decision-009-issuer-staff-authentication-jwt-database-re-check-and-lockout)                                                                                  | Issuer staff authentication (JWT, database re-check and lockout)                                                                                  | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
+| [010](#decision-010-credential-signing-deferred-to-wallet-redemption-holder-binding)                                                                                | Credential signing deferred to wallet redemption (holder binding)                                                                                 | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, FR-ISS-02, NFR-01, NFR-06, NFR-08                  |
+| [011](#decision-011-openid4vci-pre-authorised-code-offer-format)                                                                                                    | OpenID4VCI pre-authorised code offer format                                                                                                       | Fri 20 Nov 2026 | S1                       | Draft – review | FR-ISS-01, NFR-01, NFR-06, NFR-08                             |
+| [012](#decision-012-reissue-supersedes-immediately-status-changes-recorded-as-append-only-events)                                                                   | Reissue supersedes immediately; status changes recorded as append-only events                                                                     | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-03, FR-BAK-01, NFR-06, NFR-08                          |
+| [013](#decision-013-per-credential-status-endpoint-ietf-token-status-list-as-future-work)                                                                           | Per-credential status endpoint; IETF Token Status List as future work                                                                             | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-VER-02, FR-WAL-05, FR-ISS-03, FR-BAK-01, NFR-06, NFR-08    |
+| [014](#decision-014-encrypted-key-file-or-encrypted-env-bundle-decrypted-once-in-a-central-key-store-kmshsm-as-future-work)                                         | Encrypted key file or encrypted env bundle, decrypted once in a central key store; KMS/HSM as future work                                         | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-01, FR-ISS-02, NFR-08                                     |
+| [015](#decision-015-frontend-stack-react--vite--ts-react-router-tanstack-query-tailwind--shadcnui-react-i18next-shared-portal-ui-package)                           | Frontend stack: React + Vite + TS, React Router, TanStack Query, Tailwind + shadcn/ui, react-i18next, shared portal-ui package                    | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
+| [016](#decision-016-staff-token-in-memory--sessionstorage-never-localstorage-httponly-cookie-as-future-work)                                                        | Staff token in memory + sessionStorage, never localStorage; httpOnly cookie as future work                                                        | Tue 24 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-02, NFR-04, NFR-05, NFR-08, FR-ISS-01                     |
+| [017](#decision-017-dashboard-demo-data-via-the-real-services-marked-by-an-inactive-staff-account-reset-lifts-the-append-only-guard-in-one-transaction)             | Dashboard demo data via the real services, marked by an inactive staff account; reset lifts the append-only guard in one transaction              | Wed 25 Nov 2026 | S2                       | Draft – review | FR-ISS-01, FR-ISS-03, NFR-08                                  |
+| [018](#decision-018-one-shared-claims-validation-package-the-portal-precompiles-the-schemas-at-build-time)                                                          | One shared claims-validation package; the portal precompiles the schemas at build time                                                            | Thu 26 Nov 2026 | S2                       | Draft – review | FR-ISS-01, NFR-02, NFR-05, NFR-08                             |
+| [019](#decision-019-issuance-form-is-read-only-and-previewed-server-side)                                                                                           | Issuance form is read-only and previewed server-side; schema limited by issuer type                                                               | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-01, FR-ISS-02, FR-WAL-06                               |
+| [020](#decision-020-portrait-embedded-in-the-credential-size-limited-and-selectively-disclosable)                                                                   | Portrait embedded in the credential, size-limited (40 KB) and selectively disclosable                                                             | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | NFR-03, NFR-06, NFR-08, FR-WAL-06                             |
+| [021](#decision-021-pre-authorised-code-kept-only-in-portal-memory-qr-never-re-shown)                                                                               | Pre-authorised code kept only in portal memory; QR never re-shown; tx_code deferred                                                               | Thu 26 Nov 2026 | S2 (Sprint 1 carry-over) | Draft – review | FR-ISS-01, NFR-06, NFR-08                                     |
+| [022](#decision-022-expo-router--expo-go-for-sprint-2-development-build-when-push-notifications-or-os-level-offer-links-are-needed)                                 | Expo Router + Expo Go for Sprint 2; development build when push notifications or OS-level offer links are needed                                  | Fri 27 Nov 2026 | S2                       | Draft – review | NFR-05, NFR-06                                                |
+| [023](#decision-023-wallet-storage-tiers-secure-store-for-keys-and-credential-secrets-encrypted-vault-for-credentials-asyncstorage-only-for-non-secret-preferences) | Wallet storage tiers: secure store for keys and credential secrets, encrypted vault for credentials, AsyncStorage only for non-secret preferences | Fri 27 Nov 2026 | S2                       | Draft – review | FR-WAL-03, NFR-08                                             |
+| [024](#decision-024-one-shared-navy-and-azure-palette-for-all-three-apps-portals-distinguished-by-a-role-tag)                                                       | One shared 'Navy and azure' palette for all three apps, portals distinguished by a role tag                                                       | Fri 27 Nov 2026 | S2                       | Draft – review | NFR-05, NFR-04                                                |
 
 ## Decision 001: TypeScript for all JavaScript components
 
@@ -2028,5 +2030,164 @@ and iOS bundle id), scheme `univault`.
   `EXPO_PUBLIC_API_BASE_URL`, Windows Firewall rules for 4000 and 8081; the backend already
   listens on all interfaces. Once offers are redeemed from the phone, `PUBLIC_BASE_URL` must use
   the same address.
+- **Typed, stable route names without Expo Router's typed routes** (added 27 Nov 2026, app
+  shell; accepted in review): `experiments.typedRoutes` stays off, because its types are
+  generated into the git-ignored `.expo/types` by `expo start`, so a fresh clone (CI,
+  `npm run typecheck`) would check against different types than a developer machine. Instead
+  every path comes from ONE route table, `wallet/src/navigation/routes.ts` (`ROUTES`,
+  `ROUTE_FILES`), and `wallet/test/routes.test.tsx` fails if it and the files in `app/` differ
+  in either direction, and renders every route. Screens never write a path string.
 - **Backlog:** EAS account and development build (`expo-dev-client`) when the first trigger
-  feature is scheduled; persisted language choice with the wallet storage.
+  feature is scheduled. (The persisted language choice was done on 27 Nov 2026 under Decision
+  023.)
+
+## Decision 023: Wallet storage tiers: secure store for keys and credential secrets, encrypted vault for credentials, AsyncStorage only for non-secret preferences
+
+- **Date:** Fri 27 Nov 2026
+- **Sprint:** S2
+- **Status:** Draft – review
+- **Requirements:** FR-WAL-03, NFR-08
+- **Related:** Decision 007 (ES256 holder keys), Decision 016 (portal staff token never in
+  localStorage), Decision 020 (portrait inside the credential), Decision 022 (Expo Go modules
+  only in Sprint 2), [mobile-wallet.md](../frontend/mobile-wallet.md) §9
+- **Evidence:** `wallet/src/lib/preferences.ts` (`PREFERENCE_KEYS`),
+  `wallet/test/preferences.test.tsx` (only listed keys are ever written; language applied before
+  the first frame)
+
+### Context
+
+The wallet keeps three kinds of data on the phone, with very different sensitivity: the
+holder's **private key** (ES256, binds every credential to this phone; whoever has it can
+present the holder's credentials), the **credentials** themselves (signed SD-JWTs with all
+disclosures: names, NIC numbers, dates of birth, a portrait of up to 40 KB), and **UI
+preferences** (today only the language). The app shell (27 Nov 2026) needed somewhere to save
+the language before the vault exists, and it was important to fix where each kind of data goes
+before the first secret is written, so nothing sensitive lands in the convenient store by habit.
+Sri Lanka's PDPA (NFR-08) applies to the personal data in the credentials.
+
+### Options considered
+
+1. **Everything in AsyncStorage:** simplest, but AsyncStorage is unencrypted. It is readable from
+   device backups and on rooted or jailbroken phones, so keys and personal data would be exposed.
+2. **Everything in the secure store** (`expo-secure-store`: iOS Keychain, Android Keystore):
+   strong protection, but meant for small secrets, with no listing or querying. Expo's
+   SecureStore documentation has warned that values larger than about 2048 bytes may fail on
+   some platforms; credentials are far larger than that (an embedded portrait alone can be up to
+   40 KB – Decision 020), so they go in the encrypted vault and only the vault key lives in the
+   secure store. Source: Expo SecureStore documentation,
+   <https://docs.expo.dev/versions/latest/sdk/securestore/>.
+3. **An encrypted database with a native cipher** (for example SQLCipher): good for many records,
+   but it needs a native module, so it cannot run in Expo Go (Decision 022) in Sprint 2.
+4. **Three tiers by sensitivity (chosen).**
+
+### Decision
+
+**Option 4.** Each kind of data has exactly one place:
+
+| Tier                                   | Holds                                                                                                                                            | Never holds                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| **Secure store** (`expo-secure-store`) | The holder's private key(s) and the vault's data-encryption key: small secrets, protected by the OS keystore                                     | Anything large or listable                                          |
+| **Encrypted vault**                    | Credentials (SD-JWTs and their disclosures) and on-device history, encrypted with the data key from the secure store; designed in the vault task | Unencrypted credential data                                         |
+| **AsyncStorage**                       | Non-secret UI preferences only, every key listed in `PREFERENCE_KEYS` (today `univault.language`)                                                | Keys, credentials, SD-JWTs, claims, tokens, PINs, anything personal |
+
+### Reason
+
+- **Least exposure (NFR-08):** the most sensitive item (the private key) gets the strongest
+  protection the phone offers; personal data is never stored in clear; the one unencrypted
+  store holds nothing that identifies the holder.
+- **Fits the platform limits:** small secrets in the keystore, large records encrypted under a
+  key kept in it: the usual "envelope" pattern, and it works in Expo Go.
+- **Holder control (FR-WAL-03):** credentials stay on the phone, under the holder's lock (the
+  Security screen will add the wallet lock and biometric unlock).
+- **Same rule as the portals:** Decision 016 keeps secrets out of localStorage; the wallet keeps
+  them out of AsyncStorage.
+
+### Consequences
+
+- `wallet/src/lib/preferences.ts` is the only code that writes AsyncStorage; a new preference
+  must be added to `PREFERENCE_KEYS` and must not be secret or personal. A test fails if any
+  other key is written. CLAUDE.md records the rule.
+- The holder-key task uses `expo-secure-store` (Expo Go compatible), and the vault task
+  designs the encryption (cipher, key generation and rotation, where the encrypted records
+  live) and records it, extending this decision.
+- Losing or resetting the phone loses the key and so the credentials (they are bound to it):
+  re-issuance by the issuer is the recovery path. Backup and restore is future work.
+- The saved language is applied before the first frame (the root layout waits for
+  `restoreLanguage()` under the splash screen); a failing read falls back to the phone's
+  language.
+
+## Decision 024: One shared 'Navy and azure' palette for all three apps, portals distinguished by a role tag
+
+- **Date:** Fri 27 Nov 2026
+- **Sprint:** S2
+- **Status:** Draft – review
+- **Requirements:** NFR-05, NFR-04
+- **Related:** Decision 015 (shared portal-ui package), Decision 022 (wallet tokens from
+  portal-ui), Decision 023 (wallet storage), [design-system.md](../design/design-system.md),
+  [issuer-portal.md](../frontend/issuer-portal.md), [mobile-wallet.md](../frontend/mobile-wallet.md)
+- **Evidence:** `portal-ui/src/tokens.ts` (single source), `portal-ui/test/tokens.test.ts`
+  (theme.css matches the tokens; no hex colour outside tokens.ts), `wallet/test/contrast.test.ts`
+  (WCAG AA in both themes), `issuer-portal/test/design-system.test.tsx` and
+  `wallet/test/design-system.test.tsx` (status mapping, role tag, one primary per screen)
+
+### Context
+
+UniVault has three apps used by three different groups: the issuer portal (employer or bank
+staff), the verifier portal (organisations checking credentials, Sprint 3) and the holder
+wallet (citizens). Until 27 Nov 2026 the portals and wallet used a deep-teal palette with
+generic success / warning / danger tones. The final design system (`docs/design/design-system.md`)
+needed one decision first: whether the apps share one look or each gets its own colour.
+
+### Options considered
+
+1. **One palette for all three apps, portals told apart by a role tag (chosen).** Navy frame,
+   neutral ground, one azure action per screen; the two portals differ only by a pill in the top
+   bar ("Issuer portal" with a certificate icon, "Verifier portal" with a shield-check icon).
+2. **A colour per app** (for example a green issuer portal and an orange verifier portal on the
+   same layout): each portal recognisable at a glance, but the brand colours would compete with
+   the status colours, and people would have to learn several schemes.
+
+### Decision
+
+**Option 1.** All three apps use the "Navy and azure" palette from `portal-ui/src/tokens.ts`
+(light for the portals; light and dark, following the phone, for the wallet), the same token
+names, type scale (Noto Sans and Noto Sans Sinhala), spacing and radii. The portals share
+portal-ui's `AppShell`; the role tag (label and icon) is an AppShell prop, so the verifier
+portal passes "Verifier portal" + shield-check and inherits everything else.
+
+### Reason
+
+From design-system.md, "Why one palette, with role tags":
+
+1. **Consistency (NFR-05).** People learn one set of colours and patterns. A user who meets the
+   verifier portal after the wallet knows where to look.
+2. **No colour clashes.** Giving the issuer a green or the verifier an orange would collide with
+   the status colours: a green portal would make every page look "valid". Status colours keep one
+   meaning each (valid, expired, revoked, pending).
+3. **The portals rarely meet.** An issuer staff member and a verifier staff member each work in
+   one portal. The tag, the icon and the page title make it clear which one is open; colour is
+   not needed for that.
+
+Accessibility (NFR-04) is easier to guarantee with one palette: one list of colour pairs is
+checked for WCAG AA in both themes, instead of one list per app.
+
+### Consequences
+
+- **Single source:** every colour, font, size, spacing and radius value lives in
+  `portal-ui/src/tokens.ts`; `theme.css` is generated from it (CSS variables named like the design
+  system, `var(--brand)`, and Tailwind utilities with the same names); the wallet imports the same
+  module. A test fails on any hex colour outside tokens.ts and theme.css. The design source files
+  (`docs/design/source/`) were deleted once their values were in tokens.ts.
+- **Contrast fixes:** three light-theme pairings of the first palette were below AA; fixed with
+  two usage tokens (`focus-ring-on-brand`, `accent-text-on-soft`) and a darker `text-subtle`
+  (design-system.md, Accessibility, with before and after ratios). In dark, `text-subtle` on
+  `brand-soft` is 4.04:1, so the wallet uses `text-muted` on brand-soft panels.
+- **Status mapping:** every status maps to one of the four status sets with its own icon and word;
+  "Valid" (වලංගුයි) replaces "Active" in the portal and the wallet; superseded / replaced and the
+  wallet's "Checking…" use the pending colours, the wallet's "Not checked yet" the expired colours.
+- **One primary action per screen** (azure); tested where possible. The issuer portal's empty
+  states repeated the header's primary link and were demoted to secondary.
+- **Portal CSS changes with the tokens**: the old "issuer portal CSS byte-identical" check is
+  replaced by the test that `theme.css` equals what `tokens.ts` generates.
+- **Fonts self-hosted** in the portals (Noto Sans, Noto Sans Sinhala, JetBrains Mono through
+  @fontsource; the CSP forbids CDNs); the wallet bundles only the five weights it uses.

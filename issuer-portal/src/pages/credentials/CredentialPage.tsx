@@ -62,7 +62,7 @@ export function CredentialPage() {
           title={t('issuance.result.notFound.title')}
           message={t('issuance.result.notFound.message')}
           action={
-            <Link to="/credentials" className={buttonVariants({ variant: 'outline' })}>
+            <Link to="/credentials" className={buttonVariants({ variant: 'secondary' })}>
               {t('issuance.credentialsPage.title')}
             </Link>
           }
@@ -74,7 +74,7 @@ export function CredentialPage() {
       <Alert variant="destructive" role="alert" className="flex flex-col items-start gap-2">
         <p className="font-medium">{t('issuance.result.loadFailed')}</p>
         <p>{message.message}</p>
-        <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+        <Button variant="secondary" size="sm" onClick={() => void query.refetch()}>
           {t('common.tryAgain')}
         </Button>
       </Alert>
@@ -97,7 +97,7 @@ export function CredentialPage() {
         {items.map((item) => (
           <span key={item.id} className="flex flex-col">
             <Button
-              variant={item.tone === 'destructive' ? 'destructive' : 'outline'}
+              variant={item.tone === 'destructive' ? 'destructive' : 'secondary'}
               onClick={item.disabled ? undefined : item.onSelect}
               aria-disabled={item.disabled ? true : undefined}
               aria-describedby={item.disabled ? `action-${item.id}-reason` : undefined}
@@ -106,7 +106,7 @@ export function CredentialPage() {
               {item.label}
             </Button>
             {item.disabled && item.disabledReason ? (
-              <span id={`action-${item.id}-reason`} className="mt-1 text-xs text-muted-foreground">
+              <span id={`action-${item.id}-reason`} className="mt-1 text-caption text-text-muted">
                 {item.disabledReason}
               </span>
             ) : null}
@@ -138,7 +138,7 @@ export function CredentialPage() {
               <Fact label={t('issuance.result.status')}>
                 <CredentialStatusBadge status={credential.effectiveStatus} />
                 {credential.status !== credential.effectiveStatus ? (
-                  <span className="ml-2 text-sm text-muted-foreground">
+                  <span className="ml-2 text-body-sm text-text-muted">
                     {t('credentials.detail.storedStatus')}:{' '}
                     {t(`credentials.statuses.${credential.status}`)}
                   </span>
@@ -146,7 +146,7 @@ export function CredentialPage() {
               </Fact>
               <Fact label={t('issuance.result.id')}>
                 <span className="inline-flex items-center gap-1">
-                  <span className="font-mono text-sm break-all">{credential.id}</span>
+                  <span className="font-mono text-body-sm break-all">{credential.id}</span>
                   <CopyButton
                     value={credential.id}
                     label={t('credentials.list.copyId', { id: credential.id.slice(0, 8) })}
@@ -160,18 +160,18 @@ export function CredentialPage() {
               <Fact label={t('issuance.result.holder')}>
                 <Link
                   to={`/holders/${credential.holder.id}`}
-                  className="text-primary underline-offset-2 hover:underline"
+                  className="text-accent-text underline-offset-2 hover:underline"
                 >
                   {credential.holder.fullName}
                 </Link>{' '}
-                <span className="font-mono text-sm text-muted-foreground">
+                <span className="font-mono text-body-sm text-text-muted">
                   {credential.holder.externalRef}
                 </span>
               </Fact>
               <Fact label={t('credentials.detail.created')}>
                 <time dateTime={credential.createdAt}>{date(credential.createdAt)}</time>
                 {credential.createdBy ? (
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-body-sm text-text-muted">
                     {' '}
                     {t('credentials.detail.by', { name: credential.createdBy.displayName })}
                   </span>
@@ -181,7 +181,7 @@ export function CredentialPage() {
                 {credential.issuedAt ? (
                   <time dateTime={credential.issuedAt}>{date(credential.issuedAt)}</time>
                 ) : (
-                  <span className="text-muted-foreground">{t('credentials.detail.notIssued')}</span>
+                  <span className="text-text-muted">{t('credentials.detail.notIssued')}</span>
                 )}
               </Fact>
               <Fact label={t('issuance.result.expiresAt')}>
@@ -221,11 +221,11 @@ export function CredentialPage() {
       <div className="mt-6 flex flex-wrap gap-3">
         <Link
           to={`/holders/${credential.holder.id}`}
-          className={buttonVariants({ variant: 'outline' })}
+          className={buttonVariants({ variant: 'secondary' })}
         >
           {t('issuance.result.backToHolder')}
         </Link>
-        <Link to="/credentials/new" className={buttonVariants({ variant: 'outline' })}>
+        <Link to="/credentials/new" className={buttonVariants({ variant: 'secondary' })}>
           {t('issuance.result.issueAnother')}
         </Link>
       </div>
@@ -237,7 +237,7 @@ export function CredentialPage() {
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dt className="text-body-sm text-text-muted">{label}</dt>
       <dd className="font-medium">{children}</dd>
     </div>
   );
@@ -247,7 +247,7 @@ function CredentialLink({ id }: { id: string }) {
   return (
     <Link
       to={`/credentials/${id}`}
-      className="font-mono text-sm text-primary underline-offset-2 hover:underline"
+      className="font-mono text-body-sm text-accent-text underline-offset-2 hover:underline"
     >
       {id}
     </Link>
@@ -275,11 +275,11 @@ function OfferCard({ credential, language }: { credential: CredentialDetail; lan
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col items-start gap-4">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-sm text-text-muted">
           {t('issuance.result.walletOfferDescription')}
         </p>
         {offer ? (
-          <p className="text-sm font-medium">
+          <p className="text-body-sm font-medium">
             {t('credentials.detail.activeOfferUntil', {
               time: formatColomboTime(offer.expiresAt, language),
             })}
@@ -287,7 +287,7 @@ function OfferCard({ credential, language }: { credential: CredentialDetail; lan
         ) : null}
         <Link
           to={`/credentials/${credential.id}/offer`}
-          className={buttonVariants({ variant: 'default' })}
+          className={buttonVariants({ variant: 'primary' })}
         >
           {offer ? t('credentials.detail.openOffer') : t('issuance.result.createOffer')}
         </Link>
@@ -312,14 +312,14 @@ function Timeline({ credentialId }: { credentialId: string }) {
         {query.isError ? (
           <Alert variant="destructive" role="alert" className="flex flex-col items-start gap-2">
             <p>{t('credentials.detail.timelineFailed')}</p>
-            <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+            <Button variant="secondary" size="sm" onClick={() => void query.refetch()}>
               {t('common.tryAgain')}
             </Button>
           </Alert>
         ) : !query.data ? (
           <Skeleton className="h-24" />
         ) : query.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('credentials.detail.timelineEmpty')}</p>
+          <p className="text-body-sm text-text-muted">{t('credentials.detail.timelineEmpty')}</p>
         ) : (
           <ol className="flex flex-col gap-4 border-l border-border pl-4">
             {query.data.map((event) => (
@@ -347,14 +347,14 @@ function TimelineItem({ event, language }: { event: CredentialStatusEvent; langu
   return (
     <li className="flex flex-col gap-0.5">
       <span className="font-medium">{label}</span>
-      <span className="text-sm text-muted-foreground">
+      <span className="text-body-sm text-text-muted">
         <time dateTime={event.createdAt}>
           {formatColomboDateTime(event.createdAt, language) ?? event.createdAt}
         </time>
         {who ? ` · ${who}` : null}
       </span>
       {event.reason ? (
-        <span className="text-sm">
+        <span className="text-body-sm">
           {t('credentials.detail.reason', { reason: reasonLabel(event.reason) })}
         </span>
       ) : null}

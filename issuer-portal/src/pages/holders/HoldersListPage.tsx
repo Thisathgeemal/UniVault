@@ -67,8 +67,10 @@ export function HoldersListPage() {
   if (!user) return null;
 
   const isCustomer = user.issuer.type === 'bank';
-  const registerLink = (
-    <Link to="/holders/new" className={buttonVariants({ variant: 'default' })}>
+  // One primary per page: the header's link is the primary; the empty state repeats it as a
+  // secondary button (design system: one azure action per screen)
+  const registerLink = (variant: 'primary' | 'secondary') => (
+    <Link to="/holders/new" className={buttonVariants({ variant })}>
       <UserPlus aria-hidden="true" className="h-4 w-4" />
       {t('holders.registerAction')}
     </Link>
@@ -82,7 +84,7 @@ export function HoldersListPage() {
       cell: (h) => (
         <Link
           to={`/holders/${h.id}`}
-          className="font-medium text-primary underline-offset-2 hover:underline"
+          className="font-medium text-accent-text underline-offset-2 hover:underline"
           onClick={(e) => e.stopPropagation()}
         >
           {h.fullName}
@@ -111,7 +113,7 @@ export function HoldersListPage() {
             </span>
           </>
         ) : (
-          <span className="text-muted-foreground">
+          <span className="text-text-muted">
             <span aria-hidden="true">—</span>
             <span className="sr-only">{t('holders.list.noIdNumber')}</span>
           </span>
@@ -152,9 +154,13 @@ export function HoldersListPage() {
         <div className="flex flex-col gap-1">
           <p className="font-medium">{t('holders.list.loadFailed')}</p>
           <p>{error.message}</p>
-          {error.reference ? <p className="font-mono text-xs">{error.reference}</p> : null}
+          {error.reference ? <p className="font-mono text-caption">{error.reference}</p> : null}
         </div>
-        <Button variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}>
+        <Button
+          variant="secondary"
+          onClick={() => void query.refetch()}
+          disabled={query.isFetching}
+        >
           {t('common.tryAgain')}
         </Button>
       </Alert>
@@ -166,7 +172,7 @@ export function HoldersListPage() {
         description={t('holders.list.noMatch.description')}
         icon={<SearchX className="h-10 w-10" />}
         action={
-          <Button variant="outline" onClick={() => onSearch('')}>
+          <Button variant="secondary" onClick={() => onSearch('')}>
             {t('holders.list.clearSearch')}
           </Button>
         }
@@ -178,7 +184,7 @@ export function HoldersListPage() {
         title={t('holders.list.empty.title')}
         description={t('holders.list.empty.description')}
         icon={<Users className="h-10 w-10" />}
-        action={registerLink}
+        action={registerLink('secondary')}
       />
     );
   } else {
@@ -229,7 +235,7 @@ export function HoldersListPage() {
       <PageHeader
         title={t('holders.title')}
         description={t('holders.description')}
-        actions={registerLink}
+        actions={registerLink('primary')}
       />
       <div className="mb-4">
         <SearchInput

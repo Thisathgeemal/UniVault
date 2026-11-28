@@ -35,9 +35,9 @@ export interface ToastProviderProps {
 }
 
 const TONES: Record<ToastTone, string> = {
-  success: 'border-brand-500 bg-brand-50 text-brand-900',
-  info: 'border-info/40 bg-info-muted text-info',
-  error: 'border-destructive/40 bg-destructive-muted text-destructive',
+  success: 'border-status-valid bg-status-valid-bg text-status-valid-text',
+  info: 'border-border bg-brand-soft text-text',
+  error: 'border-status-revoked bg-status-revoked-bg text-status-revoked-text',
 };
 
 /**
@@ -91,7 +91,7 @@ export function ToastProvider({ children, closeLabel, durationMs = 6000 }: Toast
             key={toast.id}
             data-tone={toast.tone}
             className={cn(
-              'pointer-events-auto flex items-start justify-between gap-3 rounded-md border px-4 py-3 text-sm shadow-md',
+              'pointer-events-auto flex items-start justify-between gap-3 rounded-md border px-4 py-3 text-body-sm shadow-md',
               TONES[toast.tone],
             )}
           >
@@ -99,7 +99,7 @@ export function ToastProvider({ children, closeLabel, durationMs = 6000 }: Toast
             <button
               type="button"
               aria-label={closeLabel}
-              className="rounded-md p-0.5 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-md p-0.5 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
               onClick={() => dismiss(toast.id)}
             >
               <Close className="h-4 w-4" />

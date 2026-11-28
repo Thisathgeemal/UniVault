@@ -281,28 +281,28 @@ function HolderForm({ type }: { type: CredentialTypeName }) {
         <Alert variant="destructive" role="alert" className="mb-6 flex flex-col gap-1">
           <p className="font-medium">{t('holders.register.failed')}</p>
           <p>{failure.message}</p>
-          {failure.reference ? <p className="font-mono text-xs">{failure.reference}</p> : null}
+          {failure.reference ? <p className="font-mono text-caption">{failure.reference}</p> : null}
         </Alert>
       ) : null}
 
       <form noValidate onSubmit={onSubmit} className="flex max-w-3xl flex-col gap-6">
-        <p className="text-sm text-muted-foreground">{t('holders.register.requiredNote')}</p>
+        <p className="text-body-sm text-text-muted">{t('holders.register.requiredNote')}</p>
         {groups.map(({ group, hidden, fields }) => (
           <fieldset
             key={group.id}
-            className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5"
+            className="flex flex-col gap-4 rounded-md border border-border bg-surface p-5"
           >
-            <legend className="px-1 text-base font-semibold">
+            <legend className="px-1 text-h3 font-semibold">
               {tKey(t, `holders.register.groups.${group.id}`)}
             </legend>
             {group.id === 'permanentAddress' ? (
-              <p className="text-sm text-muted-foreground">{t('holders.register.countryNote')}</p>
+              <p className="text-body-sm text-text-muted">{t('holders.register.countryNote')}</p>
             ) : null}
             {group.optionalObject ? (
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-body-sm">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 accent-primary"
+                  className="h-4 w-4 accent-accent"
                   checked={Boolean(state.objects[group.optionalObject])}
                   onChange={(e) => setObject(group.optionalObject!, e.target.checked)}
                 />
@@ -320,7 +320,7 @@ function HolderForm({ type }: { type: CredentialTypeName }) {
           <Button type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? t('holders.register.submitting') : t('holders.register.submit')}
           </Button>
-          <Link to="/holders" className={buttonVariants({ variant: 'outline' })}>
+          <Link to="/holders" className={buttonVariants({ variant: 'secondary' })}>
             {t('holders.register.cancel')}
           </Link>
         </div>

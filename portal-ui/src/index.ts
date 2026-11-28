@@ -11,7 +11,7 @@ export {
   MAIN_CONTENT_ID,
   type AppShellProps,
 } from './AppShell.js';
-export { Header, type HeaderMenuButton, type HeaderProps } from './Header.js';
+export { Header, type HeaderMenuButton, type HeaderProps, type RoleTag } from './Header.js';
 export {
   isSidebarItemActive,
   Sidebar,
@@ -65,7 +65,12 @@ export {
   type FormFieldProps,
 } from './FormField.js';
 export { ErrorSummary, type ErrorSummaryItem, type ErrorSummaryProps } from './ErrorSummary.js';
-export { StatusBadge, type StatusBadgeProps, type StatusTone } from './StatusBadge.js';
+export {
+  STATUS_SET_CLASSES,
+  StatusBadge,
+  type StatusBadgeProps,
+  type StatusSet,
+} from './StatusBadge.js';
 export {
   ToastProvider,
   useToast,

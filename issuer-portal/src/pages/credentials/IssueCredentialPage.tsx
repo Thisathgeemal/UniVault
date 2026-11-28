@@ -278,10 +278,10 @@ function IssueWizard({ holderId }: { holderId: string }) {
                 })}
               </p>
               <div className="flex flex-col gap-1">
-                <label className="flex items-start gap-2 text-sm">
+                <label className="flex items-start gap-2 text-body-sm">
                   <input
                     type="checkbox"
-                    className="mt-0.5 h-4 w-4 accent-primary"
+                    className="mt-0.5 h-4 w-4 accent-accent"
                     checked={confirmed}
                     aria-invalid={confirmError && !confirmed ? true : undefined}
                     aria-describedby={confirmError && !confirmed ? 'confirm-error' : undefined}
@@ -293,7 +293,7 @@ function IssueWizard({ holderId }: { holderId: string }) {
                   {t('issuance.confirm.checkbox')}
                 </label>
                 {confirmError && !confirmed ? (
-                  <p id="confirm-error" className="text-sm font-medium text-destructive">
+                  <p id="confirm-error" className="text-body-sm font-medium text-status-revoked">
                     {t('issuance.confirm.required')}
                   </p>
                 ) : null}
@@ -304,7 +304,7 @@ function IssueWizard({ holderId }: { holderId: string }) {
 
         <div className="flex flex-wrap gap-3">
           {step > 1 ? (
-            <Button variant="outline" onClick={() => update({ step: step - 1 })}>
+            <Button variant="secondary" onClick={() => update({ step: step - 1 })}>
               {t('issuance.back')}
             </Button>
           ) : null}
@@ -317,7 +317,7 @@ function IssueWizard({ holderId }: { holderId: string }) {
               {issue.isPending ? t('issuance.confirm.issuing') : t('issuance.confirm.issue')}
             </Button>
           )}
-          <Link to={`/holders/${holderId}`} className={buttonVariants({ variant: 'ghost' })}>
+          <Link to={`/holders/${holderId}`} className={buttonVariants({ variant: 'text' })}>
             {t('issuance.cancel')}
           </Link>
         </div>
@@ -367,16 +367,14 @@ function HolderAndSchemaStep({
             <Skeleton className="h-16" />
           ) : (
             <div className="flex flex-col gap-3">
-              <p className="text-lg font-semibold">{holder.data.fullName}</p>
+              <p className="text-h3 font-semibold">{holder.data.fullName}</p>
               <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
                 <div>
-                  <dt className="text-sm text-muted-foreground">
-                    {t('issuance.holder.reference')}
-                  </dt>
+                  <dt className="text-body-sm text-text-muted">{t('issuance.holder.reference')}</dt>
                   <dd className="font-mono">{holder.data.externalRef}</dd>
                 </div>
                 <div>
-                  <dt className="text-sm text-muted-foreground">{t('issuance.holder.idNumber')}</dt>
+                  <dt className="text-body-sm text-text-muted">{t('issuance.holder.idNumber')}</dt>
                   <dd className="font-mono">
                     {idNumber ? (
                       <>
@@ -393,7 +391,7 @@ function HolderAndSchemaStep({
               </dl>
               <Link
                 to="/credentials/new"
-                className="text-sm font-medium text-primary hover:underline"
+                className="text-body-sm font-medium text-accent-text hover:underline"
               >
                 {t('issuance.holder.change')}
               </Link>
@@ -401,7 +399,7 @@ function HolderAndSchemaStep({
           )}
         </CardContent>
       </Card>
-      <fieldset className="rounded-card border border-border bg-surface p-5">
+      <fieldset className="rounded-md border border-border bg-surface p-5">
         <legend className="px-1 font-semibold">{t('issuance.schema.legend')}</legend>
         {schemasFailed ? (
           <p role="alert">{t('issuance.schema.loadFailed')}</p>
@@ -416,11 +414,11 @@ function HolderAndSchemaStep({
                   name="credential-type"
                   value={s.credentialType}
                   defaultChecked={index === 0}
-                  className="h-4 w-4 accent-primary"
+                  className="h-4 w-4 accent-accent"
                 />
                 <span className="font-medium">{t(`credentialTypes.${s.credentialType}`)}</span>
               </label>
-              <p className="pl-6 text-sm text-muted-foreground">
+              <p className="pl-6 text-body-sm text-text-muted">
                 {t(`issuance.schema.notes.${s.credentialType}`)}
               </p>
             </div>
@@ -477,7 +475,7 @@ function DetailsStep({
           <CardTitle>{t('issuance.details.title')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
-          <p className="text-sm text-muted-foreground">{t('issuance.details.description')}</p>
+          <p className="text-body-sm text-text-muted">{t('issuance.details.description')}</p>
           {groups.map((group) => (
             <section key={group.id} aria-labelledby={`details-${group.id}`}>
               <h3 id={`details-${group.id}`} className="mb-2 font-semibold">
@@ -488,7 +486,7 @@ function DetailsStep({
               <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
                 {group.claims.map((claim) => (
                   <div key={claim.name} className="flex flex-col gap-0.5">
-                    <dt className="text-sm text-muted-foreground">{claimLabel(t, claim.name)}</dt>
+                    <dt className="text-body-sm text-text-muted">{claimLabel(t, claim.name)}</dt>
                     <dd className="font-medium break-words">
                       {formatClaimValue(
                         t,
@@ -499,7 +497,7 @@ function DetailsStep({
                         exists,
                       )}
                       {claim.derived ? (
-                        <span className="block text-xs font-normal text-muted-foreground">
+                        <span className="block text-caption font-normal text-text-muted">
                           {t('issuance.preview.derived')}
                         </span>
                       ) : null}
@@ -511,26 +509,26 @@ function DetailsStep({
           ))}
           <Link
             to={`/holders/${holderId}`}
-            className="text-sm font-medium text-primary hover:underline"
+            className="text-body-sm font-medium text-accent-text hover:underline"
           >
             {t('issuance.details.wrongDetails')}
           </Link>
         </CardContent>
       </Card>
 
-      <fieldset className="flex flex-col gap-3 rounded-card border border-border bg-surface p-5">
+      <fieldset className="flex flex-col gap-3 rounded-md border border-border bg-surface p-5">
         <legend className="px-1 font-semibold">{t('issuance.validity.legend')}</legend>
         <p aria-live="polite" className="font-medium">
           {t('issuance.validity.expiresOn', {
             date: formatColomboDate(preview.expiry.expiresAt, language),
           })}
         </p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-sm text-text-muted">
           {t('issuance.validity.defaultExpiry', {
             date: formatColomboDate(preview.expiry.defaultExpiresAt, language),
           })}
         </p>
-        {cap ? <p className="text-sm">{cap}</p> : null}
+        {cap ? <p className="text-body-sm">{cap}</p> : null}
         <FormField
           id="valid-until"
           label={t('issuance.validity.validUntil')}
@@ -553,7 +551,7 @@ function DetailsStep({
         </FormField>
         {validUntil ? (
           <Button
-            variant="ghost"
+            variant="text"
             size="sm"
             className="self-start"
             onClick={() => {
@@ -573,14 +571,14 @@ function DisclosableBadge() {
   const { t } = useTranslation();
   return (
     <span className="inline-flex items-center gap-1">
-      <Badge variant="default">{t('issuance.preview.disclosable')}</Badge>
+      <Badge>{t('issuance.preview.disclosable')}</Badge>
       <Tooltip content={t('issuance.preview.disclosableExplained')}>
         {(trigger) => (
           <button
             type="button"
             {...trigger}
             aria-label={t('issuance.preview.disclosableInfo')}
-            className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex h-5 w-5 items-center justify-center rounded-full text-text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
             <Info aria-hidden="true" className="h-4 w-4" />
           </button>

@@ -1,5 +1,5 @@
 /** shadcn/ui-style primitives: semantics, variants and class merging. */
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   Alert,
@@ -18,10 +18,14 @@ import {
   PageHeader,
 } from '../src/index.js';
 
+function TagIcon(props: { className?: string }) {
+  return <svg data-testid="tag-icon" {...props} />;
+}
+
 describe('primitives', () => {
   it('Button defaults to type="button" and merges classes', () => {
     render(
-      <Button variant="outline" size="sm" className="px-8">
+      <Button variant="secondary" size="sm" className="px-8">
         Go
       </Button>,
     );
@@ -88,7 +92,8 @@ describe('primitives', () => {
   it('Header without a menu button, with logout disabled while pending', () => {
     render(
       <Header
-        appName="App"
+        appName="UniVault"
+        roleTag={{ label: 'Verifier portal', icon: TagIcon }}
         orgName="Org"
         userName="User"
         roleLabel="Officer"
@@ -100,4 +105,48 @@ describe('primitives', () => {
     expect(screen.queryByRole('button', { name: /menu/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeDisabled();
   });
+
+  it('Header is the navy top bar with the role tag passed in (label and icon)', () => {
+    render(
+      <Header
+        appName="UniVault"
+        roleTag={{ label: 'Verifier portal', icon: TagIcon }}
+        orgName="Org"
+        userName="User"
+        roleLabel="Officer"
+        logoutLabel="Sign out"
+        onLogout={() => undefined}
+      />,
+    );
+    const header = screen.getByRole('banner');
+    expect(header.className).toContain('bg-brand');
+    expect(header.className).toContain('text-on-brand');
+    const tag = screen.getByTestId('role-tag');
+    expect(tag).toHaveTextContent('Verifier portal');
+    for (const cls of ['bg-role-tag-bg', 'text-on-brand', 'rounded-pill']) {
+      expect(tag.className).toContain(cls);
+    }
+    expect(within(tag).getByTestId('tag-icon')).toHaveAttribute('aria-hidden', 'true');
+    // actions in the bar are on-brand buttons, never azure
+    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveAttribute(
+      'data-variant',
+      'onBrand',
+    );
+  });
+
+  it.each([
+    ['primary', 'bg-accent', 'text-on-accent'],
+    ['secondary', 'border-border-strong', 'text-text'],
+    ['text', 'text-accent-text', 'hover:underline'],
+    ['destructive', 'bg-status-revoked', 'text-on-status-revoked'],
+    ['onBrand', 'bg-role-tag-bg', 'text-on-brand'],
+  ] as const)(
+    'Button %s uses the design-system tokens, 40px min and radius-md',
+    (variant, a, b) => {
+      render(<Button variant={variant}>Act</Button>);
+      const button = screen.getByRole('button', { name: 'Act' });
+      for (const cls of [a, b, 'min-h-10', 'rounded-md']) expect(button.className).toContain(cls);
+      expect(button).toHaveAttribute('data-variant', variant);
+    },
+  );
 });

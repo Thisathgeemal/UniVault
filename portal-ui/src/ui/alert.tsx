@@ -2,11 +2,11 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import type { ComponentProps } from 'react';
 import { cn } from '../cn.js';
 
-export const alertVariants = cva('rounded-md border px-4 py-3 text-sm', {
+export const alertVariants = cva('rounded-md border px-4 py-3 text-body-sm', {
   variants: {
     variant: {
-      info: 'border-info/30 bg-info-muted text-info',
-      destructive: 'border-destructive/30 bg-destructive-muted text-destructive',
+      info: 'border-border bg-brand-soft text-text',
+      destructive: 'border-status-revoked bg-status-revoked-bg text-status-revoked-text',
     },
   },
   defaultVariants: { variant: 'info' },
