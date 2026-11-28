@@ -18,6 +18,12 @@ export const en = {
     en: 'English',
     si: 'සිංහල',
   },
+  /** Settings → Appearance (theme). */
+  appearance: {
+    system: 'Use device setting',
+    light: 'Light',
+    dark: 'Dark',
+  },
   tabs: {
     credentials: 'Credentials',
     scan: 'Scan',
@@ -106,6 +112,10 @@ export const en = {
     languageHint: 'Changes the language of the whole app.',
     languageSaved: 'Language changed',
     languageNotSaved: 'Language changed, but it could not be saved for next time.',
+    appearance: 'Appearance',
+    appearanceHint: 'Light or dark colours for the whole app.',
+    appearanceSaved: 'Appearance changed',
+    appearanceNotSaved: 'Appearance changed, but it could not be saved for next time.',
     security: 'Security',
     securityHint: 'Wallet lock and fingerprint or face unlock',
     about: 'About',
@@ -121,6 +131,80 @@ export const en = {
     placeholderTitle: 'Security settings are coming soon',
     placeholderMessage:
       'Here you will choose how the wallet is locked (device passcode, fingerprint or face) before anything is shown or shared. Your keys will be kept in the phone’s secure storage.',
+  },
+  /** First start (app/onboarding). Short sentences, plain words (NFR-04). */
+  onboarding: {
+    next: 'Next',
+    skip: 'Skip',
+    skipHint: 'Goes to the privacy screen',
+    stepOf: 'Step {{current}} of {{total}}',
+    language: {
+      title: 'Choose your language',
+      body: 'You can change it later in Settings.',
+    },
+    welcome: {
+      title: 'Welcome to UniVault',
+      body: 'UniVault keeps your digital identity on your phone.',
+      body2: 'You decide what to share, and with whom.',
+    },
+    howItWorks: {
+      title: 'How it works',
+      issue: 'An organisation, such as your employer or bank, gives you a credential.',
+      keep: 'You keep it in this wallet.',
+      show: 'You show it to someone who needs to check it.',
+      issuer: 'Organisation',
+      holder: 'You',
+      verifier: 'Checker',
+    },
+    selectiveDisclosure: {
+      title: 'You choose what to share',
+      body: 'Share only what is needed. Nothing more.',
+      exampleTitle: 'For example',
+      example: 'Prove you are over 18 without showing your birthday.',
+    },
+    security: {
+      title: 'Your wallet is protected',
+      pin: 'You use your PIN or fingerprint before every share.',
+      encrypted: 'Your credentials are encrypted on this phone.',
+      offline: 'It works without the internet.',
+    },
+    privacy: {
+      title: 'Your privacy',
+      stays: 'Your credentials stay on this phone.',
+      shared: 'Something is shared only when you approve it. You choose what.',
+      noUniVault: 'Nothing is sent to UniVault when you share.',
+      detailsLink: 'Privacy details',
+      understand: 'I understand',
+      cta: 'Set up security',
+      ctaHint: 'Tick “I understand” first',
+      notSaved: 'Could not save this. You may see these screens again next time.',
+    },
+    privacyDetails: {
+      title: 'Privacy details',
+      onPhoneTitle: 'What stays on this phone',
+      onPhone:
+        'Your credentials and your history are kept only on this phone, encrypted. UniVault has no copy.',
+      sharingTitle: 'What is shared, and when',
+      sharing:
+        'When someone asks to check a credential, you see who is asking and what they ask for. Only what you approve is sent, straight to them.',
+      univaultTitle: 'What UniVault receives',
+      univault: 'Nothing. The wallet sends nothing to UniVault when you share.',
+      removingTitle: 'If you remove the app',
+      removing:
+        'Your credentials are removed with it. Ask the organisation that gave you a credential to issue it again.',
+      version: 'Privacy text version: {{version}}',
+    },
+  },
+  /** After onboarding, before the wallet: security setup (placeholder until the PIN task). */
+  setup: {
+    title: 'Set up security',
+    heading: 'Set up your PIN',
+    body: 'Next, you choose a PIN for this wallet. You will use it, or your fingerprint, to open the wallet and before every share.',
+    comingSoon: 'PIN setup comes in the next version of the app.',
+    devNote:
+      'Development builds only: this marks security as set up so you can reach the wallet. The real PIN setup replaces it.',
+    devContinue: 'Continue (development placeholder)',
+    notSaved: 'Could not save this. You may see this screen again next time.',
   },
   about: {
     title: 'About',
@@ -240,6 +324,16 @@ export const en = {
     reachable: 'Reachable: server status “{{status}}” (HTTP {{http}})',
     unreachable: 'Not reachable ({{code}})',
     notConfigured: 'Set the API base URL first.',
+    resetTitle: 'Onboarding',
+    resetDescription:
+      'Shows the first-start screens again. Clears the onboarding, privacy and security-setup flags; keeps the language and appearance.',
+    resetButton: 'Reset onboarding',
+    resetConfirmTitle: 'Reset onboarding?',
+    resetConfirmMessage:
+      'The app will open the first-start screens. Your language and appearance stay as they are.',
+    resetConfirm: 'Reset',
+    resetDone: 'Onboarding reset',
+    resetFailed: 'Could not reset onboarding.',
   },
   errors: {
     title: 'Something went wrong',

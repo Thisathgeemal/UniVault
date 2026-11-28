@@ -45,6 +45,7 @@ describe('every route renders', () => {
     [ROUTES.historyEntry('sample-history-2'), 'history-detail-screen'],
     [ROUTES.settings, 'settings-screen'],
     [ROUTES.language, 'language-screen'],
+    [ROUTES.appearance, 'appearance-screen'],
     [ROUTES.security, 'security-screen'],
     [ROUTES.about, 'about-screen'],
     [ROUTES.diagnostics, 'diagnostics-screen'],

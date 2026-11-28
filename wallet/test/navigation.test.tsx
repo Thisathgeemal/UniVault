@@ -113,6 +113,7 @@ describe('stacks: in and back out with the header back button', () => {
 
   it.each([
     ['settings-language', ROUTES.language, 'language-screen'],
+    ['settings-appearance', ROUTES.appearance, 'appearance-screen'],
     ['settings-security', ROUTES.security, 'security-screen'],
     ['settings-about', ROUTES.about, 'about-screen'],
     ['diagnostics-link', ROUTES.diagnostics, 'diagnostics-screen'],

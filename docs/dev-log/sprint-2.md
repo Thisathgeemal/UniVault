@@ -179,6 +179,50 @@ store, issuer portal) is logged in [sprint-1.md](sprint-1.md).
 - **Evidence:** `portal-ui/test/tokens.test.ts`, `issuer-portal/test/design-system.test.tsx`,
   `wallet/test/contrast.test.ts`, `wallet/test/design-system.test.tsx`; e2e 10 passed.
 
+### Sat 28 Nov (wallet onboarding, the security gate and the Appearance setting)
+
+- **Done:** **Appearance** (Settings → Appearance, below Language): "Use device setting"
+  (default), "Light", "Dark" (Sinhala පෙනුම: උපාංග සැකසුම භාවිත කරන්න / ආලෝක / අඳුරු, for native
+  review); saved as `univault.appearance` and restored with the language before the first frame
+  (`restoreAppState()`); the effective scheme (choice, or the phone for "Use device setting", live)
+  drives `useTheme()`, so screens, header, tab bar, dialogs and toasts change at once; navigation
+  theme and the root view colour (`expo-system-ui`) follow; native UI via
+  `Appearance.setColorScheme()`; the Settings row shows the value. **Status bar:** one computed
+  `<StatusBar>` (light content on the navy home header in both themes, else by theme), replacing
+  the imperative `setStatusBarStyle` calls. **Onboarding** (`app/onboarding/`): language (large
+  English / සිංහල options, applied at once) → welcome → how it works (issuer → holder → verifier
+  drawing) → you choose what to share (over-18 example) → your wallet is protected → your privacy
+  ("I understand" required before "Set up security"; "Privacy details" static screen); Next /
+  Back, horizontal swipe, Skip to Privacy (never past it), progress dots with "Step X of 6" for
+  screen readers (progressbar + live region), Android back exits on step 1 and goes to the
+  previous step after it, reduce motion turns stack transitions (and the dialog fade) off; simple
+  original SVG illustrations (`react-native-svg` 15.16.0 via `npx expo install`) in on-brand
+  tokens on a navy panel. **Gate** (`src/onboarding/gate.ts`, applied by `index`, `(tabs)`,
+  `onboarding` and `setup` layouts): not onboarded → onboarding; onboarded without security →
+  `/setup/security`; both → tabs; typed URLs and deep links redirected the same way; onboarding
+  counts only with an acknowledgement of the current privacy text (`privacy-v1`, stored with the
+  date as `univault.privacyAcknowledgedAt`). `isSecuritySetupComplete()` is the one security
+  check, a placeholder on the `univault.securitySetupCompleted` preference until the PIN task
+  (`/setup/security` "Set up your PIN" placeholder; its Continue button is development-only and
+  stripped from release bundles). **Diagnostics → Reset onboarding** (dev only, ConfirmDialog;
+  keeps language and appearance); Diagnostics now gated inline (`!__DEV__ || …`), so its checks
+  are dropped from release bundles too. New components `ChoiceList` (Language, Appearance,
+  onboarding) and `Checkbox`. Contrast: 83 pairs in light and 82 in dark (illustration lines,
+  progress dots, checkbox), lowest unchanged. Docs: mobile-wallet.md §7, §9 (preference keys
+  table), §15 (flow, gate, screens); design-system.md (onboarding illustrations, Appearance, and
+  "status-*-bg pill" → "badge (radius-sm)"); Decision 023 consequences (privacy acknowledgement,
+  no skipping security setup; no new decision). Wallet tests 343 → **473** (17 files), coverage
+  99.54 / 95.93 / 99.32 / 99.87 (functions threshold raised 98 → 99). expo-doctor 20/20; Metro
+  Android bundle 1,505 modules; root lint 0 warnings, format and secrets checks pass.
+- **Next:** Wording review of the onboarding text and native-speaker review of its Sinhala
+  (about 70 new strings); screenshots ([s2-wallet-onboarding-guide.md](evidence/s2-wallet-onboarding-guide.md));
+  the PIN and biometric task replaces `isSecuritySetupComplete()` and the placeholder flag.
+- **Blockers:** None.
+- **Evidence:** `wallet/test/onboarding.test.tsx` (83), `wallet/test/appearance.test.tsx` (19),
+  `wallet/test/preferences.test.tsx` (storage rule over all five keys),
+  [s2-wallet-onboarding-guide.md](evidence/s2-wallet-onboarding-guide.md) (screenshots to be
+  taken).
+
 ## Backlog
 
 - **Sample data in the release bundle:** `src/fixtures/sample-data.ts` (synthetic, never shown
@@ -196,7 +240,11 @@ store, issuer portal) is logged in [sprint-1.md](sprint-1.md).
 - **EAS development build** (`expo-dev-client`) when push notifications or OS-level
   `openid-credential-offer://` links are scheduled (Decision 022).
 - **Native-speaker review** of `wallet/src/i18n/locales/si.ts` (27 Nov: about 110 new strings
-  for the shell, UI kit included).
+  for the shell, UI kit included; 28 Nov: about 70 more for onboarding, setup, Appearance and
+  Reset onboarding, including "Step X of Y" = "පියවර Y න් X වැන්න").
+- **Security-setup placeholder:** `isSecuritySetupComplete()` reads the
+  `univault.securitySetupCompleted` preference and a development-only button sets it; the PIN task
+  replaces both with a secure-store check (until then a release build stops at `/setup/security`).
 - **Final app icon and splash** (the current ones are generated placeholders).
 
 ## Testing evidence
@@ -205,9 +253,12 @@ Record the tests that show the sprint goal is met, with links to output in `evid
 
 | Test / check                         | Type (unit / integration / manual)           | Result         | Evidence                                                                          |
 | ------------------------------------ | -------------------------------------------- | -------------- | --------------------------------------------------------------------------------- |
-| Wallet unit and component tests      | unit / component (Jest + RNTL)               | 223 passed     | `wallet/test/`                                                                    |
+| Wallet unit and component tests      | unit / component (Jest + RNTL)               | 473 passed     | `wallet/test/`                                                                    |
+| Onboarding gate and flows            | component (real `app/` tree)                 | 83 passed      | `wallet/test/onboarding.test.tsx`                                                 |
+| Appearance setting and status bar    | component (simulated system changes)         | 19 passed      | `wallet/test/appearance.test.tsx`                                                 |
+| Onboarding on the phone              | manual (Expo Go)                             | to be recorded | [s2-wallet-onboarding-guide.md](evidence/s2-wallet-onboarding-guide.md)           |
 | Wallet status words = issuer portal  | unit (parity test, en + si)                  | passed         | `wallet/test/status.test.tsx`                                                     |
-| WCAG AA contrast, light and dark     | unit (74 / 73 design + component pairs)      | passed         | `wallet/test/contrast.test.ts`                                                    |
+| WCAG AA contrast, light and dark     | unit (83 / 82 design + component pairs)      | passed         | `wallet/test/contrast.test.ts`                                                    |
 | One primary action per page / screen | component (portal and wallet)                | passed         | `issuer-portal/test/design-system.test.tsx`, `wallet/test/design-system.test.tsx` |
 | No hex colour outside tokens.ts      | unit (scans every app's source)              | passed         | `portal-ui/test/tokens.test.ts`                                                   |
 | theme.css generated from tokens.ts   | unit (replaces the byte-identical CSS check) | passed         | `portal-ui/test/tokens.test.ts`                                                   |
@@ -392,3 +443,26 @@ android` (a release bundle) still contained the kit's test IDs.
   `useFonts` from `expo-font`; the export now lists exactly the five design weights plus the icon
   font. `test/app.test.tsx` fails if a package index is imported again.
 - **Lesson:** Read the asset list of a release bundle after adding a font or image package.
+
+### Issue 11: The AsyncStorage mock counts a setItem twice (28 Nov 2026)
+
+- **Task:** Storage rule test over the new preference keys
+- **Symptom:** The rewritten "only listed keys are ever written" test expected 8 writes and saw 14.
+- **Cause:** The official mock implements `setItem` through `multiSet`, so every `setItem` call
+  also appears in `multiSet.mock.calls`. Counting both lists counts each write twice (except real
+  `multiSet` calls).
+- **Resolution:** The test checks every written key/value against its allowed values in both
+  lists and counts distinct keys (all five), not calls.
+- **Lesson:** Know how a mock is built before counting its calls; assert on what was written, not
+  on how many calls it took.
+
+### Issue 12: Mocking expo-status-bar broke every navigator in the test (28 Nov 2026)
+
+- **Task:** Status bar style per theme
+- **Symptom:** Every test in `appearance.test.tsx` failed with "useVerticalBarEdgeIOS is not a
+  function" from expo-router's `Screen`.
+- **Cause:** `jest.mock('expo-status-bar', () => ({{ StatusBar }}))` replaced the whole module;
+  expo-router's React Navigation fork imports other functions from it.
+- **Resolution:** Spread the real module and replace only `StatusBar`
+  (`{{ ...jest.requireActual('expo-status-bar'), StatusBar }}`).
+- **Lesson:** Partial mocks of a module the framework itself uses must keep its other exports.

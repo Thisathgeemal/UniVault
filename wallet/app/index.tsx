@@ -1,7 +1,12 @@
 import { Redirect } from 'expo-router';
-import { ROUTES } from '../src/navigation/routes';
+import { AREA_ENTRY, requiredArea } from '../src/onboarding/gate';
+import { useSetup } from '../src/onboarding/SetupProvider';
 
-/** `/` (app start, `univault://`) opens the Credentials tab. */
+/**
+ * `/` (app start, `univault://`): wherever the gate says (src/onboarding/gate.ts): onboarding on
+ * a first start, security setup after it, otherwise the Credentials tab.
+ */
 export default function Index() {
-  return <Redirect href={ROUTES.credentials} />;
+  const { state } = useSetup();
+  return <Redirect href={AREA_ENTRY[requiredArea(state)]} />;
 }

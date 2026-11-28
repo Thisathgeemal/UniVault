@@ -2,6 +2,11 @@ import { render } from '@testing-library/react-native';
 import type { ReactElement, ReactNode } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '../src/components';
+import type { AppearancePreference } from '../src/lib/preferences';
+import { SetupProvider } from '../src/onboarding/SetupProvider';
+import type { SetupState } from '../src/onboarding/gate';
+import { AppearanceProvider } from '../src/theme/appearance';
+import { COMPLETED_SETUP } from './setup-state';
 
 /** Fixed safe-area metrics so SafeAreaView renders in Jest (no native measurement). */
 export const TEST_SAFE_AREA = {
@@ -9,15 +14,31 @@ export const TEST_SAFE_AREA = {
   insets: { top: 47, left: 0, right: 0, bottom: 34 },
 };
 
-/** The providers app/_layout.tsx puts around every screen (safe areas, toasts). */
-export function Providers({ children }: { children: ReactNode }) {
+export interface ProviderOptions {
+  appearance?: AppearancePreference;
+  setup?: SetupState;
+}
+
+/**
+ * The providers app/_layout.tsx puts around every screen (safe areas, appearance, setup state,
+ * toasts). Default: "Use device setting" and a holder who finished setup.
+ */
+export function Providers({
+  children,
+  appearance = 'system',
+  setup = COMPLETED_SETUP,
+}: ProviderOptions & { children: ReactNode }) {
   return (
     <SafeAreaProvider initialMetrics={TEST_SAFE_AREA}>
-      <ToastProvider>{children}</ToastProvider>
+      <AppearanceProvider initial={appearance}>
+        <SetupProvider initial={setup}>
+          <ToastProvider>{children}</ToastProvider>
+        </SetupProvider>
+      </AppearanceProvider>
     </SafeAreaProvider>
   );
 }
 
-export async function renderWithProviders(ui: ReactElement) {
-  return await render(<Providers>{ui}</Providers>);
+export async function renderWithProviders(ui: ReactElement, options: ProviderOptions = {}) {
+  return await render(<Providers {...options}>{ui}</Providers>);
 }

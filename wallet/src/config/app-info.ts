@@ -34,3 +34,13 @@ export const uiKitEnabled = (): boolean => __DEV__;
  * invented credentials.
  */
 export const sampleDataEnabled = (): boolean => __DEV__;
+
+/**
+ * PLACEHOLDER until the PIN task: the "Continue" button on /setup/security that marks security
+ * setup as done (src/onboarding/security-setup.ts). Development builds only, so a release build
+ * can never reach the wallet without real security setup.
+ */
+export const securitySetupPlaceholderEnabled = (): boolean => __DEV__;
+
+/** Diagnostics → "Reset onboarding" (development builds only). */
+export const onboardingResetEnabled = (): boolean => __DEV__;

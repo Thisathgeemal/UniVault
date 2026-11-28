@@ -2052,7 +2052,8 @@ and iOS bundle id), scheme `univault`.
   only in Sprint 2), [mobile-wallet.md](../frontend/mobile-wallet.md) §9
 - **Evidence:** `wallet/src/lib/preferences.ts` (`PREFERENCE_KEYS`),
   `wallet/test/preferences.test.tsx` (only listed keys are ever written; language applied before
-  the first frame)
+  the first frame), `wallet/src/onboarding/gate.ts` and `wallet/test/onboarding.test.tsx` (28 Nov:
+  the gate, the privacy acknowledgement)
 
 ### Context
 
@@ -2115,6 +2116,25 @@ Sri Lanka's PDPA (NFR-08) applies to the personal data in the credentials.
 - The saved language is applied before the first frame (the root layout waits for
   `restoreLanguage()` under the splash screen); a failing read falls back to the phone's
   language.
+- **Added 28 Nov 2026 (onboarding and Appearance):** `PREFERENCE_KEYS` gains
+  `univault.appearance` (`system` | `light` | `dark`), `univault.onboardingCompleted`,
+  `univault.privacyAcknowledgedAt` and the placeholder `univault.securitySetupCompleted`. All are
+  non-secret UI state: they choose the first screen and the theme, and protect nothing. They are
+  restored with the language before the first frame (`restoreAppState()`).
+- **Privacy acknowledgement:** "I understand" on the onboarding Privacy screen is stored as
+  `univault.privacyAcknowledgedAt` = `{ "at": ISO 8601 instant, "version": "privacy-v1" }`,
+  written together with `onboardingCompleted` (one `multiSet`). It records which privacy text the
+  holder saw and when; it is not personal data (no name, no device id) and never leaves the phone.
+  Onboarding counts as complete only for the CURRENT text version (`PRIVACY_POLICY_VERSION`):
+  changing the privacy text means bumping the version, and every holder sees onboarding again.
+- **No skipping security setup:** the wallet's tabs open only when onboarding is complete AND
+  `isSecuritySetupComplete()` is true (`wallet/src/onboarding/gate.ts`, applied by every layout,
+  so deep links and typed URLs are redirected too). Until the PIN task,
+  `isSecuritySetupComplete()` reads the `securitySetupCompleted` preference, which only a
+  development-build placeholder button sets (stripped from release bundles, so a release build
+  cannot reach the tabs yet). The PIN task replaces the function's body with a check against the
+  secure store and removes that preference: whether a wallet is protected must never depend on an
+  unencrypted flag.
 
 ## Decision 024: One shared 'Navy and azure' palette for all three apps, portals distinguished by a role tag
 

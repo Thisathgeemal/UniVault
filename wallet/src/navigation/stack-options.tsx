@@ -1,9 +1,9 @@
-import { useFocusEffect } from 'expo-router';
 import type { NativeStackHeaderProps, NativeStackNavigationOptions } from 'expo-router';
-import { setStatusBarStyle } from 'expo-status-bar';
-import { useCallback } from 'react';
 import { Header } from '../components/Header';
+import { useReduceMotion } from '../theme/reduce-motion';
 import { useTheme } from '../theme/use-theme';
+
+export { useBrandStatusBar } from './status-bar';
 
 /**
  * Renders the shared Header for a stack screen: title from the options, back when possible;
@@ -28,30 +28,19 @@ export function StackHeader({
 }
 
 /**
- * Light status-bar content while a screen with the navy header is focused (dark icons would
- * vanish on navy); back to the scheme's default when it loses focus.
- */
-export function useBrandStatusBar(): void {
-  const { scheme } = useTheme();
-  useFocusEffect(
-    useCallback(() => {
-      setStatusBarStyle('light');
-      return () => setStatusBarStyle(scheme === 'dark' ? 'light' : 'dark');
-    }, [scheme]),
-  );
-}
-
-/**
  * Screen options for every Stack (root and the four tab stacks): the shared Header (back button
  * only when there is a screen to go back to, so a tab's root never shows one) and the themed
  * background. Android's hardware back button is handled by the navigator: it pops the stack,
  * then the tab navigator goes to the first tab (backBehavior "firstRoute"), and only from the
- * Credentials root does it leave the app (the Android norm).
+ * Credentials root does it leave the app (the Android norm). With the phone's "reduce motion"
+ * setting on, screens change without an animated transition.
  */
 export function useStackScreenOptions(): NativeStackNavigationOptions {
   const theme = useTheme();
+  const reduceMotion = useReduceMotion();
   return {
     header: (props) => <StackHeader {...props} />,
     contentStyle: { backgroundColor: theme.colors.bg },
+    animation: reduceMotion ? 'none' : 'default',
   };
 }

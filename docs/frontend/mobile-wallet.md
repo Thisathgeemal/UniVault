@@ -7,9 +7,11 @@
 The holder's app. This document describes the project as initialised on 27 Nov 2026
 (navigation, theme, languages, shared code, Diagnostics) and the **application shell** added the
 same day: a stack per tab, the shared component set, credential status badges, light/dark
-theming with a contrast rule, saved preferences and the developer UI kit. Credential redemption
-(OpenID4VCI), the encrypted vault and presentations are added by the next Sprint 2 tasks and
-will extend this document.
+theming with a contrast rule, saved preferences and the developer UI kit. On 28 Nov 2026 it gained
+**onboarding** (first start), the **gate** that keeps the wallet closed until onboarding and
+security setup are done (section 15), and the **Appearance** setting (section 7). Credential
+redemption (OpenID4VCI), the PIN and the encrypted vault and presentations are added by the next
+Sprint 2 tasks and will extend this document.
 
 ## 1. Stack
 
@@ -19,7 +21,8 @@ will extend this document.
 | Navigation  | Expo Router 58 (file-based): a root Stack, JavaScript bottom tabs (`expo-router/js-tabs`)                            |
 | Language    | TypeScript **6.0.3**, strict (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`)                              |
 | i18n        | i18next 27.2.7 + react-i18next 18.0.3 + expo-localization                                                            |
-| Preferences | `@react-native-async-storage/async-storage` 2.2.0 (language only, section 9)                                         |
+| Preferences | `@react-native-async-storage/async-storage` 2.2.0 (language, appearance, onboarding flags; section 9)                |
+| Drawings    | `react-native-svg` 15.16.0 (`npx expo install`; the onboarding illustrations, section 15)                            |
 | Fonts       | Noto Sans 400/500/600 + Noto Sans Sinhala 400/600 (`@expo-google-fonts/*` 0.4.2, OFL, per-weight imports), expo-font |
 | Icons       | `@expo/vector-icons` (Ionicons), decorative only                                                                     |
 | Tests       | Jest 30 + jest-expo 58 + React Native Testing Library 14                                                             |
@@ -42,10 +45,14 @@ wallet/
   app/                      routes (Expo Router), section 3
   src/components/           the shared components, section 5
   src/credentials/          status.ts: backend status → wallet state, tone and icon (section 6)
-  src/theme/                theme from the shared tokens (light/dark), useTheme(), contrast.ts
+  src/onboarding/           steps.ts, gate.ts (THE gate rule), SetupProvider, security-setup.ts
+                            (placeholder), OnboardingStep, illustrations (section 15)
+  src/theme/                theme from the shared tokens (light/dark), useTheme(), appearance.tsx
+                            (Appearance setting), reduce-motion.ts, contrast.ts
   src/i18n/                 i18next; languages.ts; locales/en.ts, locales/si.ts
-  src/lib/                  crypto-setup.ts, crypto-check.ts, preferences.ts, format.ts
-  src/navigation/           routes.ts (THE route table), tabs.ts, TabStack.tsx, stack-options.tsx
+  src/lib/                  crypto-setup.ts, crypto-check.ts, preferences.ts, app-state.ts, format.ts
+  src/navigation/           routes.ts (THE route table), tabs.ts, TabStack.tsx, stack-options.tsx,
+                            status-bar.tsx, navigation-theme.ts
   src/services/             api-client.ts (EXPO_PUBLIC_API_BASE_URL)
   src/config/               env.ts (API URL rules), app-info.ts (versions, __DEV__ gates)
   src/fixtures/             synthetic SD-JWT for Diagnostics; sample-data.ts (dev builds only)
@@ -55,13 +62,18 @@ wallet/
 
 ### 3.1 Map
 
-A root Stack holds the tab navigator; **each tab has its own Stack**, so a tab keeps its place
-when you switch away and back, and the tab bar stays visible inside a tab.
+A root Stack holds onboarding, security setup and the tab navigator; **each tab has its own
+Stack**, so a tab keeps its place when you switch away and back, and the tab bar stays visible
+inside a tab. The gate (section 15) decides which of the three a holder may see.
 
 ```mermaid
 flowchart TD
-  Root["app/_layout.tsx<br/>root Stack + providers"] --> Index["/ (index.tsx)<br/>redirect"]
+  Root["app/_layout.tsx<br/>root Stack + providers"] --> Index["/ (index.tsx)<br/>redirect by the gate"]
   Index -.-> CL
+  Index -.-> OB["onboarding/_layout.tsx<br/>six steps (section 15)"]
+  Index -.-> SU["setup/security<br/>placeholder"]
+  Root --> OB
+  Root --> SU
   Root --> Tabs["(tabs)/_layout.tsx<br/>bottom tabs, backBehavior firstRoute"]
   Root --> NF["+not-found<br/>unknown univault:// link"]
 
@@ -76,6 +88,7 @@ flowchart TD
   HD -. "credential link" .-> CD
   ST --> SI["/settings"]
   SI --> LA["/settings/language"]
+  SI --> AP["/settings/appearance"]
   SI --> SE["/settings/security<br/>placeholder"]
   SI --> AB["/settings/about"]
   SI -- "dev builds only" --> DI["/settings/diagnostics"]
@@ -84,7 +97,7 @@ flowchart TD
 
 | Route                   | File                              | Screen                                                                  |
 | ----------------------- | --------------------------------- | ----------------------------------------------------------------------- |
-| `/`                     | `index.tsx`                       | Redirect to `/credentials`                                              |
+| `/`                     | `index.tsx`                       | Redirect where the gate says: onboarding, setup or `/credentials`       |
 | `/credentials`          | `(tabs)/credentials/index.tsx`    | Dev: sample CredentialCards (labelled); release: EmptyState             |
 | `/credentials/[id]`     | `(tabs)/credentials/[id].tsx`     | Status, issuer, holder, expiry (sample data); unknown id → "not found"  |
 | `/scan`                 | `(tabs)/scan/index.tsx`           | EmptyState: offers and verification requests (camera in a later task)   |
@@ -92,10 +105,13 @@ flowchart TD
 | `/history/[id]`         | `(tabs)/history/[id].tsx`         | With, when, link to the credential; unknown id → "not found"            |
 | `/settings`             | `(tabs)/settings/index.tsx`       | Language, Security, About; Developer section (dev builds)               |
 | `/settings/language`    | `(tabs)/settings/language.tsx`    | English / සිංහල radio group, saved                                       |
+| `/settings/appearance`  | `(tabs)/settings/appearance.tsx`  | Use device setting / Light / Dark radio group, saved (section 7)        |
 | `/settings/security`    | `(tabs)/settings/security.tsx`    | Placeholder (wallet lock, biometrics later)                             |
 | `/settings/about`       | `(tabs)/settings/about.tsx`       | Description, app version, Expo SDK, Noto Sans Sinhala licence (OFL 1.1) |
 | `/settings/diagnostics` | `(tabs)/settings/diagnostics.tsx` | Dev builds only (section 11)                                            |
 | `/settings/ui-kit`      | `(tabs)/settings/ui-kit.tsx`      | Dev builds only (section 10)                                            |
+| `/onboarding/*`         | `onboarding/*.tsx`                | The six onboarding steps and Privacy details (section 15)               |
+| `/setup/security`       | `setup/security.tsx`              | "Set up your PIN" placeholder (section 15)                              |
 | anything else           | `+not-found.tsx`                  | "Page not found" + Go to my credentials                                 |
 
 ### 3.2 Typed, stable route names
@@ -181,6 +197,8 @@ Cancel, Try again, Loading…, Dismiss message, Status last checked …) it tran
 | `Screen`         | `bg` page, safe-area aware (left/right; the Header handles the top), 16 pt padding, scrolls by default                                                                                                                                                  |
 | `Header`         | Title (wraps), optional back button, up to two icon actions, pads below the status bar; `tone` surface or brand (the Credentials home)                                                                                                                  |
 | `Button`         | Design kinds `primary` (accent), `secondary` (surface + border-strong), `text` (accent-text), `destructive` (status-revoked), `onBrand` (role-tag-bg, on navy only); `loading` and `disabled`; optional icon; 44 pt, radius-md                          |
+| `ChoiceList`     | A single choice as a radio group (`radio` + `checked`, filled / empty radio icon, selected = accent fill); `size="large"` (64 pt, h2 text) for the first-start language step                                                                            |
+| `Checkbox`       | A `checkbox` row with its checked state, box / ticked-box icon, 44 pt, wrapping label ("I understand")                                                                                                                                                  |
 | `Card`           | `surface` with a hairline `border` and an optional `h3` header title                                                                                                                                                                                    |
 | `CredentialCard` | `brand` card, radius-lg: issuer initial on a role-tag-bg circle, issuer and expiry `on-brand-muted`, title and holder `on-brand`, StatusBadge in its own pill; pressable                                                                                |
 | `StatusBadge`    | A credential's state: icon + word in its status set's pill (section 6)                                                                                                                                                                                  |
@@ -215,7 +233,7 @@ own icon and word. Anything else (including `pending`, which never reaches a wal
 
 - **Design rules:** stale or offline status uses the expired colours; verification failures and
   anomalies (later) use the revoked colours; status colours mean nothing else. A status icon
-  never sits directly on navy: on a credential card it is always in its `status-*-bg` pill
+  never sits directly on navy: on a credential card it is always in its `status-*-bg` badge (radius-sm)
   (tested).
 - **Same words as the issuer portal:** the four shared labels ("Valid" replaced "Active" on
   27 Nov 2026) are copied from the portal's `credentials.statuses` in `en.ts` and `si.ts`, and the
@@ -226,10 +244,23 @@ own icon and word. Anything else (including `pending`, which never reaches a wal
 ## 7. Theming and contrast
 
 - **"Navy and azure"** ([design-system.md](../design/design-system.md), Decision 024): light and
-  dark follow the phone (`userInterfaceStyle: "automatic"`, `useColorScheme()`); no manual switch.
-  The same token names in both themes (`theme.colors.brand`, `textMuted`, `statusValidBg` …),
+  dark. The same token names in both themes (`theme.colors.brand`, `textMuted`, `statusValidBg` …),
   values from `portal-ui/src/tokens.ts`. In dark, `brand` is lighter than `bg`, so credential
   cards still stand out, and `accent` is a lighter azure with a deep navy label.
+- **Appearance setting** (Settings → Appearance, below Language; `src/theme/appearance.tsx`):
+  "Use device setting" (default), "Light" or "Dark"; the row shows the current value. The
+  **effective scheme** is the choice, or the phone's scheme (`useColorScheme()`) for "Use device
+  setting"; only then do live system changes apply. `useTheme()` reads it, so every screen,
+  Header, the tab bar, dialogs and toasts change at once; the navigation container gets a theme
+  from the same tokens (`navigation-theme.ts`) and the phone's root view the theme's `bg`
+  (`expo-system-ui`). Native UI follows through `Appearance.setColorScheme()` (set in the same
+  event as the choice; `unspecified` hands it back to the phone). Saved as `univault.appearance`
+  and restored with the language before the first frame (no flash of the wrong theme).
+- **Status bar** (`src/navigation/status-bar.tsx`): ONE `<StatusBar>` whose style is computed,
+  never set imperatively: light content while a screen with the navy header is focused
+  (`useBrandStatusBar()`, the Credentials home) in both themes; otherwise dark content on light,
+  light content on dark. So a theme change, even a live system change on the home screen, never
+  leaves dark icons on navy.
 - **60-30-10 in the wallet:** `bg` screens, a `surface` bottom tab bar with a `border` top edge
   and `surface` list rows; a `brand` header on the Credentials home screen (with light status-bar
   content while it is focused) and `brand` credential cards (radius-lg); `accent` for the one
@@ -243,8 +274,9 @@ own icon and word. Anything else (including `pending`, which never reaches a wal
   pair (`colorPairs()`, built from `toneColors` / `buttonColors`) in `src/theme/contrast.ts` must
   meet **WCAG AA in light and dark**: 4.5:1 normal text; 3:1 large text, icons, input borders and
   the focus ring. Translucent `role-tag-bg` is composited over `brand`. `test/contrast.test.ts`
-  checks 74 pairs in light and 73 in dark (lowest: text 4.58:1 light, 4.90:1 dark; borders 3.08:1
-  light, 3.24:1 dark). One source pairing fails in dark: `text-subtle` on `brand-soft` 4.04:1, so
+  checks 83 pairs in light and 82 in dark (since 28 Nov also the onboarding illustration lines on
+  navy, the progress dots, the checkbox and point icons; lowest unchanged: text 4.58:1 light,
+  4.90:1 dark; borders 3.08:1 light, 3.24:1 dark). One source pairing fails in dark: `text-subtle` on `brand-soft` 4.04:1, so
   wallet text on a brand-soft panel uses `text-muted` (5.77:1). Disabled controls (55 % opacity)
   are exempt, as in WCAG.
 - **No hex anywhere:** no colour literal in `src/` or `app/` (`test/theme.test.ts`,
@@ -278,16 +310,30 @@ own icon and word. Anything else (including `pending`, which never reaches a wal
 
 ## 9. Preferences and the storage rule
 
-- **AsyncStorage holds UI preferences only:** today just the language, under
-  `univault.language` (the same key name as the portals' localStorage). `src/lib/preferences.ts`
-  lists every key in `PREFERENCE_KEYS`; a test checks nothing else is ever written.
+- **AsyncStorage holds non-secret preferences only** (Decision 023). `src/lib/preferences.ts`
+  lists every key in `PREFERENCE_KEYS`; `test/preferences.test.tsx` checks nothing else is ever
+  written and each key only ever gets its allowed values:
+
+  | Key                               | Values                                                | Written by                                             | Read for                           |
+  | --------------------------------- | ----------------------------------------------------- | ------------------------------------------------------ | ---------------------------------- |
+  | `univault.language`               | `en` \| `si` (same name as the portals' key)          | Settings → Language, onboarding language step          | i18n before the first frame        |
+  | `univault.appearance`             | `system` \| `light` \| `dark` (missing = system)      | Settings → Appearance                                  | the effective theme                |
+  | `univault.onboardingCompleted`    | `true` (missing = not done)                           | Privacy step, "Set up security" (with the next key)    | the gate                           |
+  | `univault.privacyAcknowledgedAt`  | JSON `{ "at": ISO instant, "version": "privacy-v1" }` | Privacy step, "Set up security" (one `multiSet`)       | the gate (version must be current) |
+  | `univault.securitySetupCompleted` | `true` (missing = not done). **PLACEHOLDER**          | `/setup/security` "Continue" (development builds only) | `isSecuritySetupComplete()`        |
+
+  Diagnostics → Reset onboarding removes the last three keys (`SETUP_PROGRESS_KEYS`) and keeps
+  the language and appearance. The onboarding flags only choose the first screen; they protect
+  nothing. The PIN task replaces the placeholder flag with a check against the secure store.
+
 - **Never in AsyncStorage:** keys, credentials, SD-JWTs, claims, tokens, PINs or anything
   personal. AsyncStorage is unencrypted (device backups, rooted phones). Those go in **secure
   storage** (`expo-secure-store`: iOS Keychain / Android Keystore) from the holder-key and
   vault tasks.
-- **No flash of the wrong language:** the root layout keeps the splash screen up until both
-  the font and `restoreLanguage()` are done (saved choice, else the phone's language), so the
-  first frame is already in the right language (tested with a held storage read). A failing
+- **No flash of the wrong language, theme or screen:** the root layout keeps the splash screen
+  up until the fonts and `restoreAppState()` (`src/lib/app-state.ts`: language applied, appearance,
+  setup state) are done, so the first frame is already in the right language and theme, on the
+  screen the gate allows (tested with held storage reads). A failing
   read falls back to the device language; a failing write still switches the language for this
   session, and the toast says it could not be saved.
 
@@ -313,12 +359,15 @@ it goes when the vault replaces it.
 ## 11. Diagnostics (development builds only)
 
 Gated by `__DEV__` (false in release builds; the Settings link is hidden and the screen says
-"only available in development builds").
+"only available in development builds"). Since 28 Nov the screen gates on an inline
+`!__DEV__ || !diagnosticsEnabled()`, so Metro drops its checks (and Reset onboarding) from release
+bundles (checked with `npx expo export --platform android`: their test IDs are absent).
 
 | Check             | What it does                                                                                                                                                                                                         |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | App and device    | App version, Expo SDK, platform + OS version, Hermes on/off, API base URL (or what is wrong with it)                                                                                                                 |
 | crypto-core check | Decodes `src/fixtures/diagnostics-credential.ts` with `decodeSdJwt`, re-validates every digest with `validateDisclosures`, checks the `vct` and the 5 expected claim names: "5 of 5 disclosures decoded" + Pass/Fail |
+| Reset onboarding  | `onboardingResetEnabled()` (dev only): a ConfirmDialog, then removes the onboarding, privacy and security-setup flags (keeps language and appearance); the gate opens `/onboarding/language`                         |
 | API reachability  | `GET <EXPO_PUBLIC_API_BASE_URL>/health` (8 s timeout): Reachable with the server status (`ok` / `degraded`) and HTTP code, or the error code (`NETWORK_ERROR`, `TIMEOUT`, …)                                         |
 
 The fixture is synthetic: invented claims, an `.example` issuer, signed by a throwaway RS256 key
@@ -363,31 +412,151 @@ OS-level offer links are needed (Sprint 4–5 at the latest for the Android rele
 
 ## 14. Tests
 
-`wallet/test/` (Jest + React Native Testing Library), 15 files, 343 tests. `test/setup.ts`
+`wallet/test/` (Jest + React Native Testing Library), 17 files, 473 tests. `test/setup.ts`
 fails any test that writes an unexpected `console.error` or `console.warn` (fix the cause;
 the allow-list for unavoidable third-party noise is empty), so the suite runs silent. It also
-installs AsyncStorage's official in-memory mock (emptied before every test), the per-weight font
+installs AsyncStorage's official in-memory mock (emptied before every test, then seeded with a
+holder who finished onboarding and the placeholder security setup, `test/setup-state.ts`, so the
+gate opens the tabs; gate and onboarding tests start from `freshInstall()` or
+`seedOnboardedWithoutSecurity()`), the per-weight font
 mocks and expo-font's `useFonts`, and the splash-screen mock for the root layout. Never `spyOn` +
 restore the AsyncStorage mock's functions: restoring a `jest.fn` removes its in-memory
 implementation (use `mock…Once`).
 
-| File                     | Tests | Covers                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------ | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `navigation.test.tsx`    |    17 | Real `app/` tree: `/` → Credentials, four labelled tabs, tab switching, each stack in and back, deep link keeps the list, Android BackHandler steps, not-found and unknown ids                                                                                                                                                                         |
-| `routes.test.tsx`        |    15 | Route table = files in `app/` (both ways), a Stack per tab, id encoding, every route renders at its path, `/` redirect                                                                                                                                                                                                                                 |
-| `design-system.test.tsx` |    14 | At most one primary (azure) button on every screen but the UI kit; brand header on the Credentials home only, surface elsewhere; screens on `bg`; active tab label in `accent`, inactive `text-muted`                                                                                                                                                  |
-| `components.test.tsx`    |    37 | Every component: the five Button kinds (token colours, radius-md, 44 pt), Badge status sets + neutral (radius-sm), roles / labels / states, hidden decorative icons, Header insets and tones, CredentialCard in brand with the badge in its own pill, OfflineNotice, Toast queue and timing, ConfirmDialog back/backdrop, AppText type scale and fonts |
-| `status.test.tsx`        |    26 | Backend → wallet mapping, unknown values → Not checked yet, **the status mapping table** (set, icon, English, Sinhala), distinct icon + word per state, **label parity with the issuer portal (en + si)**, type names                                                                                                                                  |
-| `contrast.test.ts`       |   157 | WCAG maths incl. translucent compositing; no status colour on navy; text-subtle still lighter than text-muted; the before/after of the 27 Nov fixes; the one light-only pair; 74 pairs in light and 73 in dark, each ≥ 4.5:1 (text) or 3:1 (borders, focus, icons)                                                                                     |
-| `dark-mode.test.tsx`     |     3 | System dark mode: screens and components render with the dark values of the same token names                                                                                                                                                                                                                                                           |
-| `preferences.test.tsx`   |    10 | Save/load, unknown value, storage failures, only listed keys written, Language screen + toast, **simulated restart: first frame already in the saved language**                                                                                                                                                                                        |
-| `ui-kit.test.tsx`        |    15 | Every kind / state / status / card, on-brand buttons on navy, OfflineNotice, disclosure panel tokens, Toast and ConfirmDialog triggers; **release build: no link, "not available", inline `__DEV__` gate**; sample data hidden in release                                                                                                              |
-| `i18n.test.tsx`          |     7 | Language switch changes text and font; About (version, SDK, font licence); key parity, Sinhala script, placeholders; review marker; device language                                                                                                                                                                                                    |
-| `theme.test.ts`          |     6 | Theme = the tokens (design names, light and dark), 4 pt spacing, radii, 44 pt, type scale and fonts per weight and script, tones and button colours, no hex colour in `src/` or `app/`                                                                                                                                                                 |
-| `app.test.tsx`           |     9 | Root layout waits for fonts and language, hides the splash, system-font fallback; only the five font weights imported; app config identifiers, permission texts, token colours, no secrets                                                                                                                                                             |
-| `diagnostics.test.tsx`   |     7 | Facts shown; crypto check pass/fail; health reachable/unreachable; missing URL disables the check; release build shows "not available"                                                                                                                                                                                                                 |
-| `crypto.test.ts`         |    11 | crypto-core check on the fixture; forged disclosure, wrong vct / claims, garbage fail; no private key in the fixture; Hermes polyfill and capability checks                                                                                                                                                                                            |
-| `api-client.test.ts`     |     9 | URL from `EXPO_PUBLIC_API_BASE_URL` (empty, placeholder, invalid, loopback); `GET <base>/health`; degraded, network error, timeout, non-JSON                                                                                                                                                                                                           |
+| File                     | Tests | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------ | ----: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onboarding.test.tsx`    |    83 | **The gate** (rule; first start → onboarding; onboarded without security → setup; both → tabs; typed tab URLs and `/setup/security` redirected; finished holders can't re-enter; an old privacy-text version re-runs onboarding); every step in **en and si**; language applies at once; **Next / Back / swipe / Skip**, Skip never passes Privacy; **"I understand" required, acknowledgement stored with date and version**; Privacy details; **Android back** (exit on step 1, previous step after, also after Skip); **"Step X of Y"** labels and live region (en, si); **reduce motion** (stack and dialog); **dark theme** and large-text-safe layout, one primary per step; setup placeholder (dev only, inline gate); **Reset onboarding** (confirm, keeps language and appearance, failure, hidden in release) |
+| `appearance.test.tsx`    |    19 | Effective scheme; native `Appearance.setColorScheme`; Settings row below Language with its value; **each option** applies at once (screen, header, tab bar, other tabs, dialog) and is saved; not-saved toast; **simulated restart: first frame already dark**; **"Use device setting" follows a simulated live system change, Light / Dark ignore it**; **status bar per theme** and light on the navy header (also during a live change); root view colour via expo-system-ui                                                                                                                                                                                                                                                                                                                                         |
+| `navigation.test.tsx`    |    18 | Real `app/` tree: `/` → Credentials, four labelled tabs, tab switching, each stack in and back, deep link keeps the list, Android BackHandler steps, not-found and unknown ids                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `routes.test.tsx`        |    16 | Route table = files in `app/` (both ways), a Stack per tab, id encoding, every route renders at its path, `/` redirect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `design-system.test.tsx` |    15 | At most one primary (azure) button on every screen but the UI kit; brand header on the Credentials home only, surface elsewhere; screens on `bg`; active tab label in `accent`, inactive `text-muted`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `components.test.tsx`    |    37 | Every component: the five Button kinds (token colours, radius-md, 44 pt), Badge status sets + neutral (radius-sm), roles / labels / states, hidden decorative icons, Header insets and tones, CredentialCard in brand with the badge in its own pill, OfflineNotice, Toast queue and timing, ConfirmDialog back/backdrop, AppText type scale and fonts                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `status.test.tsx`        |    26 | Backend → wallet mapping, unknown values → Not checked yet, **the status mapping table** (set, icon, English, Sinhala), distinct icon + word per state, **label parity with the issuer portal (en + si)**, type names                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `contrast.test.ts`       |   175 | WCAG maths incl. translucent compositing; no status colour on navy; text-subtle still lighter than text-muted; the before/after of the 27 Nov fixes; the one light-only pair; 83 pairs in light and 82 in dark (incl. onboarding illustrations, progress dots, checkbox), each ≥ 4.5:1 (text) or 3:1 (borders, focus, icons)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `dark-mode.test.tsx`     |     3 | System dark mode: screens and components render with the dark values of the same token names                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `preferences.test.tsx`   |    16 | Language save/load, unknown value, storage failures, Language screen + toast, **simulated restart: first frame already in the saved language**; appearance and onboarding keys (defaults, malformed acknowledgement, reset keeps language and appearance, failures), `restoreAppState` never rejects; **storage rule: only the five listed keys, each only with its allowed values**                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `ui-kit.test.tsx`        |    15 | Every kind / state / status / card, on-brand buttons on navy, OfflineNotice, disclosure panel tokens, Toast and ConfirmDialog triggers; **release build: no link, "not available", inline `__DEV__` gate**; sample data hidden in release                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `i18n.test.tsx`          |     7 | Language switch changes text and font; About (version, SDK, font licence); key parity, Sinhala script, placeholders; review marker; device language                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `theme.test.ts`          |     6 | Theme = the tokens (design names, light and dark), 4 pt spacing, radii, 44 pt, type scale and fonts per weight and script, tones and button colours, no hex colour in `src/` or `app/`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `app.test.tsx`           |    10 | Root layout waits for fonts and language, hides the splash, system-font fallback; only the five font weights imported; app config identifiers, permission texts, token colours, no secrets                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `diagnostics.test.tsx`   |     7 | Facts shown; crypto check pass/fail; health reachable/unreachable; missing URL disables the check; release build shows "not available"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `crypto.test.ts`         |    11 | crypto-core check on the fixture; forged disclosure, wrong vct / claims, garbage fail; no private key in the fixture; Hermes polyfill and capability checks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `api-client.test.ts`     |     9 | URL from `EXPO_PUBLIC_API_BASE_URL` (empty, placeholder, invalid, loopback); `GET <base>/health`; degraded, network error, timeout, non-JSON                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
-Coverage (27 Nov 2026, design system): 99.06 % statements, 95.61 % branches, 98.28 % functions,
-99.79 % lines; thresholds 99 / 95 / 98 / 99.
+Coverage (28 Nov 2026, onboarding and Appearance): 99.54 % statements, 95.93 % branches, 99.32 %
+functions, 99.87 % lines; thresholds 99 / 95 / 99 / 99 (functions raised from 98).
+
+## 15. Onboarding and the gate
+
+First start: six short screens, then security setup, then the wallet. Plain words, short
+sentences (NFR-04), every string through `t()` in English and Sinhala (Sinhala needs
+native-speaker review).
+
+### 15.1 Flow
+
+```mermaid
+flowchart TD
+  Start(["App start, deep link or typed URL"]) --> Restore["Root layout, splash screen up:<br/>restoreAppState() = language, appearance, setup state"]
+  Restore --> Gate{"Gate<br/>src/onboarding/gate.ts"}
+  Gate -- "onboarding not complete" --> L["1 Language<br/>/onboarding/language"]
+  Gate -- "onboarded, security not set up" --> S["/setup/security<br/>Set up your PIN (placeholder)"]
+  Gate -- "both complete" --> T["Tabs<br/>/credentials"]
+
+  L -- Next --> W["2 Welcome"]
+  W -- Next --> H["3 How it works"]
+  H -- Next --> D["4 You choose what to share"]
+  D -- Next --> P5["5 Your wallet is protected"]
+  P5 -- Next --> PR["6 Your privacy"]
+  W -. Skip .-> PR
+  H -. Skip .-> PR
+  D -. Skip .-> PR
+  P5 -. Skip .-> PR
+  PR -- "Privacy details" --> PD["/onboarding/privacy-details"]
+  PD -- Back --> PR
+  PR -- "I understand + Set up security:<br/>saves onboardingCompleted + privacyAcknowledgedAt" --> Gate
+  S -- "Continue (development builds only):<br/>saves securitySetupCompleted (placeholder)" --> Gate
+  T -- "Diagnostics → Reset onboarding (dev only)" --> Gate
+```
+
+Back, Android's back button and a swipe right go to the previous step; a swipe left is Next. On
+the first step Android's back button leaves the app.
+
+### 15.2 The gate rule
+
+`requiredArea(state)` in **`src/onboarding/gate.ts`** is the one rule; every layout that can be
+opened applies it through `useGateRedirect(area)` and redirects with `<Redirect>`: `app/index.tsx`
+(app start, `univault://`), `app/(tabs)/_layout.tsx`, `app/onboarding/_layout.tsx`,
+`app/setup/_layout.tsx`. So a deep link or typed URL to any tab screen is redirected the same way
+as the app start.
+
+| Onboarding complete? | Security set up? | The holder sees                                               |
+| -------------------- | ---------------- | ------------------------------------------------------------- |
+| No                   | (any)            | `/onboarding/language` (also for `/setup/security` and tabs)  |
+| Yes                  | No               | `/setup/security` (also for every tab URL and onboarding URL) |
+| Yes                  | Yes              | The tabs (onboarding and setup URLs open `/credentials`)      |
+
+- **Onboarding complete** = `onboardingCompleted` AND a privacy acknowledgement whose version is
+  the current `PRIVACY_POLICY_VERSION` (`privacy-v1`). Changing the privacy text means bumping the
+  version, which sends every holder through onboarding again.
+- **Security set up** = `isSecuritySetupComplete()` (`src/onboarding/security-setup.ts`), the ONE
+  function for it. **Placeholder:** it reads the `univault.securitySetupCompleted` preference. The
+  PIN and biometric task replaces its body with a check against the secure store (and removes the
+  preference and the placeholder button); nothing else changes.
+- **No route skips security setup:** the tabs need both; `/setup/security` has no link into the
+  tabs; Skip lands on Privacy, never past it; swipes never move forward from Privacy.
+- State: `SetupProvider` (`src/onboarding/SetupProvider.tsx`) holds it, restored under the splash
+  screen, and changes it only through `acknowledgePrivacy()`, `completeSecuritySetup()`
+  (placeholder) and `resetOnboarding()`. Each updates the state at once (the gate redirects
+  straight away) and saves it; a failed save is reported in a toast and the holder continues for
+  this session.
+
+### 15.3 Screens
+
+| Step | Route                              | Purpose                                                                                                                                                                                                                               |
+| ---: | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|    1 | `/onboarding/language`             | Choose English / සිංහල first: large radio options (`ChoiceList size="large"`), applied at once and saved like Settings                                                                                                                 |
+|    2 | `/onboarding/welcome`              | "UniVault keeps your digital identity on your phone." You decide what to share                                                                                                                                                        |
+|    3 | `/onboarding/how-it-works`         | Issuer → holder → verifier: an organisation (employer or bank) gives you a credential, you keep it in the wallet, you show it to someone who checks it; a three-part drawing with the role names under it                             |
+|    4 | `/onboarding/selective-disclosure` | You choose what to share, with the example "Prove you are over 18 without showing your birthday" on a `brand-soft` panel                                                                                                              |
+|    5 | `/onboarding/security`             | PIN or fingerprint before every share, encrypted on this phone, works without the internet                                                                                                                                            |
+|    6 | `/onboarding/privacy`              | What stays on the phone, what is shared and only when you approve, nothing sent to UniVault when you share; "Privacy details" link; **"I understand" checkbox required** before "Set up security"                                     |
+|    – | `/onboarding/privacy-details`      | Static text (on the phone, sharing, what UniVault receives, removing the app) and the text version; shared header with Back                                                                                                           |
+|    – | `/setup/security`                  | **Placeholder:** "Set up your PIN" and a short explanation; "PIN setup comes in the next version". Development builds: "Continue (development placeholder)" sets the placeholder flag (inline `__DEV__` gate: not in release bundles) |
+
+### 15.4 Navigation, accessibility and design
+
+- **Frame:** `OnboardingStep` (`src/onboarding/OnboardingStep.tsx`): `bg` screen, Skip (text
+  button, explanation steps 2–5 only) at the top, the illustration on a `brand` panel
+  (`radius-lg`), the title (`h1`, header), the step's text, and a `surface` footer with the progress
+  dots and Back (secondary) / Next (**the one primary**; Privacy: "Set up security", disabled until
+  "I understand" is ticked, with a hint saying so). The content scrolls; the footer buttons wrap
+  onto their own lines at large text sizes; no fixed heights around text.
+- **Back:** Back, Android's back button (a `BackHandler` listener while the step is focused) and a
+  swipe right `dismissTo` the previous step: pop to it, or replace the current screen with it after
+  a Skip or a deep link, so Back always means "previous step". On step 1 Android's back button
+  calls `BackHandler.exitApp()`. The native swipe-back gesture is off in the onboarding stack.
+- **Swipe:** a horizontal move of at least 60 pt that is mostly sideways (touch start / end on the
+  step; taps and vertical scrolling don't count). Left = Next (not on Privacy), right = Back.
+- **Screen readers:** the progress is one `progressbar` element labelled "Step X of 6" (Sinhala:
+  "පියවර 6 න් X වැන්න") with `accessibilityValue` and a polite live region; the same words are visible
+  under the dots. The dots show progress by length and colour (the current dot is longer; done
+  dots `accent`, the rest `border-strong`). Illustrations are decorative (hidden); the role names
+  under the three-step drawing are text.
+- **Reduce motion:** `useReduceMotion()` (`src/theme/reduce-motion.ts`, read at start and followed
+  live); `useStackScreenOptions()` sets `animation: 'none'` for every stack (onboarding, setup,
+  root and the tabs' stacks) and `ConfirmDialog` appears without fading.
+- **Illustrations** (`src/onboarding/illustrations.tsx`): simple original line drawings with
+  `react-native-svg`, no text inside, no stock art, no logos, token colours only: `on-brand` lines,
+  `on-brand-muted` details, `brand-hover` and `role-tag-bg` fills on the `brand` panel (never azure
+  or a status colour on navy). Their pairs are in the contrast test (both themes).
+- **Dark theme and large text:** tested per step (dark tokens on the screen, panel and button; no
+  `numberOfLines` or `adjustsFontSizeToFit` on any text, wrapping footer); clipping at the largest
+  OS font size is checked on the phone (evidence guide `s2-wallet-onboarding-guide.md`).
+
+### 15.5 Reset onboarding (development builds only)
+
+Diagnostics → Onboarding → "Reset onboarding" asks first (ConfirmDialog, destructive), then
+`resetOnboarding()` removes `univault.onboardingCompleted`, `univault.privacyAcknowledgedAt` and
+`univault.securitySetupCompleted` (language and appearance stay), and the gate opens
+`/onboarding/language`. Hidden in release builds (`onboardingResetEnabled()`, inside Diagnostics'
+inline `__DEV__` gate; absent from the exported bundle).

@@ -11,6 +11,7 @@ export default function SettingsStack() {
       screens={[
         { name: 'index', title: t('settings.title') },
         { name: 'language', title: t('settings.language') },
+        { name: 'appearance', title: t('settings.appearance') },
         { name: 'security', title: t('security.title') },
         { name: 'about', title: t('about.title') },
         { name: 'diagnostics', title: t('diagnostics.title') },

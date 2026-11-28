@@ -1,15 +1,31 @@
 /**
  * Diagnostics (DEVELOPMENT BUILDS ONLY): build facts, the configured API URL, a crypto-core
- * check on a bundled synthetic SD-JWT and an API reachability check (GET /health).
- * In a release build (`__DEV__` false) the screen shows only "not available".
+ * check on a bundled synthetic SD-JWT, an API reachability check (GET /health) and "Reset
+ * onboarding" (clears the onboarding, privacy and security-setup flags; keeps language and
+ * appearance; the gate then opens onboarding).
+ * In a release build (`__DEV__` false) the screen shows only "not available"; the inline
+ * `!__DEV__` gate lets Metro drop everything below it from release bundles.
  */
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
-import { AppText, Badge, Button, Card, Screen } from '../../../src/components';
-import { diagnosticsEnabled, getAppInfo } from '../../../src/config/app-info';
+import {
+  AppText,
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  Screen,
+  useToast,
+} from '../../../src/components';
+import {
+  diagnosticsEnabled,
+  getAppInfo,
+  onboardingResetEnabled,
+} from '../../../src/config/app-info';
 import { getApiConfig } from '../../../src/config/env';
 import { runCryptoCoreCheck, type CryptoCheckResult } from '../../../src/lib/crypto-check';
+import { useSetup } from '../../../src/onboarding/SetupProvider';
 import { checkHealth, getApiClient, type HealthResult } from '../../../src/services/api-client';
 
 function Row({
@@ -49,6 +65,49 @@ function ResultBadge({ pass, testID }: { pass: boolean | null; testID: string })
   );
 }
 
+/** Reset onboarding (development builds only), behind a confirmation. */
+function ResetOnboardingCard() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const { resetOnboarding } = useSetup();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const reset = async () => {
+    setBusy(true);
+    const done = await resetOnboarding();
+    setBusy(false);
+    setConfirming(false);
+    toast.show({
+      message: done ? t('diagnostics.resetDone') : t('diagnostics.resetFailed'),
+      tone: done ? 'success' : 'danger',
+    });
+  };
+
+  return (
+    <Card title={t('diagnostics.resetTitle')} testID="reset-onboarding">
+      <AppText tone="muted">{t('diagnostics.resetDescription')}</AppText>
+      <Button
+        variant="secondary"
+        label={t('diagnostics.resetButton')}
+        onPress={() => setConfirming(true)}
+        testID="reset-onboarding-button"
+      />
+      <ConfirmDialog
+        visible={confirming}
+        title={t('diagnostics.resetConfirmTitle')}
+        message={t('diagnostics.resetConfirmMessage')}
+        confirmLabel={t('diagnostics.resetConfirm')}
+        destructive
+        loading={busy}
+        onConfirm={() => void reset()}
+        onCancel={() => setConfirming(false)}
+        testID="reset-onboarding-dialog"
+      />
+    </Card>
+  );
+}
+
 export default function DiagnosticsScreen() {
   const { t } = useTranslation();
   const [crypto, setCrypto] = useState<CryptoCheckResult | null>(null);
@@ -74,7 +133,7 @@ export default function DiagnosticsScreen() {
     }
   }, []);
 
-  if (!diagnosticsEnabled()) {
+  if (!__DEV__ || !diagnosticsEnabled()) {
     return (
       <Screen testID="diagnostics-screen">
         <AppText>{t('diagnostics.unavailable')}</AppText>
@@ -169,6 +228,8 @@ export default function DiagnosticsScreen() {
           testID="run-api-check"
         />
       </Card>
+
+      {onboardingResetEnabled() ? <ResetOnboardingCard /> : null}
     </Screen>
   );
 }

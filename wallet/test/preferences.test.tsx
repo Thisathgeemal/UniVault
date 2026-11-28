@@ -1,7 +1,9 @@
 /**
- * Preferences (AsyncStorage, UI preferences only): the language choice is saved, survives a
- * simulated restart, and is applied BEFORE the first frame (no flash of English); storage
- * failures fall back quietly; nothing but the listed preference keys is ever written.
+ * Preferences (AsyncStorage, non-secret preferences only): the language choice is saved, survives
+ * a simulated restart, and is applied BEFORE the first frame (no flash of English); the
+ * appearance and onboarding flags load and save with safe fallbacks; storage failures fall back
+ * quietly; nothing but the listed preference keys is ever written, each only with its allowed
+ * values.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
@@ -11,12 +13,23 @@ import { join } from 'node:path';
 import { chooseLanguage, i18n, restoreLanguage } from '../src/i18n';
 import { en } from '../src/i18n/locales/en';
 import { si } from '../src/i18n/locales/si';
+import { restoreAppState } from '../src/lib/app-state';
 import {
+  clearSetupProgress,
+  loadAppearancePreference,
   loadLanguagePreference,
+  loadOnboardingProgress,
+  loadSecuritySetupFlag,
+  parsePrivacyAcknowledgement,
   PREFERENCE_KEYS,
+  saveAppearancePreference,
   saveLanguagePreference,
+  saveOnboardingCompleted,
+  saveSecuritySetupFlag,
+  SETUP_PROGRESS_KEYS,
 } from '../src/lib/preferences';
 import { ROUTES } from '../src/navigation/routes';
+import { freshInstall } from './setup-state';
 
 const APP_DIR = join(__dirname, '..', 'app');
 
@@ -28,6 +41,9 @@ const APP_DIR = join(__dirname, '..', 'app');
  */
 const getItem = AsyncStorage.getItem as jest.Mock;
 const setItem = AsyncStorage.setItem as jest.Mock;
+const multiSet = AsyncStorage.multiSet as jest.Mock;
+const multiRemove = AsyncStorage.multiRemove as jest.Mock;
+const ACK = { at: '2026-11-28T09:30:00.000Z', version: 'privacy-v1' };
 
 describe('language preference storage', () => {
   it('saves and loads the language under univault.language', async () => {
@@ -69,17 +85,131 @@ describe('language preference storage', () => {
   });
 });
 
+describe('appearance and onboarding preferences', () => {
+  it('appearance: "system" by default; saved values come back; unknown or failing → "system"', async () => {
+    expect(await loadAppearancePreference()).toBe('system');
+    expect(await saveAppearancePreference('dark')).toBe(true);
+    expect(await AsyncStorage.getItem('univault.appearance')).toBe('dark');
+    expect(await loadAppearancePreference()).toBe('dark');
+    await AsyncStorage.setItem(PREFERENCE_KEYS.appearance, 'sepia');
+    expect(await loadAppearancePreference()).toBe('system');
+    getItem.mockRejectedValueOnce(new Error('disk'));
+    expect(await loadAppearancePreference()).toBe('system');
+    setItem.mockRejectedValueOnce(new Error('disk'));
+    expect(await saveAppearancePreference('light')).toBe(false);
+  });
+
+  it('onboarding: the completed flag and the acknowledgement are saved in one write', async () => {
+    await freshInstall();
+    expect(await loadOnboardingProgress()).toEqual({
+      onboardingCompleted: false,
+      privacyAcknowledgement: null,
+    });
+    expect(await saveOnboardingCompleted(ACK)).toBe(true);
+    expect(multiSet).toHaveBeenCalledTimes(1);
+    expect(await AsyncStorage.getItem('univault.onboardingCompleted')).toBe('true');
+    const stored = await AsyncStorage.getItem('univault.privacyAcknowledgedAt');
+    expect(JSON.parse(stored ?? 'null')).toEqual(ACK);
+    expect(await loadOnboardingProgress()).toEqual({
+      onboardingCompleted: true,
+      privacyAcknowledgement: ACK,
+    });
+  });
+
+  it('a malformed acknowledgement counts as none', () => {
+    expect(parsePrivacyAcknowledgement(JSON.stringify(ACK))).toEqual(ACK);
+    expect(parsePrivacyAcknowledgement(null)).toBeNull();
+    expect(parsePrivacyAcknowledgement('2026-11-28T09:30:00Z')).toBeNull(); // not JSON
+    expect(parsePrivacyAcknowledgement('null')).toBeNull();
+    expect(parsePrivacyAcknowledgement('"text"')).toBeNull();
+    for (const bad of [
+      { ...ACK, at: 'yesterday' },
+      { ...ACK, at: '2026-13-45T99:99:99Z' },
+      { ...ACK, at: 5 },
+      { ...ACK, version: 'v1' },
+      { ...ACK, version: 1 },
+      { at: ACK.at },
+    ]) {
+      expect(parsePrivacyAcknowledgement(JSON.stringify(bad))).toBeNull();
+    }
+  });
+
+  it('security placeholder flag; reset removes only the setup keys', async () => {
+    await freshInstall();
+    expect(await loadSecuritySetupFlag()).toBe(false);
+    expect(await saveSecuritySetupFlag()).toBe(true);
+    expect(await loadSecuritySetupFlag()).toBe(true);
+    await saveLanguagePreference('si');
+    await saveAppearancePreference('dark');
+    expect(await clearSetupProgress()).toBe(true);
+    expect(multiRemove).toHaveBeenCalledWith([...SETUP_PROGRESS_KEYS]);
+    expect(await loadSecuritySetupFlag()).toBe(false);
+    expect(await loadOnboardingProgress()).toEqual({
+      onboardingCompleted: false,
+      privacyAcknowledgement: null,
+    });
+    expect(await AsyncStorage.getItem(PREFERENCE_KEYS.language)).toBe('si');
+    expect(await AsyncStorage.getItem(PREFERENCE_KEYS.appearance)).toBe('dark');
+  });
+
+  it('storage failures never throw: reads count as "not done", writes report false', async () => {
+    getItem.mockRejectedValueOnce(new Error('disk'));
+    expect(await loadOnboardingProgress()).toEqual({
+      onboardingCompleted: false,
+      privacyAcknowledgement: null,
+    });
+    getItem.mockRejectedValueOnce(new Error('disk'));
+    expect(await loadSecuritySetupFlag()).toBe(false);
+    multiSet.mockRejectedValueOnce(new Error('disk'));
+    expect(await saveOnboardingCompleted(ACK)).toBe(false);
+    setItem.mockRejectedValueOnce(new Error('disk'));
+    expect(await saveSecuritySetupFlag()).toBe(false);
+    multiRemove.mockRejectedValueOnce(new Error('disk'));
+    expect(await clearSetupProgress()).toBe(false);
+  });
+
+  it('restoreAppState reads everything together and never rejects', async () => {
+    // five reads: language, appearance, the two onboarding keys, the security flag
+    for (let i = 0; i < 5; i++) getItem.mockRejectedValueOnce(new Error('disk'));
+    expect(await restoreAppState()).toEqual({
+      language: 'en',
+      appearance: 'system',
+      setup: {
+        onboardingCompleted: false,
+        privacyAcknowledgement: null,
+        securitySetupComplete: false,
+      },
+    });
+  });
+});
+
+/** Every preference key, with the only values it may ever hold. */
+const ALLOWED_VALUES: Record<string, (value: string) => boolean> = {
+  'univault.language': (v) => ['en', 'si'].includes(v),
+  'univault.appearance': (v) => ['system', 'light', 'dark'].includes(v),
+  'univault.onboardingCompleted': (v) => v === 'true',
+  'univault.privacyAcknowledgedAt': (v) => parsePrivacyAcknowledgement(v) !== null,
+  'univault.securitySetupCompleted': (v) => v === 'true',
+};
+
 describe('storage rule: preferences only', () => {
-  it('only listed preference keys are ever written, and only "en" / "si" as values', async () => {
+  it('only listed preference keys are ever written, each only with its allowed values', async () => {
     await chooseLanguage('si');
     await chooseLanguage('en');
-    const allowed = new Set<string>(Object.values(PREFERENCE_KEYS));
-    expect(setItem.mock.calls.length).toBe(2);
-    for (const [key, value] of setItem.mock.calls) {
-      expect(allowed.has(key)).toBe(true);
-      expect(['en', 'si']).toContain(value);
+    for (const value of ['dark', 'light', 'system'] as const) await saveAppearancePreference(value);
+    await saveOnboardingCompleted({ at: new Date().toISOString(), version: 'privacy-v1' });
+    await saveSecuritySetupFlag();
+
+    const writes: [string, string][] = [
+      ...(setItem.mock.calls as [string, string][]),
+      ...(multiSet.mock.calls as [[string, string][]][]).flatMap(([pairs]) => pairs),
+    ];
+    // (the official mock's setItem goes through multiSet, so a write can appear in both lists)
+    expect(new Set(writes.map(([key]) => key)).size).toBe(5);
+    for (const [key, value] of writes) {
+      expect([key, ALLOWED_VALUES[key]?.(value) ?? 'not a preference key']).toEqual([key, true]);
     }
-    expect(Object.values(PREFERENCE_KEYS)).toEqual(['univault.language']);
+    expect(Object.values(PREFERENCE_KEYS).sort()).toEqual(Object.keys(ALLOWED_VALUES).sort());
   });
 });
 

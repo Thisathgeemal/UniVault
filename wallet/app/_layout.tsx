@@ -1,12 +1,18 @@
 /**
  * Root layout: providers for every screen.
- * - i18n: initialised synchronously at import (device language), then the SAVED language is
- *   applied (restoreLanguage) before anything renders, so there is no flash of the wrong
- *   language
- * - safe areas, OS colour scheme (status bar), Noto Sans and Noto Sans Sinhala (bundled, expo-font)
+ * - i18n: initialised synchronously at import (device language), then the SAVED state is
+ *   applied before anything renders (restoreAppState: language, appearance, setup state), so
+ *   there is no flash of the wrong language, the wrong theme or the wrong first screen
+ * - safe areas, the appearance (theme: Settings → Appearance or the phone), the setup state for
+ *   the gate (src/onboarding/gate.ts), the status bar (follows the theme and the navy header),
+ *   Noto Sans and Noto Sans Sinhala (bundled, expo-font), the navigation theme
  * - toasts (ToastProvider) and an ErrorBoundary around the navigator
- * The splash screen stays up until the fonts (or their failure: system font) AND the language are
- * ready.
+ * The splash screen stays up until the fonts (or their failure: system font) AND the saved state
+ * are ready.
+ *
+ * The gate lives in the layouts it protects (index, (tabs), onboarding, setup): each one
+ * redirects a holder who may not be there, so a typed URL or deep link is handled the same way
+ * as the app start.
  */
 // One import per weight: the packages' index files require EVERY weight and italic, which would
 // put about 20 unused font files (over 10 MB) into the app bundle
@@ -16,49 +22,53 @@ import { NotoSans_600SemiBold } from '@expo-google-fonts/noto-sans/600SemiBold';
 import { NotoSansSinhala_400Regular } from '@expo-google-fonts/noto-sans-sinhala/400Regular';
 import { NotoSansSinhala_600SemiBold } from '@expo-google-fonts/noto-sans-sinhala/600SemiBold';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary, ToastProvider } from '../src/components';
-import { restoreLanguage, setupI18n } from '../src/i18n';
+import { setupI18n } from '../src/i18n';
+import { restoreAppState, type RestoredAppState } from '../src/lib/app-state';
+import { useNavigationTheme } from '../src/navigation/navigation-theme';
 import { useStackScreenOptions } from '../src/navigation/stack-options';
-import { useTheme } from '../src/theme/use-theme';
+import { StatusBarProvider } from '../src/navigation/status-bar';
+import { SetupProvider } from '../src/onboarding/SetupProvider';
+import { AppearanceProvider } from '../src/theme/appearance';
 
 setupI18n();
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 function RootNavigator() {
   const { t } = useTranslation();
-  const theme = useTheme();
   const screenOptions = useStackScreenOptions();
+  const navigationTheme = useNavigationTheme();
   return (
-    <>
-      <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
+    <ThemeProvider value={navigationTheme}>
       <Stack screenOptions={screenOptions}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="setup" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ title: t('notFound.title') }} />
       </Stack>
-    </>
+    </ThemeProvider>
   );
 }
 
-/** True once the saved language (or the device language) is applied. */
-function useLanguageReady(): boolean {
-  const [ready, setReady] = useState(false);
+/** The saved language (applied), appearance and setup state; null until they are read. */
+function useRestoredAppState(): RestoredAppState | null {
+  const [restored, setRestored] = useState<RestoredAppState | null>(null);
   useEffect(() => {
     let active = true;
-    void restoreLanguage().then(() => {
-      if (active) setReady(true);
+    void restoreAppState().then((state) => {
+      if (active) setRestored(state);
     });
     return () => {
       active = false;
     };
   }, []);
-  return ready;
+  return restored;
 }
 
 export default function RootLayout() {
@@ -70,8 +80,8 @@ export default function RootLayout() {
     NotoSansSinhala_400Regular,
     NotoSansSinhala_600SemiBold,
   });
-  const languageReady = useLanguageReady();
-  const ready = (fontsLoaded || fontError !== null) && languageReady;
+  const restored = useRestoredAppState();
+  const ready = (fontsLoaded || fontError !== null) && restored !== null;
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync().catch(() => undefined);
@@ -80,11 +90,17 @@ export default function RootLayout() {
   if (!ready) return null;
   return (
     <SafeAreaProvider>
-      <ToastProvider>
-        <ErrorBoundary>
-          <RootNavigator />
-        </ErrorBoundary>
-      </ToastProvider>
+      <AppearanceProvider initial={restored.appearance}>
+        <SetupProvider initial={restored.setup}>
+          <StatusBarProvider>
+            <ToastProvider>
+              <ErrorBoundary>
+                <RootNavigator />
+              </ErrorBoundary>
+            </ToastProvider>
+          </StatusBarProvider>
+        </SetupProvider>
+      </AppearanceProvider>
     </SafeAreaProvider>
   );
 }

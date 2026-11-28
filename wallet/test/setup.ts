@@ -1,5 +1,7 @@
 /**
- * Jest setup: English UI, empty AsyncStorage (official mock), font and splash mocks for the
+ * Jest setup: English UI, AsyncStorage (official mock) emptied and then seeded with a holder who
+ * finished onboarding and (placeholder) security setup (test/setup-state.ts: the gate opens the
+ * tabs; gate and onboarding tests start from freshInstall()), font and splash mocks for the
  * root layout, the crypto runtime set up exactly as in the app (index.ts imports
  * src/lib/crypto-setup first), the real app config for expo-constants, and a console guard.
  *
@@ -14,6 +16,7 @@
 import '../src/lib/crypto-setup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setupI18n, i18n } from '../src/i18n';
+import { seedCompletedSetup } from './setup-state';
 
 // AsyncStorage's official in-memory Jest mock; emptied before every test (no state leaks)
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -76,6 +79,7 @@ beforeEach(async () => {
   }
   if (i18n.language !== 'en') await i18n.changeLanguage('en');
   await AsyncStorage.clear();
+  await seedCompletedSetup();
 });
 
 afterEach(() => {

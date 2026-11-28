@@ -35,14 +35,15 @@ A quick test: blur your eyes at any screen. You should see mostly light grey and
 ### Holder wallet (light and dark themes)
 
 - **60%:** `bg` screens, a `surface` bottom tab bar with a `border` top edge, and `surface` list rows.
-- **30%:** a `brand` header on the home screen, and credential cards in `brand` with `radius-lg`. On a card, the credential title is `on-brand`, and the issuer and expiry are `on-brand-muted`. The status badge sits on the card in its own `status-*-bg` pill.
+- **30%:** a `brand` header on the home screen, and credential cards in `brand` with `radius-lg`. On a card, the credential title is `on-brand`, and the issuer and expiry are `on-brand-muted`. The status badge sits on the card in its own `status-*-bg` badge (`radius-sm`).
 - **10%:** the primary action on each screen ("Scan QR", "Accept credential", "Share"), and the active tab icon and label in the bottom bar.
 - **Disclosure screen:** show the verifier's name and logo in a `brand-soft` panel at the top, the attribute checkboxes on `surface`, and one `accent` "Share" button at the bottom. Biometric or PIN confirmation follows.
 - **Offline notice:** a `status-expired-bg` banner with `status-expired-text`, saying when the status was last checked ("Status last checked 2 hours ago").
+- **Onboarding illustrations:** simple original line drawings (no stock art, no logos, no text inside) on a `brand` panel with `radius-lg`, in `on-brand` lines, `on-brand-muted` details and `brand-hover` / `role-tag-bg` fills only; never azure or a status colour on navy. One `accent` button per step ("Next", last: "Set up security"); Back and Skip are secondary and text buttons.
 
 ### Dark theme (wallet only)
 
-The portals stay light, because they run on office desktops. The wallet follows the phone's system setting. Use the `dark` value of every token. The same names work in both themes, so components don't change.
+The portals stay light, because they run on office desktops. The wallet follows the phone's system setting by default; its Appearance setting (wallet only) can fix it to light or dark instead ("Use device setting", "Light", "Dark"). Use the `dark` value of every token. The same names work in both themes, so components don't change.
 
 - In dark theme, `brand` (#16335C) is lighter than `bg` (#0A1628), so credential cards still stand out.
 - In dark theme, `accent` becomes a lighter azure (#60A5FA) with a deep navy label (`on-accent`). This is the one place azure may sit on navy.
@@ -69,7 +70,7 @@ Rules:
 - Always show the icon and the word together ("Valid", "වලංගුයි"). Never rely on colour alone, so colour-blind users can still read the status.
 - Never use a status colour for decoration, a chart series or a brand moment.
 - Verification failures and anomalies use the revoked colours. Stale or offline status uses the expired colours.
-- A status icon never sits directly on navy (`brand`, `brand-hover`): on a credential card or in the top bar it is always inside its own `status-*-bg` badge pill. Several status colours are below 3:1 on navy (revoked 2.38:1 and pending 2.03:1 on light `brand`), but every one passes inside its pill.
+- A status icon never sits directly on navy (`brand`, `brand-hover`): on a credential card or in the top bar it is always inside its own `status-*-bg` badge (`radius-sm`). Several status colours are below 3:1 on navy (revoked 2.38:1 and pending 2.03:1 on light `brand`), but every one passes inside its badge.
 
 ## Buttons
 
@@ -112,7 +113,7 @@ Spacing runs on a 4px base: `space-1` 4, `space-2` 8, `space-3` 12, `space-4` 16
 
 Every text pairing in this system meets WCAG AA (4.5:1) in both themes. Input borders and the focus ring meet 3:1. If a new pairing is added, check it before using it. Body text on `bg` is 16.6:1 in light and 15.5:1 in dark.
 
-The wallet's contrast test (`wallet/test/contrast.test.ts`, pair list in `wallet/src/theme/contrast.ts`) checks every pairing below in both themes: text, text-muted, text-subtle, links and the focus ring on `bg`, `surface` and `surface-sunken`; text on `brand-soft`; on-brand text on `brand`, `brand-hover` and the role tag; the primary, destructive and on-brand button labels; every status badge text and icon (in its pill and on `surface` / `bg`); input borders; the offline notice and the disclosure panel.
+The wallet's contrast test (`wallet/test/contrast.test.ts`, pair list in `wallet/src/theme/contrast.ts`) checks every pairing below in both themes: text, text-muted, text-subtle, links and the focus ring on `bg`, `surface` and `surface-sunken`; text on `brand-soft`; on-brand text on `brand`, `brand-hover` and the role tag; the primary, destructive and on-brand button labels; every status badge text and icon (in its badge and on `surface` / `bg`); input borders; the offline notice and the disclosure panel.
 
 ### Contrast fixes (27 Nov 2026)
 
@@ -130,7 +131,7 @@ The first version of the palette had light-theme pairings below AA. Three fixes,
 
 `text-subtle` stays visibly lighter than `text-muted` (light: 5.07:1 against 7.06:1 on `bg`). The two usage tokens are defined as other tokens in `portal-ui/src/tokens.ts`, so components never pick these colours ad hoc.
 
-**Dark theme, one restriction:** `text-subtle` on `brand-soft` is 4.04:1 in dark. The portals (light only) may use it in selected table rows; in the wallet, text on a `brand-soft` panel (the disclosure panel, info banners) uses `text-muted` (5.77:1) instead. Every other pairing passes in both themes. Lowest pairs after the fixes (74 pairs checked in light, 73 in dark): text 4.58:1 light (`text-subtle` on `brand-soft`) and 4.90:1 dark (`text-subtle` on `surface`); borders, icons and focus 3.08:1 light (`border-strong` on `surface-sunken`) and 3.24:1 dark (`border-strong` on `surface`).
+**Dark theme, one restriction:** `text-subtle` on `brand-soft` is 4.04:1 in dark. The portals (light only) may use it in selected table rows; in the wallet, text on a `brand-soft` panel (the disclosure panel, info banners) uses `text-muted` (5.77:1) instead. Every other pairing passes in both themes. Lowest pairs after the fixes (83 pairs checked in light, 82 in dark since the onboarding pairs were added on 28 Nov 2026): text 4.58:1 light (`text-subtle` on `brand-soft`) and 4.90:1 dark (`text-subtle` on `surface`); borders, icons and focus 3.08:1 light (`border-strong` on `surface-sunken`) and 3.24:1 dark (`border-strong` on `surface`).
 
 ## Using the tokens in code
 

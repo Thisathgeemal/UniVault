@@ -43,11 +43,12 @@ module.exports = {
     '!src/components/index.ts',
     '!**/*.d.ts',
   ],
-  // Just below the figures on 27 Nov 2026 after the app shell (99.19 / 95.38 / 98.74 / 100),
-  // rounded down (initialisation: 98 / 93 / 96 / 99).
+  // Just below the figures on 28 Nov 2026 after onboarding and Appearance (99.54 / 95.93 / 99.32 /
+  // 99.87), rounded down; functions raised from 98 (app shell 27 Nov: 99.19 / 95.38 / 98.74 / 100;
+  // initialisation: 98 / 93 / 96 / 99).
   // Raise them when coverage improves; never lower them to make a change pass.
   coverageThreshold: {
-    global: { statements: 99, branches: 95, functions: 98, lines: 99 },
+    global: { statements: 99, branches: 95, functions: 99, lines: 99 },
   },
   coverageReporters: ['text', 'html', 'json-summary'],
   coverageDirectory: 'coverage',

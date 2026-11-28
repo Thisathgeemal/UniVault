@@ -4,7 +4,7 @@ import { AppText, CredentialCard, EmptyState, Screen } from '../../../src/compon
 import { sampleDataEnabled } from '../../../src/config/app-info';
 import { SAMPLE_CREDENTIALS, sampleStatus } from '../../../src/fixtures/sample-data';
 import { ROUTES } from '../../../src/navigation/routes';
-import { useBrandStatusBar } from '../../../src/navigation/stack-options';
+import { useBrandStatusBar } from '../../../src/navigation/status-bar';
 
 /**
  * Credentials tab root. Until the vault exists: the empty state in release builds, synthetic

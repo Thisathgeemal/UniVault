@@ -118,18 +118,28 @@ wallet/           React Native, Expo SDK 58 + Expo Router (Decision 022; docs/fr
   app.config.ts     name, version, scheme univault, lk.univault.wallet, permission texts, splash
   metro.config.js   crypto-core symlink (watchFolders, nodeModulesPaths), tokens → portal-ui/src/tokens.ts, guards
   jest.config.js    jest-expo + .mjs transform + tokens mapping + thresholds
-  app/              routes: _layout (providers, saved language), index (→ /credentials), +not-found,
-                    (tabs)/ with a Stack per tab: credentials/ (index, [id]), scan/, history/
-                    (index, [id]), settings/ (index, language, security, about, diagnostics and
-                    ui-kit: dev only)
+  app/              routes: _layout (providers; saved language, appearance and setup state restored
+                    under the splash), index (→ where the gate says), +not-found, onboarding/ (gate;
+                    language, welcome, how-it-works, selective-disclosure, security, privacy,
+                    privacy-details), setup/ (gate; security = "Set up your PIN" placeholder),
+                    (tabs)/ (gate) with a Stack per tab: credentials/ (index, [id]), scan/, history/
+                    (index, [id]), settings/ (index, language, appearance, security, about,
+                    diagnostics and ui-kit: dev only)
   src/components/   Header, Button, Card, CredentialCard, StatusBadge, Badge, ListItem, SectionHeader,
                     LoadingState, EmptyState, ErrorState, OfflineNotice, Toast, ConfirmDialog, Icon,
-                    Screen, AppText, ErrorBoundary
+                    Screen, AppText, ErrorBoundary, ChoiceList (radio group), Checkbox
+  src/onboarding/   steps.ts (order), gate.ts (THE gate rule, PRIVACY_POLICY_VERSION), SetupProvider
+                    (setup state + actions), security-setup.ts (isSecuritySetupComplete: PLACEHOLDER),
+                    OnboardingStep (frame: Skip, Back/Next, swipe, Android back, progress),
+                    illustrations (react-native-svg, tokens only)
   src/credentials/  status.ts: walletStatusFromBackend() = THE backend → wallet status mapping
-  src/navigation/   routes.ts = THE route table (ROUTES, ROUTE_FILES), tabs.ts, TabStack, stack-options
-  src/theme/        theme = the tokens (light/dark, design names), useTheme(), contrast.ts (DESIGN_PAIRS)
+  src/navigation/   routes.ts = THE route table (ROUTES, ROUTE_FILES), tabs.ts, TabStack, stack-options,
+                    status-bar.tsx (the ONE computed StatusBar), navigation-theme.ts
+  src/theme/        theme = the tokens (light/dark, design names), useTheme(), appearance.tsx (Appearance
+                    setting, effective scheme), reduce-motion.ts, contrast.ts (DESIGN_PAIRS)
   src/i18n/         i18next + expo-localization; locales/en.ts, si.ts (needs native-speaker review)
-  src/lib/          crypto-setup.ts, crypto-check.ts (Diagnostics), preferences.ts (AsyncStorage), format.ts
+  src/lib/          crypto-setup.ts, crypto-check.ts (Diagnostics), preferences.ts (AsyncStorage),
+                    app-state.ts (restoreAppState: everything the first frame needs), format.ts
   src/fixtures/     sample-data.ts: synthetic credentials/history, dev builds only
   src/services/     api-client.ts (EXPO_PUBLIC_API_BASE_URL, GET /health)
   src/config/       env.ts (API URL rules), app-info.ts (versions, __DEV__ gate)
@@ -182,7 +192,7 @@ cleanly.)
   (exact), typescript 6.0.3, i18next 27.2.7, react-i18next 18.0.3,
   @expo-google-fonts/noto-sans 0.4.2 and noto-sans-sinhala 0.4.2 (imported per weight: 5 font files),
   @expo/vector-icons 15.1.1,
-  @react-native-async-storage/async-storage 2.2.0, jest 30.5.2, jest-expo
+  @react-native-async-storage/async-storage 2.2.0, react-native-svg 15.16.0, jest 30.5.2, jest-expo
   58.0.16, @testing-library/react-native 14.1.0, test-renderer 1.3.1, @expo/ngrok 4.1.3. Add
   Expo-managed packages ONLY with `npx expo install <pkg>`, then pin the installed version
   exactly; `npm run doctor` must stay 20/20.
@@ -220,7 +230,7 @@ cd crypto-core && npm test                  # crypto-core tests (158) + coverage
 cd claims-validation && npm test | test:coverage | build | typecheck   # shared claim validation (23 tests)
 cd portal-ui && npm run build | typecheck | test | test:coverage   # shared layout (97 tests); build regenerates theme.css
 cd wallet && npm start                      # Metro :8081 (LAN), scan with Expo Go; start:tunnel = ngrok
-cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 343 tests; doctor = expo-doctor (20/20)
+cd wallet && npm run typecheck | lint | test | test:coverage | doctor   # 473 tests; doctor = expo-doctor (20/20)
 cd wallet && npm run android | ios | fixture:diagnostics | art:placeholder
 cd issuer-portal && npm run dev             # http://localhost:5173 (backend: npm run dev in backend/)
 cd issuer-portal && npm test | test:coverage | typecheck | build | preview   # 424 tests; build also checks the bundle
@@ -359,11 +369,34 @@ of `D:/...`. See Sprint 1, Issue 6.
     borders, focus ring, icons, large text) in light AND dark (`test/contrast.test.ts`). Use
     `toneColors()` / `buttonColors()`, not ad-hoc pairs. In the wallet, text on `brand-soft` is
     `text-muted` (dark `text-subtle` on brand-soft is 4.04:1).
-  - **Storage rule (Decision 023):** AsyncStorage = UI preferences ONLY (today `univault.language`; every key in
-    `PREFERENCE_KEYS`, `src/lib/preferences.ts`, test-enforced). Keys, credentials, SD-JWTs,
-    claims, tokens, PINs and anything personal go in secure storage (`expo-secure-store`) from
-    the holder-key / vault tasks, never AsyncStorage. The saved language is applied before the
-    first frame (root layout waits for `restoreLanguage()` under the splash screen).
+  - **Storage rule (Decision 023):** AsyncStorage = non-secret preferences ONLY, every key in
+    `PREFERENCE_KEYS` (`src/lib/preferences.ts`; test-enforced: only these keys, each only with its
+    allowed values): `univault.language` (`en`|`si`), `univault.appearance`
+    (`system`|`light`|`dark`), `univault.onboardingCompleted` (`true`),
+    `univault.privacyAcknowledgedAt` (JSON `{ at: ISO instant, version: "privacy-v1" }`) and the
+    PLACEHOLDER `univault.securitySetupCompleted` (`true`; goes in the PIN task). Keys,
+    credentials, SD-JWTs, claims, tokens, PINs and anything personal go in secure storage
+    (`expo-secure-store`) from the holder-key / vault tasks, never AsyncStorage. All of it is
+    restored before the first frame (root layout waits for `restoreAppState()` under the splash
+    screen: no flash of the wrong language, theme or screen).
+  - **Gate rule (`src/onboarding/gate.ts`, `requiredArea()`): the tabs are reachable only when
+    onboarding is complete AND `isSecuritySetupComplete()` is true.** Not onboarded →
+    `/onboarding/language`; onboarded without security → `/setup/security`. "Onboarding complete"
+    = `onboardingCompleted` + an acknowledgement of the CURRENT `PRIVACY_POLICY_VERSION` (bump it
+    when the privacy text changes). Every layout that can be opened (`app/index.tsx`, `(tabs)`,
+    `onboarding`, `setup`) redirects with `useGateRedirect(area)`, so deep links and typed URLs
+    are handled like the app start. NO route may let a holder skip security setup: Skip stops at
+    Privacy, `/setup/security` has no way into the tabs except completing setup.
+    `isSecuritySetupComplete()` (`src/onboarding/security-setup.ts`) is the ONE security check:
+    today a placeholder on the preference (set only by a dev-only button, inline `__DEV__` gate);
+    the PIN task replaces its body with a secure-store check. Change setup state only through
+    `SetupProvider` (`acknowledgePrivacy`, `completeSecuritySetup`, `resetOnboarding`).
+  - **Theme:** `useTheme()` uses the EFFECTIVE scheme (`src/theme/appearance.tsx`): Settings →
+    Appearance ("Use device setting" default, Light, Dark), or the phone's scheme (live) for
+    "Use device setting". Never call `useColorScheme()` in a component. The status bar is ONE
+    computed `<StatusBar>` (`src/navigation/status-bar.tsx`): navy-header screens call
+    `useBrandStatusBar()`; never `setStatusBarStyle()`. Stacks use `useStackScreenOptions()`
+    (reduce motion → `animation: 'none'`).
   - **Dev-only screens and data:** Diagnostics (`diagnosticsEnabled()`), UI kit (`uiKitEnabled()`)
     and the synthetic sample credentials/history (`sampleDataEnabled()`) are `__DEV__` only. Gate a
     dev-only screen with an INLINE `!__DEV__ || !gate()` so Metro drops its code from release
@@ -437,7 +470,7 @@ Details (Decision 024):
   revoked / ban; pending (Awaiting wallet) → pending / hourglass; superseded (Replaced) → pending /
   swap; wallet "Not checked yet" → expired / offline; "Checking…" → pending / refresh. Errors,
   failed verifications and anomalies use the revoked colours. "Valid" (වලංගුයි), never "Active".
-  A status icon never sits directly on navy: always in its badge pill.
+  A status icon never sits directly on navy: always in its `status-*-bg` badge (radius-sm).
 - **Portals:** light only; portal-ui `AppShell` = navy top bar (UniVault + role tag:
   `header.roleTag = { label, icon }`) and navy 240 px sidebar (active item: brand-hover fill,
   on-brand label, 3 px on-brand left bar); pages on `bg`, cards and tables on `surface`, table
@@ -446,8 +479,10 @@ Details (Decision 024):
   radius-pill; type steps `text-display` … `text-caption` (forms 16 px, dense tables
   `text-body-sm`); fonts self-hosted via @fontsource. `issuer-portal/test/design-system.test.tsx`
   checks at most one primary per page.
-- **Wallet:** light + dark from the same names; bg screens, surface tab bar (border top, active
-  tab accent), brand header on the Credentials home only, CredentialCard brand + radius-lg;
+- **Wallet:** light + dark from the same names (Settings → Appearance, default the phone); bg
+  screens, surface tab bar (border top, active tab accent), brand header on the Credentials home
+  only, CredentialCard brand + radius-lg; onboarding illustrations original SVG on a brand panel in
+  on-brand / on-brand-muted / brand-hover / role-tag-bg only;
   `Button` kinds as above (min 44 pt); `OfflineNotice` (expired colours); the disclosure panel
   token set (`componentTokens.disclosurePanel`, brand-soft) is shown in the UI kit for later.
 
@@ -658,8 +693,11 @@ documented, unavoidable third-party noise only and is empty). Fix the cause, nev
   calls".
 - A test that expects an error (ErrorBoundary) mocks `console.error` itself. `clearMocks` is on
   (fresh call counts per test).
-- `test/setup.ts` installs the official AsyncStorage mock (cleared before each test) and mocks the
-  Sinhala font and splash screen for the root layout. **Never `jest.spyOn` + restore the
+- `test/setup.ts` installs the official AsyncStorage mock (cleared before each test, then seeded
+  with a holder who finished onboarding and the placeholder security setup, `test/setup-state.ts`,
+  so the gate opens the tabs; gate / onboarding tests start with `freshInstall()` or
+  `seedOnboardedWithoutSecurity()`) and mocks the Sinhala font and splash screen for the root
+  layout. The mock's `setItem` goes through `multiSet` (a write shows in both call lists). **Never `jest.spyOn` + restore the
   AsyncStorage mock's functions:** they are `jest.fn`s and restoring removes their in-memory
   store (later tests then pass against a dead store). Use `(AsyncStorage.getItem as
 jest.Mock).mockRejectedValueOnce(…)` / `mockImplementationOnce`.
@@ -788,15 +826,15 @@ secrets or personal data may appear in responses or logs.
 
 ## Done so far (Sprint 1, and Sprint 2 from 27 Nov)
 
-Test totals (27 Nov 2026, design system applied): **crypto-core 158 tests** (6 files; 97.63%
+Test totals (28 Nov 2026, wallet onboarding and Appearance; other packages unchanged since 27 Nov): **crypto-core 158 tests** (6 files; 97.63%
 statements, 93.89% branches, 100% functions, 99.14% lines), **backend
 571 tests** (23 files in two Vitest projects; 90.74% statements, 88.08% branches, 94.52% functions,
 91.13% lines; thresholds 90 / 86 / 93 / 90), **issuer-portal 424 tests** (18
 files; 97.56% statements, 92.2% branches, 98.02% functions, 98.57% lines;
 thresholds 96 / 91 / 97 / 98) plus **10 Playwright e2e tests**, **portal-ui 97
 tests** (8 files; 100% statements, 98.73% branches, 100% functions, 100% lines;
-thresholds 99 / 94 / 99 / 99), **wallet 343 tests** (15 files, Jest + RNTL; 99.06% statements,
-95.61% branches, 98.28% functions, 99.79% lines; thresholds 99 / 95 / 98 / 99) and
+thresholds 99 / 94 / 99 / 99), **wallet 473 tests** (17 files, Jest + RNTL; 99.54% statements,
+95.93% branches, 99.32% functions, 99.87% lines; thresholds 99 / 95 / 99 / 99) and
 **claims-validation 23 tests** (1 file; 98.63%
 statements, 90.47% branches, 100% functions, 98.57% lines; thresholds 98 / 89 / 100 / 98),
 all passing.
@@ -938,5 +976,17 @@ replaces }`.
   cards, OfflineNotice, disclosure panel tokens in the UI kit, Noto Sans per weight (5 font
   files); contrast test over every design pairing in both themes. Also Decision 023 (storage
   tiers) and the portal's "Replaced" wording everywhere.
+- **Wallet onboarding, the security gate and Appearance** (28 Nov, Sprint 2,
+  `docs/frontend/mobile-wallet.md` §7, §9, §15, Decision 023 consequences): Settings → Appearance
+  (Use device setting / Light / Dark, saved, restored before the first frame, live system changes
+  only for "Use device setting", app-wide incl. navigation theme, dialogs and the root view;
+  one computed status bar, light on the navy header); onboarding stack (language, welcome, how it
+  works, selective disclosure, security, privacy + "I understand" + Privacy details) with Next /
+  Back / swipe / Skip-to-Privacy, "Step X of 6" for screen readers, Android back (exit on step 1),
+  reduce motion, original SVG illustrations (`react-native-svg`); the gate (onboarding → setup →
+  tabs, deep links redirected; privacy acknowledgement with date + `privacy-v1`);
+  `/setup/security` placeholder with `isSecuritySetupComplete()` on a placeholder flag (dev-only
+  Continue); Diagnostics → Reset onboarding (dev only; Diagnostics now inline-gated, stripped from
+  release bundles); `ChoiceList`, `Checkbox`; contrast 83 / 82 pairs.
 - **Planned routes (return `501` until built):** wallet redemption
   (`/credential-offers/token`, `/credential`), verifications.

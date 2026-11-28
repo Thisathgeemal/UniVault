@@ -2,6 +2,8 @@ export { AppText, type AppTextProps, type AppTextTone, type AppTextVariant } fro
 export { Badge, type BadgeProps, type BadgeTone } from './Badge';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export { Card, type CardProps } from './Card';
+export { Checkbox, type CheckboxProps } from './Checkbox';
+export { ChoiceList, type Choice, type ChoiceListProps } from './ChoiceList';
 export { ConfirmDialog, type ConfirmDialogProps } from './ConfirmDialog';
 export { CredentialCard, issuerInitial, type CredentialCardProps } from './CredentialCard';
 export { EmptyState, type EmptyStateProps } from './EmptyState';

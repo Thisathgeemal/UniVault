@@ -1,5 +1,5 @@
-import { useColorScheme } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useEffectiveColorScheme } from './appearance';
 import { fontFor, getTheme, typeStyle, type Theme, type TypeStep, type Weight } from './index';
 
 export interface ThemeWithScript extends Theme {
@@ -11,9 +11,12 @@ export interface ThemeWithScript extends Theme {
   type: (step: TypeStep) => { fontSize: number; lineHeight: number; fontFamily: string };
 }
 
-/** The theme for the OS colour scheme and the current UI language. */
+/**
+ * The theme for the effective colour scheme (Settings → Appearance, or the phone's setting:
+ * src/theme/appearance.tsx) and the current UI language.
+ */
 export function useTheme(): ThemeWithScript {
-  const scheme = useColorScheme();
+  const scheme = useEffectiveColorScheme();
   const { i18n } = useTranslation();
   const script = i18n.language === 'si' ? 'sinhala' : 'latin';
   return {

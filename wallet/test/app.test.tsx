@@ -32,6 +32,12 @@ describe('root layout (real app/ routes)', () => {
     expect(SplashScreen.hideAsync).toHaveBeenCalled();
   });
 
+  it('still starts if hiding the splash screen fails', async () => {
+    (SplashScreen.hideAsync as jest.Mock).mockRejectedValueOnce(new Error('no splash'));
+    await renderRouter(APP_DIR, { initialUrl: '/' });
+    expect(await screen.findByTestId('credentials-screen')).toBeOnTheScreen();
+  });
+
   it('keeps the splash screen (renders nothing) while the font loads', async () => {
     (useFonts as jest.Mock).mockReturnValue([false, null]);
     await renderRouter(APP_DIR, { initialUrl: '/' });

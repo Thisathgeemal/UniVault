@@ -11,6 +11,10 @@ status badges in the issuer portal's words, the "Navy and azure" design system
 ([docs/design/design-system.md](../docs/design/design-system.md): light/dark from the shared
 tokens, Noto Sans + Noto Sans Sinhala, WCAG AA contrast tested in both themes), the saved
 language preference, About, and the dev-only Diagnostics and UI kit.
+**28 Nov 2026:** onboarding on the first start (language, welcome, how it works, selective
+disclosure, security, privacy with "I understand"), then a "Set up your PIN" placeholder; a
+**gate** opens the tabs only when onboarding AND security setup are complete; **Settings →
+Appearance** (Use device setting / Light / Dark).
 Credentials and History show **synthetic sample data in development builds only**; credential
 redemption, the vault, the camera and presentation follow in the next Sprint 2 tasks. Design
 doc: [docs/frontend/mobile-wallet.md](../docs/frontend/mobile-wallet.md).
@@ -95,7 +99,7 @@ bundle; never put a secret in one.
 | `npm run typecheck`           | `tsc --noEmit` (TypeScript 6.0.3)                                              |
 | `npm run lint`                | Root ESLint config on `wallet/`, 0 warnings allowed                            |
 | `npm test`                    | Jest (jest-expo) + React Native Testing Library                                |
-| `npm run test:coverage`       | Same with coverage; fails below 99 / 95 / 98 / 99 (stmts/branches/funcs/lines) |
+| `npm run test:coverage`       | Same with coverage; fails below 99 / 95 / 99 / 99 (stmts/branches/funcs/lines) |
 | `npm run doctor`              | `npx expo-doctor`: SDK version alignment, config and dependency checks         |
 | `npm run fixture:diagnostics` | Regenerates the synthetic SD-JWT used by Diagnostics (throwaway keys)          |
 | `npm run art:placeholder`     | Regenerates the placeholder icon and splash PNGs from the design tokens        |
@@ -111,24 +115,34 @@ wallet/
   metro.config.js          linked crypto-core, tokens mapping, guards (see the file header)
   jest.config.js           jest-expo + .mjs transform + tokens mapping, coverage thresholds
   app/                     Expo Router routes (every path is in src/navigation/routes.ts)
-    _layout.tsx            root Stack: i18n + saved language, safe areas, font, splash, toasts, ErrorBoundary
-    index.tsx              / → /credentials
+    _layout.tsx            root Stack: saved language + appearance + setup state (under the splash),
+                           safe areas, theme, status bar, font, toasts, ErrorBoundary
+    index.tsx              / → where the gate says (onboarding, setup or /credentials)
+    onboarding/            _layout (gate) + language, welcome, how-it-works, selective-disclosure,
+                           security, privacy, privacy-details
+    setup/                 _layout (gate) + security ("Set up your PIN" placeholder)
     +not-found.tsx
-    (tabs)/_layout.tsx     Credentials · Scan · History · Settings (backBehavior firstRoute)
+    (tabs)/_layout.tsx     Credentials · Scan · History · Settings (backBehavior firstRoute; gate)
     (tabs)/credentials/    _layout (Stack), index (list), [id] (detail placeholder)
     (tabs)/scan/           _layout, index (placeholder; camera later)
     (tabs)/history/        _layout, index, [id] (placeholder)
-    (tabs)/settings/       _layout, index, language, security (placeholder), about,
+    (tabs)/settings/       _layout, index, language, appearance, security (placeholder), about,
                            diagnostics (dev only), ui-kit (dev only)
   src/
     components/            Header, Button, Card, CredentialCard, StatusBadge, Badge, ListItem,
                            SectionHeader, LoadingState, EmptyState, ErrorState, OfflineNotice,
-                           Toast, ConfirmDialog, Icon, Screen, AppText, ErrorBoundary
+                           Toast, ConfirmDialog, Icon, Screen, AppText, ErrorBoundary, ChoiceList,
+                           Checkbox
+    onboarding/            steps, gate (THE gate rule), SetupProvider, security-setup (placeholder),
+                           OnboardingStep, illustrations (react-native-svg)
     credentials/           status.ts: backend status → wallet state (the one mapping)
-    theme/                 the shared tokens (design names, light/dark); useTheme; contrast.ts
+    theme/                 the shared tokens (design names, light/dark); useTheme; appearance
+                           (Appearance setting); reduce-motion; contrast.ts
     i18n/                  i18next setup, languages, locales/en.ts, locales/si.ts (needs review)
-    lib/                   crypto-setup, crypto-check, preferences (AsyncStorage), format (dates)
-    navigation/            routes.ts (route table), tabs.ts, TabStack, stack-options (Header)
+    lib/                   crypto-setup, crypto-check, preferences (AsyncStorage), app-state
+                           (restore before the first frame), format (dates)
+    navigation/            routes.ts (route table), tabs.ts, TabStack, stack-options (Header),
+                           status-bar, navigation-theme
     services/              api-client (EXPO_PUBLIC_API_BASE_URL, GET /health)
     config/                env (API URL parsing), app-info (versions, __DEV__ gates)
     fixtures/              synthetic SD-JWT for Diagnostics; sample-data (dev builds only)
@@ -140,10 +154,24 @@ wallet/
 
 ## Storage rule
 
-`@react-native-async-storage/async-storage` holds **UI preferences only** (today: the language,
-key `univault.language`). It is unencrypted: never put a key, credential, SD-JWT, claim, token,
-PIN or anything personal in it. Those go in secure storage (`expo-secure-store`) from the
-holder-key and vault tasks. Every AsyncStorage key is listed in `src/lib/preferences.ts`.
+`@react-native-async-storage/async-storage` holds **non-secret preferences only** (Decision 023):
+`univault.language`, `univault.appearance`, `univault.onboardingCompleted`,
+`univault.privacyAcknowledgedAt` (ISO date + privacy text version) and the placeholder
+`univault.securitySetupCompleted` (replaced by a secure-store check in the PIN task). It is
+unencrypted: never put a key, credential, SD-JWT, claim, token, PIN or anything personal in it.
+Those go in secure storage (`expo-secure-store`) from the holder-key and vault tasks. Every
+AsyncStorage key is listed in `src/lib/preferences.ts` (table in
+[mobile-wallet.md](../docs/frontend/mobile-wallet.md) §9).
+
+## First start and the gate
+
+A fresh install opens onboarding (`/onboarding/language` … `/onboarding/privacy`), then
+`/setup/security`, and only then the tabs; any URL into the tabs before that is redirected
+(`src/onboarding/gate.ts`, [mobile-wallet.md](../docs/frontend/mobile-wallet.md) §15). Until the
+PIN task, `/setup/security` is a placeholder: in a **development build** its "Continue
+(development placeholder)" button marks security as set up; a release build cannot get past it.
+To see onboarding again: **Settings → Diagnostics → Reset onboarding** (development builds only;
+keeps the language and appearance).
 
 ## Design system
 
@@ -151,12 +179,12 @@ All UI follows [docs/design/design-system.md](../docs/design/design-system.md); 
 font, size and radius comes from `portal-ui/src/tokens.ts` through `src/theme` (never a hex value
 in a component; tests fail otherwise). Status colours mean valid, expired, revoked and pending
 only, each status shown as icon + word. One primary (azure) button per screen. The light/dark
-theme follows the phone; there is no switch in the app.
+theme follows the phone unless **Settings → Appearance** fixes it to Light or Dark.
 
 ## Developer screens
 
 **Settings → Developer** (development builds only): **Diagnostics** (versions, crypto-core and
-API checks) and **UI kit** (every component, variant and status in the current language and
+API checks, Reset onboarding) and **UI kit** (every component, variant and status in the current language and
 colour scheme; switch the phone to dark mode to see the dark theme). Neither is reachable in a
 release build.
 

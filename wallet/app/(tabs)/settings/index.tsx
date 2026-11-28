@@ -4,12 +4,17 @@ import { Card, ListItem, Screen, SectionHeader } from '../../../src/components';
 import { diagnosticsEnabled, getAppInfo, uiKitEnabled } from '../../../src/config/app-info';
 import { isLanguage } from '../../../src/i18n';
 import { ROUTES } from '../../../src/navigation/routes';
+import { useAppearance } from '../../../src/theme/appearance';
 
-/** Settings tab root: links to Language, Security, About and (development builds) dev tools. */
+/**
+ * Settings tab root: Language and Appearance (each with its current value), Security, About and
+ * (development builds) dev tools.
+ */
 export default function SettingsScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const language = isLanguage(i18n.language) ? i18n.language : 'en';
+  const { preference: appearance } = useAppearance();
   const showDeveloper = diagnosticsEnabled() || uiKitEnabled();
 
   return (
@@ -22,6 +27,13 @@ export default function SettingsScreen() {
           title={t('settings.language')}
           value={t(`language.${language}`)}
           onPress={() => router.push(ROUTES.language)}
+        />
+        <ListItem
+          testID="settings-appearance"
+          icon="contrast-outline"
+          title={t('settings.appearance')}
+          value={t(`appearance.${appearance}`)}
+          onPress={() => router.push(ROUTES.appearance)}
         />
         <ListItem
           testID="settings-security"

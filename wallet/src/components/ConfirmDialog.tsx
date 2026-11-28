@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useReduceMotion } from '../theme/reduce-motion';
 import { useTheme } from '../theme/use-theme';
 import { AppText } from './AppText';
 import { Button } from './Button';
@@ -23,7 +24,8 @@ export interface ConfirmDialogProps {
 /**
  * A modal question with Cancel and Confirm. Android's back button and a tap outside the dialog
  * cancel (onRequestClose); screen readers stay inside it (accessibilityViewIsModal). The
- * buttons stack vertically so long labels and large text sizes still fit.
+ * buttons stack vertically so long labels and large text sizes still fit. It fades in, or appears
+ * at once while the phone's "reduce motion" setting is on.
  */
 export function ConfirmDialog({
   visible,
@@ -39,11 +41,12 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
   const theme = useTheme();
+  const reduceMotion = useReduceMotion();
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType={reduceMotion ? 'none' : 'fade'}
       onRequestClose={onCancel}
       statusBarTranslucent
       testID={testID ? `${testID}-modal` : undefined}

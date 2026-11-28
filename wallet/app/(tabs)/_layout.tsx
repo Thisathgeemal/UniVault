@@ -8,17 +8,25 @@
  * tab's stack; at a tab's root it goes to the Credentials tab (backBehavior "firstRoute"); only
  * at the Credentials root does it leave the app. Pressing the selected tab again returns to its
  * root.
+ *
+ * GATE: the tabs open only when onboarding AND security setup are complete
+ * (src/onboarding/gate.ts); any URL into them before that (app start, deep link, typed URL) is
+ * redirected to onboarding or to security setup.
  */
+import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../../src/components';
 import { TAB_ROUTES } from '../../src/navigation/tabs';
+import { useGateRedirect } from '../../src/onboarding/SetupProvider';
 import { MIN_TOUCH_TARGET } from '../../src/theme';
 import { useTheme } from '../../src/theme/use-theme';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const redirect = useGateRedirect('app');
+  if (redirect) return <Redirect href={redirect} />;
   return (
     <Tabs
       backBehavior="firstRoute"

@@ -240,6 +240,23 @@ export function colorPairs(c: ThemeColors, scheme: 'light' | 'dark'): ColorPair[
     { use: 'avatar initial', fg: c.onBrand, bg: c.roleTagBg, under: c.brand, kind: 'text' },
     // Toast: inverted (text colour as the background)
     { use: 'toast', fg: c.bg, bg: c.text, kind: 'text' },
+    // Onboarding (src/onboarding): illustration lines on the navy panel and on its fills, role
+    // labels under the drawing, progress dots on the footer, the "I understand" checkbox
+    { use: 'illustration line on brand', fg: c.onBrand, bg: c.brand, kind: 'icon' },
+    { use: 'illustration detail on brand', fg: c.onBrandMuted, bg: c.brand, kind: 'icon' },
+    { use: 'illustration line on brand-hover fill', fg: c.onBrand, bg: c.brandHover, kind: 'icon' },
+    {
+      use: 'illustration line on role-tag-bg fill',
+      fg: c.onBrand,
+      bg: c.roleTagBg,
+      under: c.brand,
+      kind: 'icon',
+    },
+    { use: 'illustration label on brand', fg: c.onBrand, bg: c.brand, kind: 'text' },
+    { use: 'progress dot (done) on surface', fg: c.accent, bg: c.surface, kind: 'icon' },
+    { use: 'progress dot (to do) on surface', fg: c.borderStrong, bg: c.surface, kind: 'border' },
+    { use: 'checkbox on bg', fg: c.accentText, bg: c.bg, kind: 'icon' },
+    { use: 'point icon on bg', fg: c.textMuted, bg: c.bg, kind: 'icon' },
   );
   return pairs;
 }

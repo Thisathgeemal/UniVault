@@ -30,6 +30,7 @@ describe('one primary action per screen', () => {
     [ROUTES.historyEntry('sample-history-1'), 'history-detail-screen'],
     [ROUTES.settings, 'settings-screen'],
     [ROUTES.language, 'language-screen'],
+    [ROUTES.appearance, 'appearance-screen'],
     [ROUTES.security, 'security-screen'],
     [ROUTES.about, 'about-screen'],
     [ROUTES.diagnostics, 'diagnostics-screen'],
